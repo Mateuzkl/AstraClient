@@ -533,7 +533,14 @@ void Painter::drawCoords(CoordsBuffer& coordsBuffer, DrawMode drawMode, ColorArr
         glDrawArrays(GL_TRIANGLE_STRIP, 0, vertexCount);
     }
     m_draws += vertexCount;
+#ifdef __EMSCRIPTEN__
+    // draws() counts vertices. calls() must count the actual glDrawArrays calls
+    // above, including the per-color split, for browser diagnostics.
+    m_calls += drawMode == Triangles && colors ? colors->size()
+                                               : (drawMode == Triangles || drawMode == TriangleStrip ? 1 : 0);
+#else
     m_calls += 1;
+#endif
 
     if (!textured)
         PainterShaderProgram::enableAttributeArray(PainterShaderProgram::TEXCOORD_ATTR);

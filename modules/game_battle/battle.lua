@@ -15,6 +15,38 @@ local battleAges = {}
 local hoveredCreature = nil
 local newHoveredCreature = nil
 local prevCreature = nil
+local pendingPanelEvents = {}
+local visibilityEvent = nil
+
+local function ensureBattleWindow(id)
+  id = tonumber(id)
+  if not id or id % 1 ~= 0 or id < 1 or id > maxBattleWindow then
+    return nil
+  end
+  local battle = battleClasses[id]
+  if not battle then return nil end
+  if not battle.window then
+    battle:configure(id)
+    battle:setSecondary(battle.secondary)
+  end
+  return battle
+end
+
+local function cancelPanelEvents()
+  for _, event in pairs(pendingPanelEvents) do removeEvent(event) end
+  pendingPanelEvents = {}
+end
+
+function onGameEnd()
+  if battleUpdateEvent then
+    removeEvent(battleUpdateEvent)
+    battleUpdateEvent = nil
+  end
+  cancelPanelEvents()
+  battleAges = {}
+  battleAgeNumber = 1
+  clearBattlePanels()
+end
 
 local CreatureButtonColors = {
   onIdle = {notHovered = '#afafaf', hovered = '#f7f7f7'},
@@ -36,7 +68,9 @@ function init()
 
   connect(g_game, {
     onAttackingCreatureChange = onTargetStateChange,
-    onFollowingCreatureChange = onTargetStateChange
+    onFollowingCreatureChange = onTargetStateChange,
+    onGameStart = updateBattleList,
+    onGameEnd = onGameEnd
   })
 
   keybindOpenBattle:active()
@@ -51,10 +85,10 @@ function init()
   battleClasses = {}
   for i = 1, maxBattleWindow, 1 do
     local battleClass = BattleClass.create()
-    battleClass:configure(i)
-    battleClass:setSecondary(i ~= 1)
+    battleClass.secondary = i ~= 1
     table.insert(battleClasses, battleClass)
   end
+  ensureBattleWindow(1)
 
   updateBattleList()
 end
@@ -62,19 +96,36 @@ end
 function terminate()
   disconnect(g_game, {
     onAttackingCreatureChange = onTargetStateChange,
-    onFollowingCreatureChange = onTargetStateChange
+    onFollowingCreatureChange = onTargetStateChange,
+    onGameStart = updateBattleList,
+    onGameEnd = onGameEnd
   })
 
   keybindOpenBattle:deactive()
   keybindOpenSecondaryBattle:deactive()
 
-  if battleUpdateEvent then
-    removeEvent(battleUpdateEvent)
-    battleUpdateEvent = nil
+  onGameEnd()
+  if visibilityEvent then
+    removeEvent(visibilityEvent)
+    visibilityEvent = nil
   end
-  clearBattlePanels()
-
-  mouseWidget:destroy()
+  if editNameBattleWindow then
+    editNameBattleWindow:destroy()
+    editNameBattleWindow = nil
+  end
+  for _, battle in pairs(battleClasses) do
+    if battle.window then
+      battle.window.battle = nil
+      battle.window:destroy()
+      battle.window = nil
+    end
+    battle.buttons = {}
+    battle.panel = nil
+    battle.filterPanel = nil
+    battle.toggleFilterButton = nil
+  end
+  battleClasses = {}
+  if mouseWidget then mouseWidget:destroy(); mouseWidget = nil end
 end
 
 function toggle()
@@ -113,7 +164,9 @@ function onMiniWindowClose(window)
     end
   end
 
-  addEvent(function()
+  if visibilityEvent then removeEvent(visibilityEvent) end
+  visibilityEvent = addEvent(function()
+    visibilityEvent = nil
     if modules.game_sidebuttons then
       for _, data in ipairs(battleClasses) do
         local battleWindow = data:getWindow()
@@ -227,8 +280,12 @@ end
 function updateBattleList()
   if battleUpdateEvent then
     removeEvent(battleUpdateEvent)
+    battleUpdateEvent = nil
   end
-
+  if not g_game.isOnline() then
+    clearBattlePanels()
+    return
+  end
   battleUpdateEvent = scheduleEvent(updateBattleList, battleUpdateInterval)
   checkCreatures()
 end
@@ -440,7 +497,7 @@ function checkCreatures()
   local spectators = g_map.getSpectatorsInRangeEx(playerPos, false, math.floor(dimension.width / 2), math.floor(dimension.width / 2), math.floor(dimension.height / 2), math.floor(dimension.height / 2))
 
   for _, battle in pairs(battleClasses) do
-    if not battle.secondary or (battle.window and battle.window:isVisible()) then
+    if battle.window and (not battle.secondary or battle.window:isVisible()) then
       updateBattleCreatures(battle, spectators, player)
     end
   end
@@ -661,10 +718,13 @@ end
 function addBattleWindow()
   for i = 2, maxBattleWindow do
     local data = battleClasses[i]
-    if data and data:getWindow() and not data:getWindow():isVisible() and m_interface.addToPanels(data:getWindow()) then
-      data:showBattle()
-      data:getWindow():getParent():moveChildToIndex(data:getWindow(), data:getWindow():getParent():getChildCount())
-      return
+    if data and (not data.window or not data.window:isVisible()) then
+      data = ensureBattleWindow(i)
+      if m_interface.addToPanels(data.window) then
+        data:showBattle()
+        data.window:getParent():moveChildToIndex(data.window, data.window:getParent():getChildCount())
+        return
+      end
     end
   end
 
@@ -706,13 +766,15 @@ function updateBattleIconCreatures(widget, checked)
 end
 
 function onPlayerLoad(bCondig)
+  cancelPanelEvents()
   for id, config in pairs(bCondig) do
     if config.isPartyView then
       goto continue
     end
 
-    local data = battleClasses[id + 1]
-    if (data and data:getWindow()) or data.window:isVisible() then
+    local instance = tonumber(id)
+    local data = instance and ensureBattleWindow(instance + 1)
+    if data and data.window then
       data:setName(config.name)
       for _, value in pairs(config.battleListFilters) do
         local invertedValue = value:gsub("hide", "show")
@@ -730,7 +792,10 @@ function onPlayerLoad(bCondig)
         data.window:minimize()
       end
 
-      scheduleEvent(function() setupBattlePanel(data, id + 1, config.showFilters) end, (id + 1) * 1000, "setupBattlePanel")
+      pendingPanelEvents[instance] = scheduleEvent(function()
+        pendingPanelEvents[instance] = nil
+        setupBattlePanel(data, instance + 1, config.showFilters)
+      end, (instance + 1) * 1000, "setupBattlePanel")
 
       if config.contentHeight < data:getWindow():getMinimumHeight() then
         config.contentHeight = data:getWindow():getMinimumHeight()
@@ -766,7 +831,7 @@ end
 
 function onPlayerUnload()
   for k, data in pairs(battleClasses) do
-    if data and data:getWindow():isOpened() then
+    if data and data.window and data.window:isOpened() then
       data:registerInSideBars()
     end
   end
@@ -775,9 +840,10 @@ function onPlayerUnload()
 end
 
 function moveBattle(instance, panel, height, minimized)
-  local data = battleClasses[instance + 1]
+  instance = tonumber(instance)
+  local data = instance and ensureBattleWindow(instance + 1)
 
-  if (data and data:getWindow()) or data.window:isVisible() then
+  if data and data.window then
     local window = data.window
 
     window:setParent(panel)

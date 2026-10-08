@@ -45,7 +45,7 @@ sellAllButton = nil
 sellAllWithDelayButton = nil
 playerFreeCapacity = 0
 playerMoney = 0
-tradeItems = {}
+tradeItems = { [BUY] = {}, [SELL] = {} }
 playerItems = {}
 sellAllWhitelist = {}
 selectedItem = nil
@@ -53,8 +53,28 @@ selectedItem = nil
 quickSellButton = nil
 
 cancelNextRelease = nil
-sellAllWithDelayEvent = nil
 local npcWindowLayoutRefreshScheduled = false
+local currentTradeType = BUY
+local tradeSession = NpcTradeSession.new(scheduleEvent, removeEvent)
+local quickSellWindow
+local quickSellRadio
+local blacklistWindow
+local warningWindow
+
+local function closeQuickSellWindows()
+  if quickSellRadio then
+    quickSellRadio:destroy()
+  end
+  for _, widget in pairs({ quickSellWindow, blacklistWindow, warningWindow }) do
+    if widget and not widget:isDestroyed() then
+      widget:destroy()
+    end
+  end
+  if quickSellWindow or blacklistWindow or warningWindow then
+    g_client.setInputLockWidget(nil)
+  end
+  quickSellWindow, blacklistWindow, warningWindow, quickSellRadio = nil, nil, nil, nil
+end
 
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
@@ -72,6 +92,7 @@ function saveData()
 end
 
 function loadData()
+  sellAllWhitelist = {}
   if not LoadedPlayer:isLoaded() then return end
 
   local file = "/characterdata/" .. LoadedPlayer:getId() .. "/sellAllWhitelist.json"
@@ -83,7 +104,15 @@ function loadData()
       return g_logger.error(
       "Error while reading profiles file. To fix this problem you can delete storage.json. Details: " .. result)
     end
-    sellAllWhitelist = result
+    if type(result) == 'table' then
+      local seen = {}
+      for _, id in pairs(result) do
+        if type(id) == 'number' and id > 0 and id <= 65535 and id == math.floor(id) and not seen[id] then
+          seen[id] = true
+          table.insert(sellAllWhitelist, id)
+        end
+      end
+    end
   else
     sellAllWhitelist = {}
   end
@@ -148,6 +177,12 @@ function init()
   currencyMoneyLabel = setupPanel:getChildById('currencyMoneyLabel')
   moneyLabel = setupPanel:getChildById('money')
   itemButton = setupPanel:getChildById('item')
+  itemButton.onMouseRelease = itemPopup
+  g_mouse.bindPress(itemButton, function()
+    if tradeSession.open and g_keyboard.isShiftPressed() then
+      g_game.inspectNpcTrade(itemButton:getItem())
+    end
+  end)
   tradeButton = npcWindow:recursiveGetChildById('tradeButton')
   headPanel = npcWindow:recursiveGetChildById('headPanel')
   currencyItem = headPanel:getChildById('currencyItem')
@@ -179,6 +214,7 @@ function init()
   })
 
   connect(LocalPlayer, {
+    onPositionChange = onNpcDialogPositionChange,
     onFreeCapacityChange = onFreeCapacityChange,
     onInventoryChange = onInventoryChange
   })
@@ -187,6 +223,7 @@ function init()
 end
 
 function terminate()
+  hide()
   initialized = false
   disconnect(g_game, {
     onGameStart = start,
@@ -197,11 +234,16 @@ function terminate()
   })
 
   disconnect(LocalPlayer, {
+    onPositionChange = onNpcDialogPositionChange,
     onFreeCapacityChange = onFreeCapacityChange,
     onInventoryChange = onInventoryChange
   })
 
   terminateNpcDialog()
+  if radioTabs then
+    radioTabs:destroy()
+    radioTabs = nil
+  end
   if npcWindow and not npcWindow:isDestroyed() then
     npcWindow:destroy()
   end
@@ -232,9 +274,9 @@ local function scheduleNpcWindowLayoutRefresh()
   end
 
   npcWindowLayoutRefreshScheduled = true
-  addEvent(refreshNpcWindowLayout)
-  scheduleEvent(refreshNpcWindowLayout, 50)
-  scheduleEvent(function()
+  tradeSession:schedule(refreshNpcWindowLayout)
+  tradeSession:schedule(refreshNpcWindowLayout, 50)
+  tradeSession:schedule(function()
     refreshNpcWindowLayout()
     npcWindowLayoutRefreshScheduled = false
   end, 150)
@@ -254,7 +296,7 @@ local function ensureNpcWindowExpanded()
 end
 
 function show()
-  if g_game.isOnline() then
+  if g_game.isOnline() and tradeSession.open then
     if #tradeItems[BUY] > 0 then
       radioTabs:selectWidget(buyTab)
       quickSellButton:setEnabled(false)
@@ -284,7 +326,7 @@ function show()
     if npcWindow and npcWindow:isVisible() and npcWindow:getParent() then
       local parent = npcWindow:getParent()
       parent:moveChildToIndex(npcWindow, #parent:getChildren())
-      npcWindow.close = function() closeNpcTrade() end
+      npcWindow.close = function() endNpcConversation() end
       npcWindow:focus()
       setupPanel:enable()
     end
@@ -299,7 +341,11 @@ function start()
 end
 
 function hide()
-  if not npcWindow then
+  local wasOpen = tradeSession.open or (npcWindow and npcWindow:isVisible())
+  tradeSession:finish()
+  npcWindowLayoutRefreshScheduled = false
+  closeQuickSellWindows()
+  if not npcWindow or not wasOpen then
     return
   end
 
@@ -328,7 +374,14 @@ function hide()
 
   layout:enableUpdates()
   layout:update()
+  tradeItems = { [BUY] = {}, [SELL] = {} }
+  playerItems = {}
+  playerMoney = 0
   onNpcTradeHidden()
+end
+
+function isTrading()
+  return tradeSession.open
 end
 
 function onItemBoxChecked(widget)
@@ -338,7 +391,7 @@ function onItemBoxChecked(widget)
     local item = widget.item
     selectedItem = item
     refreshItem(item)
-    tradeButton:enable()
+    tradeButton:setEnabled(quantityScroll:getMaximum() > 0)
 
     if getCurrentTradeType() == SELL then
       quantityScroll:setValue(quantityScroll:getMaximum())
@@ -355,9 +408,10 @@ function onQuantityValueChange(quantity)
 end
 
 function onTradeTypeChange(radioTabs, selected, deselected)
+  currentTradeType = selected == buyTab and BUY or SELL
   tradeButton:setText(selected:getText())
   selected:setOn(true)
-  deselected:setOn(false)
+  if deselected then deselected:setOn(false) end
 
   if selected == buyTab then
     quickSellButton:setEnabled(false)
@@ -370,8 +424,11 @@ function onTradeTypeChange(radioTabs, selected, deselected)
 end
 
 function onTradeClick()
-  if not selectedItem then return end
-  removeEvent(sellAllWithDelayEvent)
+  if not tradeSession.open or not selectedItem or quantityScroll:getValue() < 1 then return end
+  if tradeSession.sellQueue then
+    tradeSession.sellQueue:cancel()
+    tradeSession.sellQueue = nil
+  end
   if getCurrentTradeType() == BUY then
     g_game.buyItem(selectedItem.ptr, quantityScroll:getValue(), ignoreCapacity, buyWithBackpack)
   else
@@ -424,8 +481,6 @@ function onExtraMenu()
       end, "", equippedState)
   end
   menu:addSeparator()
-  menu:addCheckBoxOption(tr('Show search field'), function() end, "", true)
-  menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'), function() end, "", false)
   menu:display(mousePosition)
   return true
 end
@@ -480,8 +535,6 @@ function itemPopup(self, mousePosition, mouseButton)
         end, "", equippedState)
     end
     menu:addSeparator()
-    menu:addCheckBoxOption(tr('Show search field'), function() end, "", true)
-    menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'), function() end, "", false)
     menu:display(mousePosition)
     return true
   elseif ((g_mouse.isPressed(MouseLeftButton) and mouseButton == MouseRightButton)
@@ -520,10 +573,6 @@ function setShowWeight(state)
   showWeight = state
 end
 
-function setShowYourCapacity(state)
-
-end
-
 function clearSelectedItem()
   priceLabel:setText("0")
   quantityScroll:setMinimum(0)
@@ -531,18 +580,15 @@ function clearSelectedItem()
   quantityScroll:setValue(0)
   quantityScroll:setOn(true)
   amountText:setText('0')
-  if selectedItem then
+  if selectedItem and radioItems then
     radioItems:selectWidget(nil)
-    selectedItem = nil
   end
+  selectedItem = nil
+  tradeButton:disable()
 end
 
 function getCurrentTradeType()
-  if tradeButton:getText() == tr('Buy') then
-    return BUY
-  else
-    return SELL
-  end
+  return currentTradeType
 end
 
 function getItemPrice(item, single)
@@ -563,19 +609,33 @@ function getItemPrice(item, single)
   return item.price * amount
 end
 
-function getSellQuantity(item)
+function getSellQuantity(item, excludeEquipped)
   if not item or not playerItems[item:getId()] then return 0 end
+  if excludeEquipped == nil then excludeEquipped = ignoreEquipped end
   local removeAmount = 0
-  if ignoreEquipped then
+  if excludeEquipped then
     local localPlayer = g_game.getLocalPlayer()
+    if not localPlayer then return 0 end
     for i = 1, LAST_INVENTORY do
       local inventoryItem = localPlayer:getInventoryItem(i)
-      if inventoryItem and (inventoryItem:getId() == item:getId() and inventoryItem:getTier() == item:getTier()) then
-        removeAmount = removeAmount + inventoryItem:getCount()
+      if inventoryItem and inventoryItem:getId() == item:getId() and
+          (not item:isFluidContainer() or inventoryItem:getCountOrSubType() == item:getCountOrSubType()) then
+        removeAmount = removeAmount + (inventoryItem:isStackable() and inventoryItem:getCount() or 1)
       end
     end
   end
-  return playerItems[item:getId()] - removeAmount
+  return math.max(0, playerItems[item:getId()] - removeAmount)
+end
+
+local function canBulkSellItem(item)
+  if item:isStackable() then return true end
+  -- PlayerGoods has only an ID, not a per-subtype inventory count. Scanning
+  -- open containers cannot prove that unseen containers have no variants.
+  -- Keep subtype-dependent items on the individual sale path instead.
+  local thing = g_things.getThingType(item:getId(), ThingCategoryItem)
+  return thing and not thing:isFluidContainer() and not thing:isSplash() and
+    not thing:isChargeable() and not item:isChargeableByCategory() and
+    item:getCountOrSubType() == 0
 end
 
 function canTradeItem(item)
@@ -596,21 +656,21 @@ function refreshItem(item)
   if ItemsDatabase and ItemsDatabase.setTier then
     ItemsDatabase.setTier(itemButton, item.ptr)
   end
-  itemButton.onMouseRelease = itemPopup
-
+  local finalCount
   if getCurrentTradeType() == BUY then
-    local capacityMaxCount = math.floor(playerFreeCapacity / item.weight)
+    local capacityMaxCount = item.weight > 0 and math.floor(playerFreeCapacity / item.weight) or MAX_TRADE_AMOUNT
     if ignoreCapacity then
       capacityMaxCount = uint32Max
     end
     local priceMaxCount = math.floor(getPlayerMoney() / getItemPrice(item, true))
-    local finalCount = math.max(0, math.min(getMaxAmount(item), math.min(priceMaxCount, capacityMaxCount)))
-    quantityScroll:setMinimum(1)
-    quantityScroll:setMaximum(finalCount)
+    finalCount = math.max(0, math.min(getMaxAmount(item), math.min(priceMaxCount, capacityMaxCount)))
   else
-    quantityScroll:setMinimum(1)
-    quantityScroll:setMaximum(math.max(0, math.min(getMaxAmount(), getSellQuantity(item.ptr))))
+    finalCount = math.max(0, math.min(getMaxAmount(), getSellQuantity(item.ptr)))
   end
+  quantityScroll:setMinimum(0)
+  quantityScroll:setMaximum(finalCount)
+  quantityScroll:setMinimum(finalCount > 0 and 1 or 0)
+  tradeButton:setEnabled(finalCount > 0)
 
   local text = tonumber(amountText:getText())
   if not text then
@@ -622,12 +682,10 @@ function refreshItem(item)
   end
 
   setupPanel:enable()
-  g_mouse.bindPress(itemButton,
-    function(mousePos, mouseMoved) if g_keyboard.isShiftPressed() then g_game.inspectNpcTrade(itemButton:getItem()) end end)
 end
 
 function refreshTradeItems()
-  if not g_game.isOnline() then
+  if not g_game.isOnline() or not tradeSession.open then
     return
   end
 
@@ -646,9 +704,6 @@ function refreshTradeItems()
 
   local currentTradeItems = tradeItems[getCurrentTradeType()]
   for key, item in ipairs(currentTradeItems) do
-    if getCurrentTradeType() == SELL and not canTradeItem(item) then
-      goto continue
-    end
     local itemBox = g_ui.createWidget('NPCItemBox', itemsPanel)
     itemBox:setId("itemBox_" .. item.name)
     itemBox.item = item
@@ -683,7 +738,6 @@ function refreshTradeItems()
     end
 
     radioItems:addWidget(itemBox)
-    ::continue::
   end
 
   layout:enableUpdates()
@@ -695,7 +749,7 @@ function refreshTradeItems()
 end
 
 function refreshPlayerGoods()
-  if not initialized then return end
+  if not initialized or not tradeSession.open then return end
 
   moneyLabel:setText(comma_value(formatCurrency(getPlayerMoney())))
 
@@ -764,9 +818,14 @@ function refreshPlayerGoods()
   end
 end
 
-function onOpenNpcTrade(items, currencyId, currencyName)
-  currencyId = tonumber(currencyId) or GOLD_COINS
-  currencyName = currencyName or ''
+function onOpenNpcTrade(items)
+  hide()
+  tradeSession:begin()
+  playerFreeCapacity = g_game.getLocalPlayer():getFreeCapacity()
+  -- The current 0x7A packet carries no custom-currency metadata. Do not
+  -- pretend that optional Lua arguments are supplied by the native parser.
+  local currencyId = GOLD_COINS
+  local currencyName = ''
   CURRENCYID = currencyId
   currencyItem:setItemId(currencyId)
   currencyItem:setVisible(true)
@@ -814,29 +873,27 @@ function onOpenNpcTrade(items, currencyId, currencyName)
     end
   end
 
-  addEvent(show) -- player goods has not been parsed yet
-  scheduleEvent(refreshTradeItems, 50)
-  scheduleEvent(refreshPlayerGoods, 50)
-  if tradeButton:getText() == "Ok" then
-    tradeButton:setText("Buy")
-  end
+  tradeSession:schedule(show) -- player goods has not been parsed yet
+  tradeSession:schedule(refreshTradeItems, 50)
+  tradeSession:schedule(refreshPlayerGoods, 50)
 end
 
+-- Public/bot API: close only the shop. The window X explicitly ends the
+-- conversation instead, so scripts that say "bye" afterward remain valid.
 function closeNpcTrade()
+  if not tradeSession.open then return end
   g_game.doThing(false)
   g_game.closeNpcTrade()
   g_game.doThing(true)
-  addEvent(hide)
+  hide()
 end
 
 function onCloseNpcTrade()
-  addEvent(function()
-    hide()
-    onNpcDialogTradeClosed()
-  end)
+  hide()
 end
 
 function onPlayerGoods(money, items)
+  if not tradeSession.open then return end
   playerMoney = tonumber(money) or 0
   playerItems = {}
   for _, item in pairs(items or {}) do
@@ -850,6 +907,7 @@ function onPlayerGoods(money, items)
   end
 
   refreshPlayerGoods()
+  if tradeSession.sellQueue then tradeSession.sellQueue:onGoods() end
 end
 
 function onFreeCapacityChange(localPlayer, freeCapacity, oldFreeCapacity)
@@ -936,34 +994,71 @@ function getMaxAmount(item)
   return MAX_TRADE_AMOUNT
 end
 
-function sellAll(delayed, exceptions)
-  -- backward support
-  if type(delayed) == "table" then
-    exceptions = delayed
-    delayed = false
-  end
-  exceptions = exceptions or {}
-  removeEvent(sellAllWithDelayEvent)
-  local queue = {}
+local function startSellQueue(entries, notify)
+  if not tradeSession.open or not g_game.isOnline() then return false end
+  if tradeSession.sellQueue then tradeSession.sellQueue:cancel() end
+  tradeSession.sellQueue = nil
+  local generation = tradeSession.generation
+  local excludeEquipped = ignoreEquipped
+  local saleEntries, seen, subtypes = {}, {}, {}
   for _, entry in ipairs(tradeItems[SELL]) do
     local id = entry.ptr:getId()
-    if not table.find(exceptions, id) then
-      local sellQuantity = getSellQuantity(entry.ptr)
-      while sellQuantity > 0 do
-        local maxAmount = math.min(sellQuantity, getMaxAmount())
-        if delayed then
-          g_game.sellItem(entry.ptr, maxAmount, ignoreEquipped)
-          sellAllWithDelayEvent = scheduleEvent(function() sellAll(true) end, 1100)
-          return
-        end
-        table.insert(queue, { entry.ptr, maxAmount, ignoreEquipped })
-        sellQuantity = sellQuantity - maxAmount
-      end
+    local subtype = entry.ptr:isStackable() and 0 or entry.ptr:getCountOrSubType()
+    if subtypes[id] and subtypes[id] ~= subtype then
+      subtypes[id] = false -- 0x7B cannot disambiguate two variants of one ID
+    elseif subtypes[id] == nil then
+      subtypes[id] = subtype
     end
   end
-  for _, entry in ipairs(queue) do
-    g_game.sellItem(entry[1], entry[2], entry[3])
+  for _, entry in ipairs(entries) do
+    local id = entry.ptr:getId()
+    local subtype = entry.ptr:isStackable() and 0 or entry.ptr:getCountOrSubType()
+    local key = id .. ':' .. subtype
+    if not seen[key] and getSellQuantity(entry.ptr, excludeEquipped) > 0 then
+      if subtypes[id] == false or not canBulkSellItem(entry.ptr) then
+        displayInfoBox(tr('Quick Sell'), tr('Subtype-dependent items cannot be sold automatically because the server does not report their quantities separately. Sell them individually or exclude them from Quick Sell.'))
+        return false
+      end
+      seen[key] = true
+      table.insert(saleEntries, { ptr = entry.ptr, price = entry.price, key = key })
+    end
   end
+  table.sort(saleEntries, function(a, b) return a.key < b.key end)
+  local queue
+  queue = NpcSellQueue.new({
+    isValid = function() return tradeSession.open and tradeSession.generation == generation and g_game.isOnline() end,
+    quantity = function(entry) return getSellQuantity(entry.ptr, excludeEquipped) end,
+    capped = function(entry) return playerItems[entry.ptr:getId()] == 255 end,
+    money = getPlayerMoney,
+    sell = function(entry, amount) g_game.sellItem(entry.ptr, amount, excludeEquipped) end,
+    schedule = function(callback, delay) return tradeSession:schedule(callback, delay) end,
+    cancel = removeEvent,
+    onFinish = function(sold, proceeds)
+      if tradeSession.sellQueue == queue then tradeSession.sellQueue = nil end
+      if notify and sold > 0 then
+        displayInfoBox(tr('Quick Sell'), tr('The server confirmed %d items sold for %d gold.', sold, proceeds))
+      end
+    end,
+    onError = function(message)
+      if tradeSession.sellQueue == queue then tradeSession.sellQueue = nil end
+      displayInfoBox(tr('Quick Sell'), tr(message))
+    end
+  })
+  tradeSession.sellQueue = queue
+  queue:start(saleEntries)
+  return true
+end
+
+function sellAll(delayed, exceptions)
+  -- Keep the bot API, but both modes now wait for real server updates.
+  if type(delayed) == 'table' then exceptions = delayed end
+  local excluded = {}
+  for _, id in pairs(exceptions or {}) do excluded[id] = true end
+  local entries = {}
+  for _, entry in ipairs(tradeItems[SELL]) do
+    if not excluded[entry.ptr:getId()] then table.insert(entries, entry) end
+  end
+  return startSellQueue(entries, false)
 end
 
 function getPlayerMoney()
@@ -1034,36 +1129,18 @@ function checkItemToSell(self)
 end
 
 function SellItemList(items, window)
-  if not g_game.isOnline() then
+  if not tradeSession.open or not g_game.isOnline() or not window or window:isDestroyed() or
+      window.tradeGeneration ~= tradeSession.generation then
     return
   end
-
-  window:hide()
-
-  local total = 0
-
-  local itemsToSend = {}
-  local maxItems = math.min(#items, 300)
-
-  for i = 1, maxItems do
-    local widget = items[i]
-    if widget and widget.sellCheckbox:isChecked() and widget.item.ptr and widget.item.ptr:getId() > 0 then
-      local quantity = getSellQuantity(widget.item.ptr)
-      total = total + (quantity * widget.item.price)
-
-      table.insert(itemsToSend, {
-        itemId = widget.item.ptr:getId(),
-        count = widget.item.ptr:getCountOrSubType(),
-        amount = quantity,
-        ignoreEquipped = ignoreEquipped
-      })
+  local entries = {}
+  for _, widget in ipairs(items) do
+    if widget.sellCheckbox:isChecked() and not inWhiteList(widget.item.ptr:getId()) then
+      table.insert(entries, widget.item)
     end
   end
-
-  g_game.sellAllItems(itemsToSend)
-  g_client.setInputLockWidget(nil)
-  window:destroy()
-  displayInfoBox("Quick Sell", string.format("You have sold %d items for %d gold.", #items, total))
+  closeQuickSellWindows()
+  startSellQueue(entries, true)
 end
 
 local function updateBlacklist(window)
@@ -1098,7 +1175,9 @@ local function updateBlacklist(window)
 end
 
 function openBlacklist()
-  local blacklistWindow = g_ui.loadUI('styles/blacklist', g_ui.getRootWidget())
+  if not tradeSession.open then return end
+  closeQuickSellWindows()
+  blacklistWindow = g_ui.loadUI('styles/blacklist', g_ui.getRootWidget())
   if not blacklistWindow then
     onTradeAllClick()
     return
@@ -1112,27 +1191,31 @@ function openBlacklist()
 
   updateBlacklist(blacklistWindow)
 
+  local generation = tradeSession.generation
   local close = function()
-    g_client.setInputLockWidget(nil)
-    if blacklistWindow then
-      blacklistWindow:destroy()
-    end
-    onTradeAllClick()
+    if generation ~= tradeSession.generation then return end
+    closeQuickSellWindows()
+    if tradeSession.open then onTradeAllClick() end
   end
 
   blacklistWindow.contentPanel.closeButton.onClick = close
 end
 
 function onTradeAllClick()
-  if getCurrentTradeType() == BUY then
+  if not tradeSession.open or getCurrentTradeType() == BUY then
     return
   end
 
-  local radio = UIRadioGroup.create()
-  window = g_ui.loadUI('styles/quicksell', g_ui.getRootWidget())
+  closeQuickSellWindows()
+  local window = g_ui.loadUI('styles/quicksell', g_ui.getRootWidget())
   if not window then
     return true
   end
+  quickSellWindow = window
+  window.tradeGeneration = tradeSession.generation
+  local generation = tradeSession.generation
+  local radio = UIRadioGroup.create()
+  quickSellRadio = radio
 
   window:setText("Quick Sell")
   window:show(true)
@@ -1187,12 +1270,12 @@ function onTradeAllClick()
   g_client.setInputLockWidget(window)
 
   local close = function()
-    g_client.setInputLockWidget(nil)
-    window:destroy()
+    if generation ~= tradeSession.generation then return end
+    closeQuickSellWindows()
   end
 
   local sell = function()
-    local warningWindow = nil
+    if not tradeSession.open or generation ~= tradeSession.generation or window:isDestroyed() then return end
     local selectedItems = {}
     local notWorthItems = {}
     local items = window.contentPanel.itemsList:getChildren()
@@ -1215,14 +1298,11 @@ function onTradeAllClick()
         message = message .. string.format("  - %s\n", item.name)
       end
       local yesCallback = function()
+        if generation ~= tradeSession.generation then return end
         SellItemList(items, window)
-        if warningWindow then
-          warningWindow:destroy()
-          warningWindow = nil
-          g_client.setInputLockWidget(nil)
-        end
       end
       local noCallback = function()
+        if generation ~= tradeSession.generation then return end
         if window then
           window:show()
           g_client.setInputLockWidget(window)
@@ -1235,7 +1315,7 @@ function onTradeAllClick()
         end
       end
       window:hide()
-      warningWindow = g_ui.createWidget('WarningQuickWindow', rootWidget)
+      warningWindow = g_ui.createWidget('WarningQuickWindow', g_ui.getRootWidget())
       warningWindow.itemTextWarning:setText(message)
       warningWindow.itemTextWarning:setEditable(false)
       warningWindow.itemTextWarning:setCursorVisible(false)

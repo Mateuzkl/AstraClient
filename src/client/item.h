@@ -170,6 +170,7 @@ public:
     void setAstraItemMetadata(uint16 slotPosition, uint8 flags);
     void setLootHighlight(bool enabled);
     bool hasLootHighlight() const { return m_lootHighlight; }
+    bool hasLootHighlightForLua() { return hasLootHighlight(); }
     bool hasAstraItemMetadata() { return m_hasAstraItemMetadata; }
     uint16 getAstraSlotPosition() { return m_astraSlotPosition; }
     uint8 getAstraItemFlags() { return m_astraItemFlags; }

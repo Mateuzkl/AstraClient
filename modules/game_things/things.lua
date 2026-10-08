@@ -3,6 +3,8 @@ loaded = false
 loading = false
 lastError = nil
 local successfulLoad = nil
+local loadedDatPath = nil
+local indexedSpritesBaseline = nil
 
 function setFileName(name)
   filename = name
@@ -18,6 +20,10 @@ end
 
 function getLoadError()
   return lastError
+end
+
+function getLoadedDatPath()
+  return loadedDatPath
 end
 
 function getMissing860Message()
@@ -62,6 +68,7 @@ local function isSameLoad(left, right)
     left.datPath == right.datPath and
     left.sprPath == right.sprPath and
     left.modernAssets == right.modernAssets and
+    left.indexedAssets == right.indexedAssets and
     left.resourceGeneration == right.resourceGeneration and
     -- A loaded U32 asset remains valid after a feature-table reset and can
     -- restore its required flag. A loaded U16 asset must never be reused when
@@ -78,6 +85,7 @@ local function invalidateAssetCache()
   -- partial or failed attempt, even if one native manager reports loaded.
   successfulLoad = nil
   loaded = false
+  loadedDatPath = nil
 end
 
 function load()
@@ -108,17 +116,31 @@ function load()
   local protocolVersion = g_game.getProtocolVersion()
   local assetVersion = getVersionFromPath(datPath) or version
   local modernAssets = hasModernAssetFeatures(datPath)
+  local indexedAssets = g_sprites.isIndexedSource and g_sprites.isIndexedSource(sprPath) or false
+
+  -- Only undo a flag that this module enabled for an indexed pack. Never
+  -- disable a version-configured U32 flag or a modern pack's required mode.
+  if indexedSpritesBaseline and not indexedAssets then
+    if indexedSpritesBaseline.version == version and not modernAssets then
+      g_game.disableFeature(GameSpritesU32)
+    end
+    indexedSpritesBaseline = nil
+  end
   local requestedLoad = {
     assetVersion = assetVersion,
     datPath = datPath,
     sprPath = sprPath,
     modernAssets = modernAssets,
+    indexedAssets = indexedAssets,
     resourceGeneration = getResourceGeneration(),
     spritesU32 = g_game.getFeature(GameSpritesU32)
   }
 
   if isSameLoad(successfulLoad, requestedLoad) and isNativeStateValid() then
     if successfulLoad.spritesU32 then
+      if indexedAssets and not g_game.getFeature(GameSpritesU32) then
+        indexedSpritesBaseline = { version = version }
+      end
       g_game.enableFeature(GameSpritesU32)
     end
     if modernAssets then
@@ -144,8 +166,8 @@ function load()
 
   local errorMessage = ''
   local spritesU32 = g_game.getFeature(GameSpritesU32)
-  local isIndexed = g_sprites.isIndexedSource and g_sprites.isIndexedSource(sprPath)
-  if isIndexed and not spritesU32 then
+  if indexedAssets and not spritesU32 then
+    indexedSpritesBaseline = { version = version }
     g_game.enableFeature(GameSpritesU32)
     spritesU32 = true
   end
@@ -173,13 +195,20 @@ function load()
   if assetVersion ~= version then
     g_game.setClientVersion(version)
     g_game.setProtocolVersion(protocolVersion)
+    -- setClientVersion reapplies the protocol profile. Any U32 flag enabled
+    -- for the temporary asset version no longer owns that restored flag.
+    indexedSpritesBaseline = nil
   end
 
   if errorMessage:len() == 0 then
     loaded = true
     requestedLoad.spritesU32 = spritesU32
     successfulLoad = requestedLoad
+    loadedDatPath = g_resources.guessFilePath(datPath, 'dat')
     if spritesU32 then
+      if indexedAssets and not g_game.getFeature(GameSpritesU32) then
+        indexedSpritesBaseline = { version = version }
+      end
       g_game.enableFeature(GameSpritesU32)
     end
     if modernAssets then
@@ -187,6 +216,10 @@ function load()
     end
   else
     invalidateAssetCache()
+    if indexedSpritesBaseline then
+      g_game.disableFeature(GameSpritesU32)
+      indexedSpritesBaseline = nil
+    end
   end
   loading = false
 

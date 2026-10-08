@@ -80,8 +80,8 @@ local popups = {
         completed = { title = "Quest Completed", desc = "You have finished '%s'", ico = "icon-infobanner-quests" },
         started   = { title = "Quest Started",   desc = "You have begun '%s'",     ico = "icon-infobanner-quests" },
     },
-    [Cat.BESTIARY]    = { title = "Bestiary Progress",  desc = "You have discovered '%s'", ico = "icon-infobanner-bestiary" },
-    [Cat.BOSSTIARY]   = { title = "Bosstiary Progress", desc = "You have discovered '%s'", ico = "icon-infobanner-bosstiary" },
+    [Cat.BESTIARY]    = { title = "Bestiary Progress",  desc = "You have progressed '%s'", ico = "icon-infobanner-bestiary" },
+    [Cat.BOSSTIARY]   = { title = "Bosstiary Progress", desc = "You have progressed '%s'", ico = "icon-infobanner-bosstiary" },
     [Cat.COSMETIC]    = { title = "Cosmetic Unlocked", desc = "You have unlocked '%s'",         ico = "icon-infobanner-unlock" },
     [Cat.PROFICIENCY] = { title = "Proficiency",      desc = "You have improved '%s'",           ico = "icon-infobanner-unlock" },
     [Cat.ECHO_WARDEN] = { title = "Echo Warden Killed", desc = "You have received %d Charm Points.", ico = "icon-infobanner-unlock" },
@@ -225,7 +225,14 @@ local function processNext()
     ui.anim:show()
     ui.anim:setMarginLeft(PAPER_X)
     ui.anim:setImageSource(OPEN_FRAMES[1])
-    if ui.iconW and d.icon then ui.iconW:setImageSource(d.icon) end
+    if ui.iconW then
+        if d.icon then
+            ui.iconW:setImageSource(d.icon)
+            ui.iconW:show()
+        else
+            ui.iconW:hide()
+        end
+    end
     if ui.creatureW then
         if d.outfit then
             ui.creatureW:setOutfit(d.outfit)
@@ -326,6 +333,30 @@ function show(title, desc, iconSrc, holdMs, outfit)
     if state == "idle" then processNext() end
 end
 
+local function resolveBestiaryRaceData(raceId, eventName, eventOutfit)
+    raceId = tonumber(raceId) or 0
+    if raceId <= 0 then return nil end
+
+    if type(eventName) == 'string' and eventName ~= '' and type(eventOutfit) == 'table' then
+        local raceData = g_things.registerRaceData(raceId, eventName, eventOutfit)
+        if cacheCyclopediaMonster then
+            cacheCyclopediaMonster(raceId, {
+                name = eventName,
+                type = eventOutfit.type,
+                auxType = eventOutfit.auxType,
+                head = eventOutfit.head,
+                body = eventOutfit.body,
+                legs = eventOutfit.legs,
+                feet = eventOutfit.feet,
+                addons = eventOutfit.addons,
+            })
+        end
+        return raceData
+    end
+
+    return g_things.getRaceData(raceId)
+end
+
 -- Event handler
 local function onClientEvent(cat, ...)
     local args = {...}
@@ -367,8 +398,12 @@ local function onClientEvent(cat, ...)
         desc = string.format(tpl.desc, tonumber(args[2]) or 0)
         iconOutfit = ECHO_WARDEN_OUTFIT
     elseif cat == Cat.BESTIARY or cat == Cat.BOSSTIARY then
-        local raceData = g_things.getRaceData(tonumber(args[1]) or 0) or {}
+        local raceData = resolveBestiaryRaceData(args[1], args[3], args[4]) or {}
         desc = string.format(tpl.desc, raceData.name or tr("Unknown creature"))
+        iconOutfit = raceData.outfit
+        if iconOutfit then
+            iconName = "icon-infobanner-unlock"
+        end
     end
 
     show(title, desc, icon(iconName), nil, iconOutfit)
@@ -376,6 +411,10 @@ end
 
 -- Module
 infobanner = {}
+
+function infobanner.resolveBestiaryNotification(raceId, eventName, eventOutfit)
+    return resolveBestiaryRaceData(raceId, eventName, eventOutfit)
+end
 
 function infobanner.init()
     createUI()
@@ -399,6 +438,12 @@ function infobanner.onGameEnd()
     state = "idle"
     if ui.container then ui.container:destroy(); ui.container = nil end
     ui = {}
+    if g_things and g_things.clearRaceDataCache then
+        g_things.clearRaceDataCache()
+    end
+    if clearCyclopediaMonsterCache then
+        clearCyclopediaMonsterCache()
+    end
 end
 
 function infobanner.show(title, desc, iconPath)

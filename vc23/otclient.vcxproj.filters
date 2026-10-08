@@ -270,6 +270,9 @@
     <ClCompile Include="..\src\framework\platform\win32platform.cpp">
       <Filter>Source Files\framework\platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\framework\platform\nativesplash.cpp">
+      <Filter>Source Files\framework\platform</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\framework\platform\win32window.cpp">
       <Filter>Source Files\framework\platform</Filter>
     </ClCompile>
@@ -412,6 +415,9 @@
       <Filter>Source Files\client</Filter>
     </ClCompile>
     <ClCompile Include="..\src\client\map.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\client\memleakmanager.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
     <ClCompile Include="..\src\client\mapio.cpp">
@@ -800,6 +806,9 @@
     <ClInclude Include="..\src\framework\platform\platformwindow.h">
       <Filter>Header Files\framework\platform</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\framework\platform\nativesplash.h">
+      <Filter>Header Files\framework\platform</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\framework\platform\win32window.h">
       <Filter>Header Files\framework\platform</Filter>
     </ClInclude>
@@ -998,6 +1007,12 @@
     <ClInclude Include="..\src\client\localplayer.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\client\memleakhistory.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\client\memleakmanager.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\client\map.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
@@ -1026,6 +1041,9 @@
       <Filter>Header Files\client</Filter>
     </ClInclude>
     <ClInclude Include="..\src\client\spritemanager.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\client\indexedspr.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
     <ClInclude Include="..\src\client\statictext.h">

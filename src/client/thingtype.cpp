@@ -25,6 +25,7 @@
 #include "spritemanager.h"
 #include "game.h"
 #include "lightview.h"
+#include "negativeoffset.h"
 
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/texture.h>
@@ -34,6 +35,7 @@
 #include <framework/graphics/shadermanager.h>
 #include <framework/core/filestream.h>
 #include <framework/otml/otml.h>
+#include <limits>
 #include <memory>
 
 ThingType::ThingType()
@@ -66,34 +68,28 @@ void ThingType::serialize(const FileStreamPtr& fin)
         if(!hasAttr((ThingAttr)i))
             continue;
 
-        int attr = i;
-        if(g_game.getClientVersion() >= 780) {
-            if(attr == ThingAttrChargeable)
-                attr = ThingAttrWritable;
-            else if(attr >= ThingAttrWritable)
-                attr += 1;
-        } else if(g_game.getClientVersion() >= 1000) {
-            if(attr == ThingAttrNoMoveAnimation)
-                attr = 16;
-            else if(attr >= ThingAttrPickupable)
-                attr += 1;
-        }
-
+        const int attr = ThingTypeFormat::serializedAttribute(
+            static_cast<ThingAttr>(i), g_game.getClientVersion());
         fin->addU8(attr);
-        switch(attr) {
+        switch(static_cast<ThingAttr>(i)) {
             case ThingAttrDisplacement: {
-                fin->addU16(m_displacement.x);
-                fin->addU16(m_displacement.y);
+                if(g_game.getFeature(Otc::GameNegativeOffset)) {
+                    fin->add16(static_cast<int16>(m_displacement.x));
+                    fin->add16(static_cast<int16>(m_displacement.y));
+                } else {
+                    fin->addU16(static_cast<uint16>(m_displacement.x));
+                    fin->addU16(static_cast<uint16>(m_displacement.y));
+                }
                 break;
             }
             case ThingAttrLight: {
-                Light light = m_attribs.get<Light>(attr);
+                Light light = m_attribs.get<Light>(i);
                 fin->addU16(light.intensity);
                 fin->addU16(light.color);
                 break;
             }
             case ThingAttrMarket: {
-                MarketData market = m_attribs.get<MarketData>(attr);
+                MarketData market = m_attribs.get<MarketData>(i);
                 fin->addU16(market.category);
                 fin->addU16(market.tradeAs);
                 fin->addU16(market.showAs);
@@ -110,7 +106,7 @@ void ThingType::serialize(const FileStreamPtr& fin)
             case ThingAttrMinimapColor:
             case ThingAttrCloth:
             case ThingAttrLensHelp:
-                fin->addU16(m_attribs.get<uint16>(attr));
+                fin->addU16(m_attribs.get<uint16>(i));
                 break;
             default:
                 break;
@@ -144,6 +140,88 @@ void ThingType::serialize(const FileStreamPtr& fin)
     }
 }
 
+bool ThingType::setDisplacement(const Point& displacement)
+{
+    const bool signedOffsets = g_game.getFeature(Otc::GameNegativeOffset);
+    const int minimum = signedOffsets ? std::numeric_limits<int16>::min() : 0;
+    const int maximum = signedOffsets ? std::numeric_limits<int16>::max() : std::numeric_limits<uint16>::max();
+    if(displacement.x < minimum || displacement.x > maximum ||
+       displacement.y < minimum || displacement.y > maximum)
+        return false;
+
+    m_displacement = displacement;
+    m_attribs.set(ThingAttrDisplacement, true);
+    m_displacementEdited = true;
+    return true;
+}
+
+bool ThingType::hasNegativeDisplacement() const
+{
+    return NegativeOffset::hasNegativeDisplacement(m_displacement.x, m_displacement.y);
+}
+
+bool ThingType::setDisplacementEnabled(const bool enabled)
+{
+    if(m_attribs.has(ThingAttrDisplacement) == enabled)
+        return true;
+
+    if(enabled)
+        m_attribs.set(ThingAttrDisplacement, true);
+    else {
+        m_attribs.remove(ThingAttrDisplacement);
+        m_displacement = Point();
+    }
+    m_displacementEdited = true;
+    return true;
+}
+
+bool ThingType::patchDisplacement(
+    std::string& datContents, const uint8 serializedAttr, size_t& insertionOffset, size_t& removalOffset) const
+{
+    insertionOffset = 0;
+    removalOffset = 0;
+    if(!m_displacementEdited)
+        return true;
+
+    if(!m_attribs.has(ThingAttrDisplacement)) {
+        if(m_displacementFileOffset == 0)
+            return true;
+        removalOffset = m_displacementFileOffset - 1;
+        return NegativeOffset::removeDisplacement(datContents, m_displacementFileOffset);
+    }
+
+    if(m_displacementFileOffset != 0)
+        return NegativeOffset::patchDisplacement(
+            datContents, m_displacementFileOffset, m_displacement.x, m_displacement.y);
+
+    if(m_attributeTerminatorFileOffset == 0 || m_attributeTerminatorFileOffset >= datContents.size())
+        return false;
+
+    if(!NegativeOffset::insertDisplacement(
+           datContents, m_attributeTerminatorFileOffset, serializedAttr, m_displacement.x, m_displacement.y))
+        return false;
+
+    insertionOffset = m_attributeTerminatorFileOffset;
+    return true;
+}
+
+void ThingType::shiftDatOffsets(const size_t changedOffset, const int amount)
+{
+    m_displacementFileOffset = NegativeOffset::shiftFileOffset(
+        m_displacementFileOffset, changedOffset, amount, false);
+    m_attributeTerminatorFileOffset = NegativeOffset::shiftFileOffset(
+        m_attributeTerminatorFileOffset, changedOffset, amount, true);
+}
+
+void ThingType::markDisplacementSaved(const size_t insertedAt, const size_t removedAt)
+{
+    if(insertedAt != 0)
+        m_displacementFileOffset = static_cast<uint32>(insertedAt + 1);
+    else if(removedAt != 0)
+        m_displacementFileOffset = 0;
+    m_displacementEdited = false;
+}
+
 void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileStreamPtr& fin)
 {
     m_null = false;
@@ -156,6 +234,7 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
         count++;
         attr = fin->getU8();
         if(attr == ThingLastAttr) {
+            m_attributeTerminatorFileOffset = fin->tell() - 1;
             done = true;
             break;
         }
@@ -230,8 +309,10 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
         switch(attr) {
             case ThingAttrDisplacement: {
                 if(g_game.getClientVersion() >= 755) {
-                    m_displacement.x = fin->getU16();
-                    m_displacement.y = fin->getU16();
+                    m_displacementFileOffset = fin->tell();
+                    const bool signedOffsets = g_game.getFeature(Otc::GameNegativeOffset);
+                    m_displacement.x = NegativeOffset::readDisplacement(*fin, signedOffsets);
+                    m_displacement.y = NegativeOffset::readDisplacement(*fin, signedOffsets);
                 } else {
                     m_displacement.x = 8;
                     m_displacement.y = 8;
@@ -347,8 +428,8 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
         int totalSprites = m_size.area() * m_layers * m_numPatternX * m_numPatternY * m_numPatternZ * groupAnimationsPhases;
         total_sprites.push_back(totalSprites);
 
-        if((totalSpritesCount+totalSprites) > 4096)
-            stdext::throw_exception("a thing type has more than 4096 sprites");
+        if((totalSpritesCount+totalSprites) > 65535)
+            stdext::throw_exception("a thing type has more than 65535 sprites");
 
         m_spritesIndex.resize((totalSpritesCount+totalSprites));
         for(int i = totalSpritesCount; i < (totalSpritesCount+totalSprites); i++)

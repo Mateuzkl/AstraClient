@@ -48,8 +48,11 @@ SpriteMaskGreen = 2
 SpriteMaskBlue = 3
 SpriteMaskYellow = 4
 
-local raceDataCache = nil
-local raceDataCacheSize = 0
+-- Static creature files are keyed by a legacy looktype-derived value, not by an
+-- authoritative server Bestiary raceId. Keep server data separate so it always
+-- wins and can be registered in O(1) without rebuilding the static list.
+local staticRaceDataCache = nil
+local authoritativeRaceDataCache = {}
 
 local function normalizeOutfit(outfit)
   if type(outfit) ~= 'table' then
@@ -91,8 +94,7 @@ local function normalizeRaceData(raceId, creature)
 end
 
 local function rebuildRaceDataCache()
-  raceDataCache = {}
-  raceDataCacheSize = 0
+  staticRaceDataCache = {}
 
   if not g_things or not g_things.getMonsterList then
     return
@@ -104,17 +106,20 @@ local function rebuildRaceDataCache()
     if numericRaceId > 0 then
       local raceData = normalizeRaceData(numericRaceId, creature)
       if raceData then
-        raceDataCache[numericRaceId] = raceData
-        raceDataCacheSize = raceDataCacheSize + 1
+        staticRaceDataCache[numericRaceId] = raceData
       end
     end
+  end
+
+  if not next(staticRaceDataCache) then
+    staticRaceDataCache = nil
   end
 end
 
 if g_things and not g_things.getRaceData then
   function g_things.clearRaceDataCache()
-    raceDataCache = nil
-    raceDataCacheSize = 0
+    staticRaceDataCache = nil
+    authoritativeRaceDataCache = {}
   end
 
   function g_things.registerRaceData(raceId, name, outfit)
@@ -123,19 +128,12 @@ if g_things and not g_things.getRaceData then
       return nil
     end
 
-    if not raceDataCache then
-      rebuildRaceDataCache()
-    end
-
     local raceData = {
       raceId = raceId,
       name = tostring(name or ('Creature ' .. tostring(raceId))),
       outfit = normalizeOutfit(outfit or {})
     }
-    if not raceDataCache[raceId] then
-      raceDataCacheSize = raceDataCacheSize + 1
-    end
-    raceDataCache[raceId] = raceData
+    authoritativeRaceDataCache[raceId] = raceData
     return raceData
   end
 
@@ -145,11 +143,16 @@ if g_things and not g_things.getRaceData then
       return nil
     end
 
-    if not raceDataCache or raceDataCacheSize == 0 then
+    local authoritative = authoritativeRaceDataCache[raceId]
+    if authoritative then
+      return authoritative
+    end
+
+    if not staticRaceDataCache then
       rebuildRaceDataCache()
     end
 
-    local raceData = raceDataCache and raceDataCache[raceId] or nil
+    local raceData = staticRaceDataCache and staticRaceDataCache[raceId] or nil
     if raceData then
       return raceData
     end

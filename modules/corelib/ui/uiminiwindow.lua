@@ -54,11 +54,11 @@ function UIMiniWindow:close()
   if miniWidgetParent and modules.game_sidebuttons then
       local allBattlesClosed = true
       if miniWidgetParent == "battleListWidget" then
-          for _, battleClass in ipairs(modules.game_battle.battleClasses) do
-              if battleClass.window:getId() == self:getId() then
+          for _, battleClass in ipairs(modules.game_battle.battleClasses or {}) do
+              if battleClass.window and battleClass.window:getId() == self:getId() then
                   battleClass.window:close()
               end
-              if battleClass.window:isVisible() then
+              if battleClass.window and battleClass.window:isVisible() then
                   allBattlesClosed = false
                   break
               end

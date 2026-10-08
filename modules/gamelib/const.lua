@@ -355,8 +355,11 @@ GameContainerTypes = 146
 GameAstraEchoRaidVisuals = 147
 GameShopCountU16 = 148
 GameAstraStoreBasePrice = 149
+GameNegativeOffset = 150
 
-LastGameFeature = 150
+GameAstraExtendedSpellIds = 152
+
+LastGameFeature = 153
 
 TextColors = {
   red        = '#F55E5E',
@@ -504,6 +507,7 @@ ExtendedIds = {
   MonkData = 146,
   Cavebot = 210,
   SmartFollow = 212,
+  NpcConversationEnd = 213,
   BotCheckAlert = 230,
   Teleportation = 246
 }

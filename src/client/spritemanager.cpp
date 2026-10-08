@@ -21,10 +21,15 @@
  */
 
 #include "spritemanager.h"
+#include "spritedecoder.h"
+#include "indexedspr.h"
 #include "game.h"
 #include "thingtypemanager.h"
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#ifdef __EMSCRIPTEN__
+#include <framework/core/startuptimer.h>
+#endif
 #include <framework/graphics/image.h>
 #include <framework/graphics/atlas.h>
 #include <framework/core/eventdispatcher.h>
@@ -59,50 +64,29 @@ void SpriteManager::terminate()
 
 std::string SpriteManager::resolveIndexedFolder(const std::string& path) const
 {
-    std::string clean = path;
-    while (!clean.empty() && (clean.back() == '/' || clean.back() == '\\')) {
-        clean.pop_back();
-    }
-    if (clean.empty())
-        return "";
-
-    // 1. Direct directory probe: clean/spr_parts.dat + clean/spr_index.dat
-    if (g_resources.fileExists(clean + "/spr_parts.dat") && g_resources.fileExists(clean + "/spr_index.dat")) {
-        return clean;
-    }
-
-    // 2. Parent directory probe for extensionless or directory-like paths
-    size_t lastSlash = clean.find_last_of("/\\");
-    std::string parentDir = (lastSlash != std::string::npos) ? clean.substr(0, lastSlash) : "";
-    std::string fileName = (lastSlash != std::string::npos) ? clean.substr(lastSlash + 1) : clean;
-
-    if (!parentDir.empty() && g_resources.fileExists(parentDir + "/spr_parts.dat") && g_resources.fileExists(parentDir + "/spr_index.dat")) {
-        // If an explicit extension was requested (e.g. "foo.spr"), only allow fallback if conventional base
-        bool hasExt = (fileName.find('.') != std::string::npos);
-        if (!hasExt || fileName == "Tibia.spr" || fileName == "tibia.spr") {
-            return parentDir;
-        }
-    }
-
-    return "";
+    return IndexedSpr::resolveFolder(path, [](const std::string& candidate) {
+        return g_resources.fileExists(candidate);
+    });
 }
 
 bool SpriteManager::isIndexedSource(const std::string& path) const
 {
-    auto cwm = g_resources.guessFilePath(path, "cwm");
-    if (g_resources.fileExists(cwm))
-        return false;
-
-    auto spr = g_resources.guessFilePath(path, "spr");
-    if (g_resources.fileExists(spr))
-        return false;
-
     return !resolveIndexedFolder(path).empty();
 }
 
 bool SpriteManager::loadSpr(std::string file)
 {
+#ifdef __EMSCRIPTEN__
+    g_app.setStartupStage("Loading Tibia sprites...");
+    StartupTimer timer("sprLoad");
+#endif
     unload();
+
+    // Detection and loading use the same rule, including packs which retain
+    // a conventional Tibia.spr or Tibia.cwm alongside their manifests.
+    const std::string indexedFolder = resolveIndexedFolder(file);
+    if (!indexedFolder.empty())
+        return loadIndexedSpr(indexedFolder);
 
     // 1. Explicit / Conventional CWM
     auto cwmFile = g_resources.guessFilePath(file, "cwm");
@@ -115,12 +99,6 @@ bool SpriteManager::loadSpr(std::string file)
     auto sprFile = g_resources.guessFilePath(file, "spr");
     if (g_resources.fileExists(sprFile)) {
         return loadCasualSpr(sprFile);
-    }
-
-    // 3. Indexed Multi-Part SPR (spr_parts.dat + spr_index.dat)
-    std::string indexedFolder = resolveIndexedFolder(file);
-    if (!indexedFolder.empty()) {
-        return loadIndexedSpr(indexedFolder);
     }
 
     return false;
@@ -366,7 +344,10 @@ void SpriteManager::unload()
     m_isIndexed = false;
     m_spritesFile = nullptr;
     m_parts.clear();
-    m_index.clear();
+    // A large indexed pack must not retain its logical index after switching
+    // back to a monolithic SPR or unloading the client assets.
+    std::vector<uint32>().swap(m_index);
+    m_spriteAddresses.clear();
     m_sprites.clear();
     m_cachedData.clear();
     clearImageCache();
@@ -383,10 +364,6 @@ ImagePtr SpriteManager::getSpriteImage(int id)
         return getSpriteImageHd(id);
     }
 
-    if (m_scaleFactor <= 1) {
-        return getSpriteImageCasual(id);
-    }
-
     auto it = m_imageCache.find(id);
     if (it != m_imageCache.end()) {
         m_imageCacheLru.splice(m_imageCacheLru.begin(), m_imageCacheLru, it->second.lruIt);
@@ -394,7 +371,7 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     }
 
     ImagePtr baseSprite = getSpriteImageCasual(id);
-    ImagePtr scaledSprite = upscaleSprite(baseSprite, m_scaleFactor);
+    ImagePtr scaledSprite = m_scaleFactor > 1 ? upscaleSprite(baseSprite, m_scaleFactor) : baseSprite;
     if (!scaledSprite)
         return baseSprite;
 
@@ -512,10 +489,19 @@ bool SpriteManager::loadCasualSpr(std::string file)
     try {
         file = g_resources.guessFilePath(file, "spr");
 
-        m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+        // SPR packs can be hundreds of MiB. Keep only their index and
+        // stream individual records; ResourceManager still buffers encrypted
+        // or compressed files when seeking requires it. Browser preload files
+        // already live in MEMFS; buffering again only duplicates the whole pack.
+        m_spritesFile = g_resources.openFile(file, true);
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
+            // This format already retains every encrypted record in m_sprites.
+            // Preserve its sequential buffering policy rather than issuing one
+            // filesystem read per length field during the entire-pack import.
+            m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+            m_spritesFile->getU32();
             m_signature = m_spritesFile->getU32();
             m_spritesCount = m_spritesFile->getU32();
             m_sprites.resize(m_spritesCount + 1);
@@ -530,7 +516,18 @@ bool SpriteManager::loadCasualSpr(std::string file)
         }
         else {
             m_spritesCount = g_game.getFeature(Otc::GameSpritesU32) ? m_spritesFile->getU32() : m_spritesFile->getU16();
-            m_spritesOffset = m_spritesFile->tell();
+            const uint32 indexOffset = m_spritesFile->tell();
+            m_spritesOffset = indexOffset;
+            const uint32 fileSize = m_spritesFile->size();
+            if (indexOffset > fileSize || static_cast<uint32>(m_spritesCount) > (fileSize - indexOffset) / 4)
+                stdext::throw_exception("Invalid sprite address table");
+
+            m_spriteAddresses.resize(m_spritesCount);
+            const uint32 indexBytes = static_cast<uint32>(m_spritesCount) * 4;
+            if (m_spritesFile->read(m_spriteAddresses.data(), 1, indexBytes) != indexBytes)
+                stdext::throw_exception("Incomplete sprite address table");
+            for (uint32& address : m_spriteAddresses)
+                address = stdext::readULE32(reinterpret_cast<const uint8*>(&address));
         }
         m_loaded = true;
         g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
@@ -538,6 +535,8 @@ bool SpriteManager::loadCasualSpr(std::string file)
     }
     catch (stdext::exception& e) {
         g_logger.error(stdext::format("Failed to load sprites from '%s': %s", file, e.what()));
+        m_spritesFile = nullptr;
+        m_spriteAddresses.clear();
         return false;
     }
 }
@@ -577,10 +576,6 @@ bool SpriteManager::loadCwmSpr(std::string file)
 
 bool SpriteManager::loadIndexedSpr(std::string folder)
 {
-    unload();
-    m_baseSpriteSize = 32;
-    updateSpriteSize();
-
     try {
         // 1. Load spr_parts.dat ("SPMT")
         std::string partsPath = folder + "/spr_parts.dat";
@@ -626,13 +621,15 @@ bool SpriteManager::loadIndexedSpr(std::string folder)
         for (uint32 i = 0; i < partCount; ++i) {
             m_parts[i].signature = partsFile->getU32();
             m_parts[i].spriteCount = partsFile->getU32();
+            if (m_parts[i].spriteCount > IndexedSpr::MaxLocalSprites)
+                stdext::throw_exception("Indexed SPR: Part count does not fit the 16-bit local sprite ID");
             m_parts[i].fileSize = 0;
             m_parts[i].file = nullptr;
             totalManifestSprites += m_parts[i].spriteCount;
         }
 
-        if (totalManifestSprites > INT_MAX) {
-            g_logger.error(stdext::format("Indexed SPR: Total manifest sprite count exceeds INT_MAX (%llu)", totalManifestSprites));
+        if (totalManifestSprites > IndexedSpr::MaxSprites) {
+            g_logger.error(stdext::format("Indexed SPR: Total manifest sprite count exceeds the supported limit (%llu)", totalManifestSprites));
             unload();
             return false;
         }
@@ -651,7 +648,9 @@ bool SpriteManager::loadIndexedSpr(std::string folder)
                 return false;
             }
 
-            auto partFile = g_resources.openFile(partPath, g_game.getFeature(Otc::GameDontCacheFiles));
+            // Keep the small offset table, not every part's pixel payload, in
+            // RAM. Encrypted/compressed resources retain their normal buffering.
+            auto partFile = g_resources.openFile(partPath, true);
             if (!partFile) {
                 g_logger.error(stdext::format("Indexed SPR: Failed to open part file: %s", partPath));
                 unload();
@@ -695,7 +694,17 @@ bool SpriteManager::loadIndexedSpr(std::string folder)
             }
 
             m_parts[i].fileSize = partFileSize;
-            m_parts[i].file = partFile;
+            auto& addresses = m_parts[i].addresses;
+            addresses.resize(localCount);
+            const uint32 tableBytes = localCount * sizeof(uint32);
+            if (tableBytes > 0 && partFile->read(addresses.data(), 1, tableBytes) != static_cast<int>(tableBytes))
+                stdext::throw_exception("Indexed SPR: Incomplete part address table");
+            for (uint32& address : addresses) {
+                address = stdext::readULE32(reinterpret_cast<const uint8*>(&address));
+                if (address != 0 && (address < 8 + tableBytes || !IndexedSpr::rangeFits(address, 5, partFileSize)))
+                    stdext::throw_exception("Indexed SPR: Invalid part sprite address");
+            }
+            m_parts[i].file = std::move(partFile);
         }
 
         // 2. Load spr_index.dat ("SPIX")
@@ -729,7 +738,7 @@ bool SpriteManager::loadIndexedSpr(std::string folder)
         }
 
         uint32 logicalSpriteCount = indexFile->getU32();
-        if (logicalSpriteCount == 0 || logicalSpriteCount > 10000000 || logicalSpriteCount > INT_MAX) {
+        if (logicalSpriteCount == 0 || logicalSpriteCount > IndexedSpr::MaxSprites) {
             g_logger.error(stdext::format("Indexed SPR: Invalid logical sprite count (%u) in %s", logicalSpriteCount, indexPath));
             unload();
             return false;
@@ -751,9 +760,12 @@ bool SpriteManager::loadIndexedSpr(std::string folder)
         // Pre-allocate index and validate every packed locator
         m_index.clear();
         m_index.resize(static_cast<size_t>(logicalSpriteCount) + 1, 0);
+        const uint32 indexBytes = logicalSpriteCount * sizeof(uint32);
+        if (indexFile->read(m_index.data() + 1, 1, indexBytes) != static_cast<int>(indexBytes))
+            stdext::throw_exception("Indexed SPR: Incomplete logical sprite index");
 
         for (uint32 i = 1; i <= logicalSpriteCount; ++i) {
-            uint32 packed = indexFile->getU32();
+            uint32 packed = stdext::readULE32(reinterpret_cast<const uint8*>(&m_index[i]));
             uint32 partNumber = (packed >> 16) & 0xFFFF;
             uint32 localId = packed & 0xFFFF;
 
@@ -863,12 +875,10 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
             return image;
         }
 
-        if (id == 0 || !m_spritesFile)
+        if (id <= 0 || id > m_spritesCount || !m_spritesFile)
             return nullptr;
 
-        m_spritesFile->seek(((id - 1) * 4) + m_spritesOffset);
-
-        uint32 spriteAddress = m_spritesFile->getU32();
+        const uint32 spriteAddress = m_spriteAddresses[id - 1];
 
         // no sprite? return an empty texture
         if (spriteAddress == 0)
@@ -876,43 +886,20 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
 
         m_spritesFile->seek(spriteAddress);
 
-        // color key
-        m_spritesFile->getU8();
-        m_spritesFile->getU8();
-        m_spritesFile->getU8();
-
-        uint16 pixelDataSize = m_spritesFile->getU16();
+        // Read the record in bulk instead of doing filesystem I/O per channel.
+        uint8 header[5];
+        if (m_spritesFile->read(header, 1, sizeof(header)) != sizeof(header))
+            stdext::throw_exception("Incomplete sprite header");
+        const uint16 pixelDataSize = stdext::readULE16(header + 3);
+        std::vector<uint8> data(pixelDataSize);
+        if (m_spritesFile->read(data.data(), 1, pixelDataSize) != pixelDataSize)
+            stdext::throw_exception("Incomplete sprite pixels");
 
         auto image = std::make_shared<Image>(Size(m_baseSpriteSize, m_baseSpriteSize));
 
-        uint8* pixels = image->getPixelData();
-        int writePos = 0;
-        int read = 0;
-        bool useAlpha = g_game.getFeature(Otc::GameSpritesAlphaChannel);
-
-        // decompress pixels
-        while (read < pixelDataSize && writePos < spriteDataSize) {
-            uint16 transparentPixels = m_spritesFile->getU16();
-            uint16 coloredPixels = m_spritesFile->getU16();
-
-            writePos += transparentPixels * 4;
-
-            if (useAlpha) {
-                m_spritesFile->read(&pixels[writePos], std::min<uint16>(coloredPixels * 4, spriteDataSize - writePos));
-                writePos += coloredPixels * 4;
-                read += 4 + (4 * coloredPixels);
-            }
-            else {
-                for (int i = 0; i < coloredPixels && writePos < spriteDataSize; i++) {
-                    pixels[writePos + 0] = m_spritesFile->getU8();
-                    pixels[writePos + 1] = m_spritesFile->getU8();
-                    pixels[writePos + 2] = m_spritesFile->getU8();
-                    pixels[writePos + 3] = 0xFF;
-                    writePos += 4;
-                }
-                read += 4 + (3 * coloredPixels);
-            }
-        }
+        if (!SpriteDecoder::decode(data.data(), data.size(), image->getPixelData(), spriteDataSize,
+                                   g_game.getFeature(Otc::GameSpritesAlphaChannel)))
+            stdext::throw_exception("Invalid sprite pixel runs");
 
         return image;
     }
@@ -951,86 +938,37 @@ ImagePtr SpriteManager::getSpriteImageIndexed(int id)
         if (partNum == 0 || partNum > m_parts.size() || localId == 0)
             return nullptr;
 
-        auto& part = m_parts[partNum - 1];
-        if (!part.file || localId > part.spriteCount)
+        const auto& part = m_parts[partNum - 1];
+        if (!part.file || localId > part.addresses.size())
             return nullptr;
 
-        // Local offset table begins after 8-byte header
-        uint32 tablePos = ((localId - 1) * sizeof(uint32)) + 8;
-        if (tablePos + sizeof(uint32) > part.fileSize)
-            return nullptr;
-
-        part.file->seek(tablePos);
-        uint32 spriteAddress = part.file->getU32();
+        const uint32 spriteAddress = part.addresses[localId - 1];
         if (spriteAddress == 0)
             return nullptr;
 
         // Validate address: must be past table and leave at least 5 bytes for color key (3) + size (2)
-        uint32 minDataOffset = 8 + (part.spriteCount * sizeof(uint32));
-        if (spriteAddress < minDataOffset || spriteAddress + 5 > part.fileSize)
-            return nullptr;
+        const uint32 minDataOffset = 8 + (part.spriteCount * sizeof(uint32));
+        if (spriteAddress < minDataOffset || !IndexedSpr::rangeFits(spriteAddress, 5, part.fileSize))
+            stdext::throw_exception("Indexed SPR: Invalid sprite record address");
 
-        part.file->seek(spriteAddress);
+        // Retain stream ownership locally and read the record in two bounded
+        // bulk operations, rather than performing filesystem I/O per channel.
+        const FileStreamPtr partFile = part.file;
+        partFile->seek(spriteAddress);
+        uint8 header[5];
+        if (partFile->read(header, 1, sizeof(header)) != sizeof(header))
+            stdext::throw_exception("Indexed SPR: Incomplete sprite header");
+        const uint16 pixelDataSize = stdext::readULE16(header + 3);
+        if (!IndexedSpr::rangeFits(spriteAddress + 5, pixelDataSize, part.fileSize))
+            stdext::throw_exception("Indexed SPR: Incomplete sprite payload");
+        std::vector<uint8> data(pixelDataSize);
+        if (pixelDataSize > 0 && partFile->read(data.data(), 1, pixelDataSize) != pixelDataSize)
+            stdext::throw_exception("Indexed SPR: Incomplete sprite pixels");
 
-        // Color key (3 bytes)
-        part.file->getU8();
-        part.file->getU8();
-        part.file->getU8();
-
-        uint16 pixelDataSize = part.file->getU16();
-        if (part.file->tell() + pixelDataSize > part.fileSize)
-            return nullptr;
-
-        const size_t pixelCapacity = static_cast<size_t>(m_baseSpriteSize) * static_cast<size_t>(m_baseSpriteSize);
         auto image = std::make_shared<Image>(Size(m_baseSpriteSize, m_baseSpriteSize));
-        uint8* pixels = image->getPixelData();
-
-        size_t outputPixels = 0;
-        size_t read = 0;
-        bool useAlpha = g_game.getFeature(Otc::GameSpritesAlphaChannel);
-
-        // Memory-safe RLE decompression
-        while (read < pixelDataSize && outputPixels < pixelCapacity) {
-            if (pixelDataSize - read < 4)
-                break;
-
-            uint16 transparentPixels = part.file->getU16();
-            uint16 coloredPixels = part.file->getU16();
-            read += 4;
-
-            if (transparentPixels > pixelCapacity - outputPixels)
-                break;
-            outputPixels += transparentPixels;
-
-            if (coloredPixels > pixelCapacity - outputPixels)
-                break;
-
-            const size_t bytesPerPixel = useAlpha ? 4 : 3;
-            if (coloredPixels > (pixelDataSize - read) / bytesPerPixel)
-                break;
-
-            size_t writePos = outputPixels * 4;
-            if (useAlpha) {
-                for (uint16 i = 0; i < coloredPixels; ++i) {
-                    pixels[writePos + 0] = part.file->getU8();
-                    pixels[writePos + 1] = part.file->getU8();
-                    pixels[writePos + 2] = part.file->getU8();
-                    pixels[writePos + 3] = part.file->getU8();
-                    writePos += 4;
-                }
-                read += coloredPixels * 4;
-            } else {
-                for (uint16 i = 0; i < coloredPixels; ++i) {
-                    pixels[writePos + 0] = part.file->getU8();
-                    pixels[writePos + 1] = part.file->getU8();
-                    pixels[writePos + 2] = part.file->getU8();
-                    pixels[writePos + 3] = 0xFF;
-                    writePos += 4;
-                }
-                read += coloredPixels * 3;
-            }
-            outputPixels += coloredPixels;
-        }
+        if (!SpriteDecoder::decode(data.data(), data.size(), image->getPixelData(),
+                                   image->getPixels().size(), g_game.getFeature(Otc::GameSpritesAlphaChannel)))
+            stdext::throw_exception("Indexed SPR: Invalid sprite pixel runs");
 
         return image;
     }

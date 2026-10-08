@@ -30,6 +30,9 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/localplayer.h
     ${CMAKE_CURRENT_LIST_DIR}/map.cpp
     ${CMAKE_CURRENT_LIST_DIR}/map.h
+    ${CMAKE_CURRENT_LIST_DIR}/memleakhistory.h
+    ${CMAKE_CURRENT_LIST_DIR}/memleakmanager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/memleakmanager.h
     ${CMAKE_CURRENT_LIST_DIR}/mapio.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.h
@@ -45,6 +48,7 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/player.h
     ${CMAKE_CURRENT_LIST_DIR}/spritemanager.cpp
     ${CMAKE_CURRENT_LIST_DIR}/spritemanager.h
+    ${CMAKE_CURRENT_LIST_DIR}/indexedspr.h
     ${CMAKE_CURRENT_LIST_DIR}/staticdata.h
     ${CMAKE_CURRENT_LIST_DIR}/statictext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/statictext.h

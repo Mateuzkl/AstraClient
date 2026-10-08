@@ -170,19 +170,21 @@ CreaturePtr CreatureType::cast()
 std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> CreatureManager::getMonsterList()
 {
     std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> list;
-    int fallbackRaceId = 1;
+    int fallbackKey = 1;
 
     for(const CreatureTypePtr& creature : m_creatures) {
         if(!creature)
             continue;
 
         const Outfit outfit = creature->getOutfit();
-        int raceId = outfit.getId() > 0 ? outfit.getId() : fallbackRaceId;
-        while(list.find(raceId) != list.end())
-            ++raceId;
+        // Legacy creature files do not contain the server's Bestiary raceId.
+        // This key is looktype-derived and must only be used as a weak fallback.
+        int legacyKey = outfit.getId() > 0 ? outfit.getId() : fallbackKey;
+        while(list.find(legacyKey) != list.end())
+            ++legacyKey;
 
-        list[raceId] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons());
-        fallbackRaceId = raceId + 1;
+        list[legacyKey] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons());
+        fallbackKey = legacyKey + 1;
     }
 
     return list;

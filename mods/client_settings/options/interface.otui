@@ -117,6 +117,78 @@ InterfaceWindow < Panel
     margin-right: 4
 
     SettingsCheckBox
+      id: disableMeleeAttackAnimations
+      size: 12 12
+      !text: tr('Disable Melee Attack Animations')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      @onSetup: |
+        local value = modules.client_settings.getOption('disableMeleeAttackAnimations')
+        self:setChecked(value)
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Disables all visual weapon attack effects, including sword, club, axe, fist and monk weapon animations.')
+
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
+      id: disableNpcDialogWindow
+      size: 12 12
+      !text: tr('Disable NPC Dialog Window')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      @onSetup: |
+        local value = modules.client_settings.getOption('disableNpcDialogWindow')
+        self:setChecked(value)
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Hides the custom NPC dialog window and keeps NPC messages in the standard chat.')
+
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
       id: showCooldown
       size: 12 12
       !text: tr('Show Cooldown Bar')
@@ -130,11 +202,10 @@ InterfaceWindow < Panel
       margin-left: 4
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
-      checked: true
+      checked: false
       @onSetup: |
         local value = modules.client_settings.getOption('showCooldown')
         self:setChecked(value)
-
 
     UIWidget
       size: 12 12

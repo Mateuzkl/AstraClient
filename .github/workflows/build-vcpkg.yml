@@ -21,6 +21,10 @@ on:
       - src/**
       - CMakeLists.txt
       - vcpkg.json
+      - .github/tests/native_splash.cpp
+      - data/images/splash.png
+      - data/cursors/**
+      - vc23/otclient.vcxproj
 
   pull_request:
     paths:
@@ -29,6 +33,10 @@ on:
       - src/**
       - CMakeLists.txt
       - vcpkg.json
+      - .github/tests/native_splash.cpp
+      - data/images/splash.png
+      - data/cursors/**
+      - vc23/otclient.vcxproj
 
 jobs:
   build-windows:
@@ -89,6 +97,30 @@ jobs:
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
 
+      - name: Test Windows native splash lifecycle and resource ownership
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          if errorlevel 1 exit /b 1
+          mkdir build\native-splash-test\data\images
+          copy /y data\images\splash.png build\native-splash-test\data\images\splash.png
+          if errorlevel 1 exit /b 1
+          cl /nologo /O2 /MT /utf-8 /std:c++17 /EHsc /DNDEBUG /DWIN32 /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\native-splash-test\native-splash-test.exe /Fo:build\native-splash-test\ .github\tests\native_splash.cpp src\framework\platform\nativesplash.cpp src\framework\graphics\apngloader.cpp /link gdiplus.lib user32.lib gdi32.lib build\vcpkg_installed\x64-windows-static\lib\zlib.lib
+          if errorlevel 1 exit /b 1
+          build\native-splash-test\native-splash-test.exe "%GITHUB_WORKSPACE%\data\cursors"
+          if errorlevel 1 exit /b 1
+
+      - name: Verify Windows splash packaging
+        shell: pwsh
+        run: |
+          $source = Get-FileHash -LiteralPath data/images/splash.png
+          $packaged = Get-FileHash -LiteralPath build/data/images/splash.png
+          if ($source.Hash -ne $packaged.Hash) { throw 'Packaged splash does not match the source artwork.' }
+          [xml]$project = Get-Content -LiteralPath vc23/otclient.vcxproj -Raw
+          if (-not $project.SelectSingleNode("//*[local-name()='Target' and @Name='CopyNativeSplash']")) {
+            throw 'The direct Visual Studio build must also package native splash artwork.'
+          }
+
       # Salva mesmo em falha: as 90 deps compilam antes do erro de compile do codigo,
       # entao a proxima run as restaura e pula direto pro compile (~20min -> ~minutos).
       - name: Save vcpkg binary cache
@@ -119,94 +151,4 @@ jobs:
           path: |
             ${{ github.workspace }}/build/AstraClient.exe
             ${{ github.workspace }}/build/*.dll
-
-  build-linux:
-    name: Linux
-    runs-on: ubuntu-latest
-
-    env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
-      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
-      SCCACHE_DIR: ${{ github.workspace }}/sccache
-      SCCACHE_GHA_ENABLED: "false"
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get latest CMake
-        uses: lukka/get-cmake@v4.3.2
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential ninja-build pkg-config autoconf automake libtool \
-            python3 zip unzip tar curl git \
-            libgl1-mesa-dev libglu1-mesa-dev libx11-dev libxext-dev libxrandr-dev \
-            libxi-dev libxcursor-dev libxinerama-dev libxrender-dev libxfixes-dev \
-            libxxf86vm-dev libasound2-dev
-
-      - name: Create vcpkg binary cache directory
-        run: mkdir -p "${{ github.workspace }}/vcpkg_cache"
-
-      - name: Restore vcpkg binary cache
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-bincache-linux-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
-          restore-keys: |
-            vcpkg-bincache-linux-${{ hashFiles('vcpkg.json') }}-
-            vcpkg-bincache-linux-
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
-      - name: Create sccache directory
-        run: mkdir -p "${{ github.workspace }}/sccache"
-
-      - name: Restore sccache
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ github.workspace }}/sccache
-          key: sccache-linux-${{ github.run_id }}
-          restore-keys: |
-            sccache-linux-
-
-      - name: Bootstrap vcpkg, configure and build
-        run: |
-          if [ ! -d vcpkg ]; then git clone https://github.com/microsoft/vcpkg vcpkg; fi
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          cmake --build build --parallel "$(nproc)"
-
-      - name: Save vcpkg binary cache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-bincache-linux-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
-
-      - name: Save sccache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ github.workspace }}/sccache
-          key: sccache-linux-${{ github.run_id }}
-
-      - name: Upload build logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-linux-${{ github.sha }}
-          path: ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
-        if: ${{ failure() }}
-
-      - name: Upload artifact binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: astraclient-linux-${{ github.sha }}
-          path: ${{ github.workspace }}/build/AstraClient
-          if-no-files-found: warn
+            ${{ github.workspace }}/build/data/images/splash.png

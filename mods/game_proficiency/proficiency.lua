@@ -1,4 +1,4 @@
-﻿-- chunkname: @/mods/game_proficiency/proficiency.lua
+-- chunkname: @/mods/game_proficiency/proficiency.lua
 
 if not WeaponProficiency then
 	WeaponProficiency = {}

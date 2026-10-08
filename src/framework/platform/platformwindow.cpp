@@ -28,8 +28,8 @@ WIN32Window window;
 #elif defined(ANDROID)
 #include "androidwindow.h"
 #elif defined(__EMSCRIPTEN__)
-#include "sdlwindow.h"
-SDLWindow window;
+#include "browserwindow.h"
+BrowserWindow window;
 #else
 #include "x11window.h"
 #include <framework/core/clock.h>

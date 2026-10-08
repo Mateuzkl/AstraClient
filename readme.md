@@ -110,7 +110,7 @@ The project is designed for developers and server owners who want:
 | UI | Modernized OTClient interface and modules |
 | Assets | Tibia 8.60 DAT/SPR package supported through `data/things/860/` |
 | Configuration | Protocol features controlled through `g_game.enableFeature` / `g_game.disableFeature` |
-| Platforms | Windows and Linux build instructions included |
+| Platforms | Windows, Linux and WebAssembly/WebGL 2 browser support |
 
 ---
 
@@ -266,6 +266,47 @@ cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake ..
 cmake --build . --config Release
 ```
+
+---
+
+### Web — Astra Web
+
+Astra Web runs the client in a browser using WebAssembly and WebGL 2, with a launcher and persistent game-data caching.
+
+Activate Emscripten **6.0.8** and install CMake **3.24+**, Ninja and Python 3. Extract the 8.60 assets as described above, then run from the repository root (Linux or WSL):
+
+```bash
+bash browser/build-wasm.sh Release
+python3 browser/serve.py build-wasm-release/dist --port 8080
+```
+
+For PowerShell, use `browser/build-wasm.ps1 -BuildType Release` after activating `emsdk_env.ps1`.
+
+Open [Astra Web locally](http://127.0.0.1:8080/astraclient.html). Use **Install** or **Update** to cache game data, then select **Play**. Optional diagnostics are available under **Web options → Performance diagnostics**.
+
+Normal Play trusts previously hash-verified cache entries to reduce startup cost. Missing or wrong-sized chunks are rejected, but same-size corruption after installation requires **Reload / Repair**, which requests full hash verification on the next Play. New downloads and legacy cache entries are always hash-verified.
+
+Configure the login and game WebSocket endpoints in `build-wasm-release/dist/config.js`. Separate binary WebSocket-to-TCP bridges are required for the server's login and game ports (normally 7171 and 7172); browsers cannot connect directly to TCP.
+
+Production hosting requires HTTPS, WSS and COOP/COEP isolation headers. See [`browser/nginx.conf.example`](browser/nginx.conf.example) for a deployment example.
+
+### Windows Startup Splash
+
+Set `ENABLE_NATIVE_SPLASH = true` in `init.lua` to enable the animated loading splash, or `false` to disable it (the current default). Restart the client after changing this option; no recompilation is required once the supporting executable has been built. The native artwork is `data/images/splash.png` and is copied beside the executable by both CMake and the `vc23` project. The browser splash is configured separately.
+
+### Optional Memory Monitor
+
+After rebuilding the client, load the diagnostic module in the client terminal:
+
+```lua
+g_modules.ensureModuleLoaded('game_memleak')
+```
+
+Open it with **Ctrl+Alt+M** or the **Memory Monitor** toolbar button. Use **Snapshot** before repeating an action, then **Diff** to compare memory and widget counts. **Force Lua GC** runs an explicit collection. Monitoring is disabled by default and collects samples only while its window is open; unloading the module releases its events and UI. Reported growth and detached widgets are diagnostic signals, not confirmed leaks. Unsupported allocation breakdowns are identified rather than estimated as total RAM.
+
+Periodic object counts use lightweight counters; full widget-tree/source scans run only on **Snapshot/Diff**. On Windows, trends, alerts and snapshot memory deltas use **private committed bytes**, with working set shown separately. Platforms without private-commit measurements do not substitute working set or WASM capacity for growth alerts. **Clear Alerts** acknowledges existing growth without erasing the observation history; a flat plateau will not repeat the same alert. Scheduled queue counts include canceled entries awaiting removal.
+
+Optional terminal controls: `g_memLeak.setAlertThreshold(bytes)` (default 10 MiB), `g_memLeak.setAlertCooldown(milliseconds)` (default 30000), and the corresponding `g_memLeak.getAlertThreshold()` / `g_memLeak.getAlertCooldown()`. `g_memLeak.addLog(text)`, `g_memLeak.getLogText()` and `g_memLeak.clearLog()` manage the bounded local session log; no data is uploaded.
 
 ---
 

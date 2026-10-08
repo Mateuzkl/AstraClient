@@ -30,10 +30,7 @@ function update()
   text = g_app.getFps() .. ' fps'
   ui.fps:setText(text)
 
-  local ping = math.round(g_game.getPing() * 0.7)
-  if g_proxy and g_proxy.getPing() > 0 then
-    ping = g_proxy.getPing()
-  end
+  local ping = g_game.getPing()
 
   ui.worldName:setText(g_game.getWorldName())
 

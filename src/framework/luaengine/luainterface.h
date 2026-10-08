@@ -224,6 +224,7 @@ public:
     void closeLuaState();
 
     void collectGarbage();
+    uint64_t getMemoryUsage(); // Live Lua-managed bytes, not process/heap capacity.
 
     void loadBuffer(const std::string& buffer, const std::string& source);
 

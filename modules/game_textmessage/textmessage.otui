@@ -18,7 +18,10 @@ ColoredBuffer < UITextEdit
   visible: false
 
 Panel
-  anchors.fill: gameMapPanel
+  anchors.top: gameMapPanel.top
+  anchors.left: gameMapPanel.left
+  anchors.right: gameMapPanel.right
+  anchors.bottom: bottomSplitter.top
   focusable: false
 
   Panel
@@ -50,5 +53,5 @@ Panel
     id: statusLabel
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
-    margin-bottom: 7
-    width: 300
+    margin-bottom: 10
+    width: 450

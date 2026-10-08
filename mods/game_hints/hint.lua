@@ -1,7 +1,17 @@
-hintWindow = nil
 local maxPages = 3
 local currentPage = 1
 local openedHints = {}
+
+function init()
+end
+
+function terminate()
+  for _, window in pairs(openedHints) do
+    window:destroy()
+  end
+  openedHints = {}
+  currentPage = 1
+end
 
 function showHint(hintType)
   local hintPath = 'styles/' .. hintType
@@ -31,7 +41,7 @@ function tutorialHint(action)
   showHint('tutorialhint')
   local hintWindow = openedHints['tutorialhint']
   if action == 'next' then
-    if currentPage < 3 then
+    if currentPage < maxPages then
       currentPage = currentPage + 1
     end
   elseif action == 'back' then
@@ -44,7 +54,7 @@ function tutorialHint(action)
   hintWindow.contentPanel:getChildById('secondScreen'):setVisible(currentPage == 2)
   hintWindow.contentPanel:getChildById('thirdScreen'):setVisible(currentPage == 3)
 
-  if currentPage == 3 then
+  if currentPage == maxPages then
     hintWindow.contentPanel:getChildById('ok'):setVisible(true)
     hintWindow.contentPanel:getChildById('next'):setVisible(false)
   else

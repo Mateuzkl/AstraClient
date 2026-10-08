@@ -34,6 +34,20 @@ WheelOfDestiny.mouseIndex = 0
 local openWheel = nil
 local lastSelectedGemVessel = nil
 
+function WheelOfDestiny.closeDialogs()
+  local dialog = openWheel
+  openWheel = nil
+  if dialog and not dialog:isDestroyed() then
+    dialog:destroy()
+  end
+end
+
+local function hasMatchingPresetVocation(code)
+  if type(code) ~= 'string' or #code < 3 then return false end
+  local prefix = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
+  return prefix ~= 'N' and code:sub(1, 2) == prefix
+end
+
 local defaultExportString = {
   [0] = "",
   [1] = "K0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -645,16 +659,14 @@ end
 function WheelOfDestiny.onDestinyWheel(playerId, canView, changeState, vocationId, points, scrollPoints, pointInvested, usedPromotionScrolls, equipedGems, atelierGems, basicUpgraded, supremeUpgraded, earnedFromAchievements)
   if not table.isIn({1, 2, 3, 4, 5}, vocationId) then
     g_client.setInputLockWidget(nil)
-    local cancelFunc = function()
-      if openWheel then
-        openWheel:destroy()
-        openWheel = nil
-      end
-    end
-
     if not openWheel then
-      openWheel = displayGeneralBox(tr('Info'), tr("To be able to use the Wheel of Destiny, a character must be at leat level 51, be promoted and have active\nPremium Time."),
+      local dialog
+      local cancelFunc = function()
+        if openWheel == dialog then WheelOfDestiny.closeDialogs() end
+      end
+      dialog = displayGeneralBox(tr('Info'), tr("To be able to use the Wheel of Destiny, a character must be at leat level 51, be promoted and have active\nPremium Time."),
       { { text=tr('Ok'), callback=cancelFunc }}, cancelFunc)
+      openWheel = dialog
       wheelWindow:hide()
       g_client.setInputLockWidget(nil)
     end
@@ -2273,6 +2285,8 @@ function WheelOfDestiny.onImportConfig(base64Data)
   end
 
   local decodedData = base64.decode(base64Data)
+  -- Two header bytes, 36 node values and four gems are required before unpacking.
+  if #decodedData ~= 42 then return {} end
   local points = string.unpack_custom("I2", decodedData)
 
   local pointInvested = {}
@@ -2438,15 +2452,13 @@ function WheelOfDestiny.onCancelConfig()
 end
 
 function WheelOfDestiny.validadeImportCode(code)
-	if not code or #code < 3 then
+	if type(code) ~= 'string' or #code < 3 then
 		return "Export code does not match a valid Wheel of Destiny."
 	end
 
-	local vocationId = tonumber(code:sub(1, 2)) or 0
 	local base64Data = code:sub(3)
 
-	local currentVocation = getVocationSt(vocationId)
-	if currentVocation ~= getVocationSt(vocation) then
+	if not hasMatchingPresetVocation(code) then
 		return "Export code does not match the character's vocation."
 	end
 
@@ -2518,9 +2530,7 @@ function WheelOfDestiny.onConfirmCreatePreset()
 
   if selectedOption == newPresetWindow.contentPanel.import then
     local presetCode = newPresetWindow.contentPanel.presetCode:getText()
-    local vocationId = tonumber(presetCode:sub(1, 2)) or 0
-    local currentVocation = getVocationSt(vocationId)
-    if currentVocation ~= getVocationSt(vocation) then return end
+    if not hasMatchingPresetVocation(presetCode) then return end
 
     local base64Data = presetCode:sub(3)
     local loadedResult = WheelOfDestiny.onImportConfig(base64Data)
@@ -2869,7 +2879,7 @@ function WheelOfDestiny.loadWheelPresets()
 			return g_logger.error("Error while reading characterdata file. Details: " .. result)
 		end
 
-    if result["presets"] == nil or #result["presets"] == 0 then
+    if type(result) ~= 'table' or type(result.presets) ~= 'table' or #result.presets == 0 then
       WheelOfDestiny.externalPreset = defaultData
     else
 		  WheelOfDestiny.externalPreset = result
@@ -2883,23 +2893,18 @@ function WheelOfDestiny.loadWheelPresets()
 end
 
 function WheelOfDestiny.generateInternalPreset()
-	for k, v in pairs(WheelOfDestiny.externalPreset.presets) do
-		local codeString = v["exportString"]
-		local vocationId = tonumber(codeString:sub(1, 2)) or 0
-		local currentVocation = getVocationSt(vocationId)
-		local base64Data = codeString:sub(3)
-		local data = WheelOfDestiny.onImportConfig(base64Data)
-
-		-- Invalid data
-		if table.empty(data) or currentVocation ~= getVocationSt(vocation) then
-			table.remove(WheelOfDestiny.externalPreset.presets, k)
-      goto continue
-		end
-
-		table.insert(WheelOfDestiny.internalPreset, { presetName = v.name, availablePoints = data.maxPoints, usedPoints = data.usedPoints, pointInvested = data.pointInvested, equipedGems = data.equipedGems })
-	
-    :: continue ::
+  local validPresets = {}
+  WheelOfDestiny.internalPreset = {}
+  for _, preset in ipairs(WheelOfDestiny.externalPreset.presets) do
+    if type(preset) == 'table' and type(preset.name) == 'string' and hasMatchingPresetVocation(preset.exportString) then
+      local data = WheelOfDestiny.onImportConfig(preset.exportString:sub(3))
+      if not table.empty(data) then
+        validPresets[#validPresets + 1] = preset
+        table.insert(WheelOfDestiny.internalPreset, { presetName = preset.name, availablePoints = data.maxPoints, usedPoints = data.usedPoints, pointInvested = data.pointInvested, equipedGems = data.equipedGems })
+      end
+    end
   end
+  WheelOfDestiny.externalPreset.presets = validPresets
 end
 
 function WheelOfDestiny.saveWheelPresets()

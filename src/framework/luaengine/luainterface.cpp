@@ -745,6 +745,12 @@ void LuaInterface::createLuaState()
 
     // load bit32 lib for bitwise operations
     luaopen_bit32(L);
+#ifdef __EMSCRIPTEN__
+    // LuaJIT exposes `bit`, while the bundled Lua 5.1 runtime does not. Keep
+    // both names available without introducing a second bitwise library.
+    lua_getglobal(L, "bit32");
+    lua_setglobal(L, "bit");
+#endif
 
     // creates weak table
     newTable();
@@ -781,6 +787,12 @@ void LuaInterface::closeLuaState()
         lua_close(L);
         L = NULL;
     }
+}
+
+uint64_t LuaInterface::getMemoryUsage()
+{
+    if (!L) return 0;
+    return uint64_t(lua_gc(L, LUA_GCCOUNT, 0)) * 1024 + lua_gc(L, LUA_GCCOUNTB, 0);
 }
 
 void LuaInterface::collectGarbage()

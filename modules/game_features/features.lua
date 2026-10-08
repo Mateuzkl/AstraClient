@@ -62,7 +62,11 @@ function updateFeatures(version)
     g_game.enableFeature(GamePrey)
     -- TFS 8.60 managed quick loot uses the Astra/Fonticak wire format.
     g_game.enableFeature(GameQuickLootFlags)
+    -- Astra's 8.60 DAT stores creature displacement as signed 16-bit values.
+    -- This must be enabled before game_things loads the DAT below.
+    g_game.enableFeature(GameNegativeOffset)
     -- GameShopCountU16 is negotiated dynamically via GameServerFeatures (0x43).
+    -- GameAstraExtendedSpellIds is also negotiated; legacy 0xA4 keeps U8 ids.
   elseif version == 1524 then
     -- Reserved for the future 15.24 profile.
   end

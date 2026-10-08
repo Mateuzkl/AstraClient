@@ -31,6 +31,7 @@
 #include "localplayer.h"
 #include "effect.h"
 #include "lightview.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 #include <framework/graphics/fontmanager.h>
 #include <framework/stdext/fastrand.h>
@@ -79,7 +80,7 @@ Tile::Tile(const Position& position) :
 {
 }
 
-void Tile::drawGround(const Point& dest, LightView* lightView)
+void Tile::drawGround(const Point& dest, LightView* lightView, const bool negativeOffsetPass)
 {
     m_topDraws = 0;
     m_drawElevation = 0;
@@ -88,25 +89,50 @@ void Tile::drawGround(const Point& dest, LightView* lightView)
         return;
     }
 
+    const bool groundFirst = NegativeOffset::useGroundFirstPass(
+        g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsetPass);
+
     // ground
     for (const ThingPtr& thing : m_things) {
-        if (!thing->isGround() && !thing->isGroundBorder() && (g_game.getFeature(Otc::GameMapDrawGroundFirst) || !thing->isOnBottom()))
+        if (!thing->isGround() && !thing->isGroundBorder() && (groundFirst || !thing->isOnBottom()))
             break;
         if (thing->isHidden())
             continue;
 
-        thing->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        const bool flatGround = NegativeOffset::isFlatGround(
+            thing->isGround(), thing->getWidth(), thing->getHeight(), thing->hasDisplacement());
+        if (!negativeOffsetPass || flatGround)
+            thing->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
         m_drawElevation = std::min<uint8_t>(m_drawElevation + thing->getElevation(), Otc::MAX_ELEVATION);
     }
 }
 
-void Tile::drawBottom(const Point& dest, LightView* lightView)
+void Tile::drawBottom(const Point& dest, LightView* lightView, const bool negativeOffsetPass)
 {
     if (m_fill != Color::alpha)
         return;
 
-    // bottom things, only when GameMapDrawGroundFirst is active
-    if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
+    // Negative offsets need a second pass for every ground/border/bottom object
+    // that can overlap neighboring tiles. Elevation is rebuilt from zero so
+    // skipped flat grounds still contribute exactly once to later layers.
+    if (negativeOffsetPass) {
+        uint8_t passElevation = 0;
+        for (const ThingPtr& thing : m_things) {
+            if (!thing->isGround() && !thing->isGroundBorder() && !thing->isOnBottom())
+                break;
+            if (thing->isHidden())
+                continue;
+
+            const bool flatGround = NegativeOffset::isFlatGround(
+                thing->isGround(), thing->getWidth(), thing->getHeight(), thing->hasDisplacement());
+            if (!flatGround)
+                thing->draw(dest - passElevation * g_sprites.getOffsetFactor(), true, lightView);
+            passElevation = std::min<uint8_t>(passElevation + thing->getElevation(), Otc::MAX_ELEVATION);
+        }
+        m_drawElevation = passElevation;
+    }
+    // Preserve the original ground-first behavior when negative offsets are off.
+    else if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         bool afterBottom = false;
         for (const ThingPtr& thing : m_things) {
             if (thing->isOnBottom())
@@ -142,7 +168,10 @@ void Tile::drawBottom(const Point& dest, LightView* lightView)
         m_drawElevation = std::min<uint8_t>(m_drawElevation + thing->getElevation(), Otc::MAX_ELEVATION);
     }
 
-    if (!g_game.getFeature(Otc::GameMapIgnoreCorpseCorrection)) {
+    // The global negative-offset pass already queues all bottom layers before
+    // all creatures. Its old cross-tile corpse redraw would reintroduce early
+    // creature/top draws in the bottom phase.
+    if (!negativeOffsetPass && !g_game.getFeature(Otc::GameMapIgnoreCorpseCorrection)) {
         for (int x = -redrawPreviousTopW; x <= 0; ++x) {
             for (int y = -redrawPreviousTopH; y <= 0; ++y) {
                 if (x == 0 && y == 0)
@@ -225,11 +254,11 @@ void Tile::drawLootHighlights(const Point& dest, LightView* lightView)
     effectType->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), 0, xPattern, yPattern, 0, highlightPhase, highlightColor, lightView);
 }
 
-void Tile::drawCreatures(const Point& dest, LightView* lightView)
+void Tile::drawCreatures(const Point& dest, LightView* lightView, const bool globalLayerPass)
 {
     if (m_fill != Color::alpha)
         return;
-    if (m_topDraws < m_topCorrection)
+    if (!globalLayerPass && m_topDraws < m_topCorrection)
         return;
 
     // walking creatures
@@ -242,7 +271,6 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
@@ -256,38 +284,42 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
     }
 }
 
-void Tile::drawTop(const Point& dest, LightView* lightView)
+void Tile::drawTop(const Point& dest, LightView* lightView, const bool globalLayerPass)
 {
     if (m_fill != Color::alpha)
         return;
-    if (m_topDraws++ < m_topCorrection)
+    if (!globalLayerPass && m_topDraws++ < m_topCorrection)
         return;
 
-    // walking creatures
-    for (const CreaturePtr& creature : m_walkingCreatures) {
-        if (creature->isHidden())
-            continue;
-        Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
-                   dest.y + ((creature->getPrewalkingPosition().y - m_position.y) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()));
-        creature->draw(creatureDest, true, lightView);
-    }
+    // Normal tile rendering keeps Astra's corpse-correction redraw exactly as
+    // before. The global layer pass has already drawn every creature once and
+    // must only queue effects and true top objects here.
+    if (!globalLayerPass) {
+        // walking creatures
+        for (const CreaturePtr& creature : m_walkingCreatures) {
+            if (creature->isHidden())
+                continue;
+            Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
+                       dest.y + ((creature->getPrewalkingPosition().y - m_position.y) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()));
+            creature->draw(creatureDest, true, lightView);
+        }
 
-    // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
-    int limit = g_adaptiveRenderer.creaturesLimit();
-    for (auto& thing : m_things) {
-        if (!thing->isCreature() || thing->isHidden())
-            continue;
-        if (limit-- <= 0)
-            break;
-        CreaturePtr creature = thing->static_self_cast<Creature>();
-        if (!creature || creature->isWalking())
-            continue;
-        creature->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        // creatures
+        int creatureLimit = g_adaptiveRenderer.creaturesLimit();
+        for (auto& thing : m_things) {
+            if (!thing->isCreature() || thing->isHidden())
+                continue;
+            if (creatureLimit-- <= 0)
+                break;
+            CreaturePtr creature = thing->static_self_cast<Creature>();
+            if (!creature || creature->isWalking())
+                continue;
+            creature->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        }
     }
 
     // effects
-    limit = std::min<int>((int)m_effects.size() - 1, g_adaptiveRenderer.effetsLimit());
+    int limit = std::min<int>((int)m_effects.size() - 1, g_adaptiveRenderer.effetsLimit());
     for (int i = limit; i >= 0; --i) {
         if (m_effects[i]->isHidden())
             continue;
@@ -615,6 +647,24 @@ std::vector<CreaturePtr> Tile::getCreatures()
             creatures.push_back(thing->static_self_cast<Creature>());
     }
     return creatures;
+}
+
+bool Tile::hasNegativeDisplacementCreature() const
+{
+    const auto needsSpecialRendering = [](const CreaturePtr& creature) {
+        return creature && !creature->isHidden() && creature->canBeSeen() && creature->usesNegativeDisplacement();
+    };
+
+    for (const CreaturePtr& creature : m_walkingCreatures) {
+        if (needsSpecialRendering(creature))
+            return true;
+    }
+
+    for (const ThingPtr& thing : m_things) {
+        if (thing->isCreature() && needsSpecialRendering(thing->static_self_cast<Creature>()))
+            return true;
+    }
+    return false;
 }
 
 ItemPtr Tile::getGround()

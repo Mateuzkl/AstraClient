@@ -16,17 +16,227 @@ end
 local charactersWindow
 local characterList
 local panelSort
-local lastSortButton
 local errorBox
 local waitingWindow
 local updateWaitEvent
 local resendWaitEvent
 local autoReconnectEvent
+local autoReconnectButton
+-- Explicit cancellation stays blocked even if the engine reports game end late.
+local autoReconnectBlocked = false
 local lastWidget
 local lastLogout = 0
+local suppressCheckCallbacks = false
 
-local function isRecentManualLogout()
+local SORT_COLUMN = {
+  Character = 1,
+  Status = 2,
+  Level = 3,
+  Vocation = 4,
+  World = 5
+}
+local SORT_BUTTON_IDS = {
+  [SORT_COLUMN.Character] = 'characterSort',
+  [SORT_COLUMN.Status] = 'statusSort',
+  [SORT_COLUMN.Level] = 'levelSort',
+  [SORT_COLUMN.Vocation] = 'vocationSort',
+  [SORT_COLUMN.World] = 'worldSort'
+}
+local SORT_COLUMN_SETTING = 'characterlist-sort-column'
+local SORT_ASCENDING_SETTING = 'characterlist-sort-ascending'
+local PINNED_CHARACTERS_SETTING = 'characterlist-pinned-characters'
+
+local function setCheckedWithoutCallback(widget, checked)
+  if not widget then return end
+  suppressCheckCallbacks = true
+  widget:setChecked(checked)
+  suppressCheckCallbacks = false
+end
+
+local function getSortColumn()
+  local sortColumn = g_settings.getNumber(SORT_COLUMN_SETTING, SORT_COLUMN.Character)
+  if sortColumn < SORT_COLUMN.Character or sortColumn > SORT_COLUMN.World then
+    sortColumn = SORT_COLUMN.Character
+  end
+  return sortColumn
+end
+
+local function getSortAscending()
+  return g_settings.getBoolean(SORT_ASCENDING_SETTING, true)
+end
+
+local function getCharacterPinKey(characterName, worldName)
+  local name = tostring(characterName or '')
+  if name == '' then return nil end
+  return name .. '|' .. tostring(worldName or '')
+end
+
+local function getPinnedCharacters()
+  local raw = g_settings.getNode(PINNED_CHARACTERS_SETTING)
+  local pinned = {}
+  if type(raw) == 'table' then
+    for key, value in pairs(raw) do
+      if type(key) == 'number' and type(value) == 'string' and value ~= '' then
+        pinned[value] = true
+      elseif type(key) == 'string' and
+        (value == true or (type(value) == 'number' and value ~= 0) or
+         (type(value) == 'string' and (value:lower() == 'true' or value == '1'))) then
+        pinned[key] = true
+      end
+    end
+  end
+
+  return pinned
+end
+
+local function setPinnedCharacters(pinned)
+  g_settings.setNode(PINNED_CHARACTERS_SETTING, pinned)
+end
+
+local function isCharacterPinned(characterName, worldName, pinnedLookup)
+  local pinKey = getCharacterPinKey(characterName, worldName)
+  if not pinKey then return false end
+  local pinned = pinnedLookup or getPinnedCharacters()
+  return pinned[pinKey] == true or pinned[tostring(characterName)] == true
+end
+
+local function setCharacterPinned(characterName, worldName, isPinned)
+  local pinKey = getCharacterPinKey(characterName, worldName)
+  if not pinKey then return end
+  local pinned = getPinnedCharacters()
+  pinned[pinKey] = isPinned and true or nil
+  pinned[tostring(characterName)] = nil
+  setPinnedCharacters(pinned)
+end
+
+local function getCharacterStatusValue(character)
+  local main = character.mainCharacter and 0 or 1
+  local hidden = character.hidden and 0 or 1
+  local dailyReward = character.dailyRewardState and 0 or 1
+  return main * 100 + hidden * 10 + dailyReward
+end
+
+local function toLowerText(value)
+  return string.lower(tostring(value or ''))
+end
+
+local function toNumberValue(value)
+  if type(value) == 'number' then
+    return value
+  end
+
+  local numericValue = tonumber(value)
+  if numericValue then
+    return numericValue
+  end
+
+  if type(value) == 'string' then
+    numericValue = tonumber((value:gsub('[^%d%-%.]', '')))
+    if numericValue then
+      return numericValue
+    end
+  end
+
+  return 0
+end
+
+local function compareCharacters(a, b, sortColumn, sortAscending, pinnedLookup)
+  local prioritizePinned = sortColumn ~= SORT_COLUMN.Level
+  if prioritizePinned then
+    local aPinned = isCharacterPinned(a.name, a.worldName, pinnedLookup)
+    local bPinned = isCharacterPinned(b.name, b.worldName, pinnedLookup)
+    if aPinned ~= bPinned then return aPinned end
+  end
+
+  local aValue, bValue
+  if sortColumn == SORT_COLUMN.Character then
+    aValue, bValue = toLowerText(a.name), toLowerText(b.name)
+  elseif sortColumn == SORT_COLUMN.Status then
+    aValue, bValue = getCharacterStatusValue(a), getCharacterStatusValue(b)
+  elseif sortColumn == SORT_COLUMN.Level then
+    aValue, bValue = toNumberValue(a.level), toNumberValue(b.level)
+  elseif sortColumn == SORT_COLUMN.Vocation then
+    aValue, bValue = toLowerText(a.vocation), toLowerText(b.vocation)
+  else
+    aValue, bValue = toLowerText(a.worldName), toLowerText(b.worldName)
+  end
+
+  if aValue == bValue then
+    aValue, bValue = toLowerText(a.name), toLowerText(b.name)
+    if aValue == bValue then
+      aValue, bValue = toLowerText(a.worldName), toLowerText(b.worldName)
+    end
+  end
+  if sortAscending then return aValue < bValue end
+  return aValue > bValue
+end
+
+local function updateSortButtons()
+  if not panelSort then return end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  for column = SORT_COLUMN.Character, SORT_COLUMN.World do
+    local button = panelSort:getChildById(SORT_BUTTON_IDS[column])
+    if button then
+      local selected = column == sortColumn
+      button:setOn(selected)
+      button:setChecked(selected and sortAscending or false, true)
+    end
+  end
+end
+
+local function buildCharacters(pinnedLookup)
+  local characters = {}
+  for _, character in ipairs(G.characters or {}) do
+    characters[#characters + 1] = character
+  end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  table.sort(characters, function(a, b)
+    return compareCharacters(a, b, sortColumn, sortAscending, pinnedLookup)
+  end)
+  return characters
+end
+
+
+local function removeAutoReconnectEvent()
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
+  end
+end
+
+local function recentlyLoggedOut()
   return lastLogout > 0 and lastLogout + 2000 > g_clock.millis()
+end
+
+local function updateAutoReconnectButton()
+  if not autoReconnectButton then return end
+  local enabled = g_settings.getBoolean('autoReconnect', false)
+  autoReconnectButton:setOn(enabled)
+  local status = enabled and 'On' or 'Off'
+  if GameEnterGameShowAppearance and not g_game.getFeature(GameEnterGameShowAppearance) then
+    autoReconnectButton:setText('Auto reconnect:\n ' .. status)
+  else
+    autoReconnectButton:setText('Auto reconnect: ' .. status)
+  end
+end
+
+local function removeLoginWaitEvents()
+  if waitingWindow then
+    waitingWindow:destroy()
+    waitingWindow = nil
+  end
+  if updateWaitEvent then
+    removeEvent(updateWaitEvent)
+    updateWaitEvent = nil
+  end
+  if resendWaitEvent then
+    removeEvent(resendWaitEvent)
+    resendWaitEvent = nil
+  end
+  CharacterList.waiting = false
+  CharacterList.scheduleTime = 5
 end
 
 CharacterList.camRecordCheck = nil
@@ -82,6 +292,7 @@ local function updateWait(timeStart, timeEnd)
 end
 
 local function resendWait()
+  resendWaitEvent = nil
   if updateWaitEvent then
     removeEvent(updateWaitEvent)
     updateWaitEvent = nil
@@ -103,37 +314,15 @@ local function resendWait()
                           vocation = selected.vocationName,
                           characterName = selected.characterName, }
 
-        LoginEvent:setCharInfo(charInfo)
+        LoginEvent:cancelLogin()
+        LoginEvent:setNewEvent(charInfo)
       end
     end
   end
 end
 
-local function updateTryLogin(timeStart, timeEnd)
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
-  if errorBox then
-    local time = g_clock.seconds()
-    if time <= timeEnd then
-      local percent = ((time - timeStart) / (timeEnd - timeStart)) * 100
-      local timeStr = string.format("%.0f", timeEnd - time)
-
-      local progressBar = errorBox.contentPanel:getChildById('progressBar')
-      progressBar:setPercent(percent)
-
-      local label = errorBox.contentPanel:getChildById('timeLabel')
-      label:setText(tr('Trying to reconnect in %s seconds.', timeStr))
-
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(timeStart, timeEnd) end, 1000 * progressBar:getPercentPixels() / 100 * (timeEnd - timeStart))
-      return true
-    end
-  end
-end
-
 local function onLoginWait(message, time)
+  removeAutoReconnectEvent()
   consoleln("[+] CharacterList.onLoginWait()" .. message .. " " .. time)
   CharacterList.destroyLoadBox()
 
@@ -170,6 +359,9 @@ function onGameLoginError(message)
     return
   end
 
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   consoleln("[+] CharacterList.onGameLoginError()", message)
   CharacterList.destroyLoadBox()
 
@@ -214,8 +406,7 @@ function onGameLoginError(message)
   end
 
   if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
+    removeAutoReconnectEvent()
   end
 
   errorBox = displayErrorBox(tr("Login Error"), message)
@@ -248,6 +439,9 @@ function onGameSessionEnd(messageId)
 end
 
 function onGameLoginToken(unknown)
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   CharacterList.destroyLoadBox()
   -- TODO: make it possible to enter a new token here / prompt token
   errorBox = displayErrorBox(tr("Two-Factor Authentification"), 'A new authentification token is required.\nPlease login again.')
@@ -264,107 +458,10 @@ function onGameConnectionError(message, code)
   end
 
   CharacterList.destroyLoadBox()
-  if errorBox and code ~= 2 then
-    errorBox:destroy()
-    errorBox = nil
-  end
-
-  if (not g_game.isOnline() or code ~= 2) and not errorBox then -- code 2 is normal disconnect, end of file
-    if code == 10054 then
-        errorBox = displayErrorBox(tr("Connection Lost"), "The connection to the game server was lost.\n\nError: The remote host closed the connection.\n\nPlease try again later.")
-        errorBox.onOk = function()
-          -- I assume it wasn't destroyed before
-          if errorBox then
-            errorBox:destroy()
-          end
-          errorBox = nil
-          CharacterList.showAgain()
-        end
-
-        scheduleAutoReconnect()
-        return
-    end
-
-    if code == 16654 then
-        errorBox = displayErrorBox(tr("Connection Failed"), "Cannot connect to the game server.\n\nError: Connection refused.\n\nThe game server is offline. Check astraclient.local\nfor more information.\n\nFor more information take a look at the FAQs in the\nSupport section at astraclient.local.")
-        errorBox.onOk = function()
-          -- I assume it wasn't destroyed before
-          if errorBox then
-            errorBox:destroy()
-          end
-          errorBox = nil
-          CharacterList.showAgain()
-        end
-
-        scheduleAutoReconnect()
-        return
-    end
-
-    if code == 16655 then
-      errorBox = displayErrorBox(tr("Connection Failed"), "Couldn't authenticate your account.\n\nPlease try again later.")
-      errorBox.onOk = function()
-        -- I assume it wasn't destroyed before
-        if errorBox then
-          errorBox:destroy()
-        end
-        errorBox = nil
-        CharacterList.hide(true)
-      end
-      return
-  end
-
-    if code == 2 or code == 10061 then
-      errorBox = g_ui.displayUI('waitinglist')
-      local function removeEventAndDestroy()
-        if errorBox then
-          errorBox:destroy()
-        end
-        errorBox = nil
-        CharacterList.showAgain()
-        if autoReconnectEvent then
-          removeEvent(autoReconnectEvent)
-        end
-      end
-
-      errorBox.onEscape = removeEventAndDestroy
-      errorBox.onEnter = function()
-        removeEventAndDestroy()
-        LoginEvent.loginTries = 0
-      end
-      errorBox:recursiveGetChildById('buttonCancel').onClick = function()
-        removeEventAndDestroy()
-        LoginEvent.loginTries = 0
-      end
-
-      local label = errorBox.contentPanel:getChildById('infoLabel')
-      label:setText("Failed to establish connection to\nthe game server.\nFailed attempts so far: " .. LoginEvent.loginTries)
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(g_clock.seconds(), g_clock.seconds() + 5) end, 0)
-      scheduleReconnect()
-      return
-    end
-
-    local text = translateNetworkError(code, g_game.getProtocolGame() and g_game.getProtocolGame():isConnecting(), message)
-    errorBox = displayErrorBox(tr("Connection Error"), text)
-    errorBox.onOk = function()
-      -- I assume it wasn't destroyed before
-      if errorBox then
-        errorBox:destroy()
-      end
-      errorBox = nil
-      CharacterList.showAgain()
-    end
-  end
-
-  if g_game.isOnline() then
-    scheduleAutoReconnect()
-  end
-end
-
-function executeReconnect()
-  local selected = characterList:getFocusedChild()
-  if not selected then return end
-
-  if g_game.isOnline() then
+  -- The server waiting list owns its retry deadline. EOF after a wait response
+  -- must not replace it with the automatic reconnect timer.
+  if (waitingWindow and code ~= 16655) or autoReconnectBlocked or recentlyLoggedOut() then
+    removeAutoReconnectEvent()
     return
   end
 
@@ -373,20 +470,43 @@ function executeReconnect()
     errorBox = nil
   end
 
-  CharacterList.doLogin()
-end
+  local title = tr('Connection Error')
+  local text = translateNetworkError(code, g_game.getProtocolGame() and g_game.getProtocolGame():isConnecting(), message)
+  if code == 10054 then
+    title = tr('Connection Lost')
+    text = "The connection to the game server was lost.\n\nError: The remote host closed the connection.\n\nPlease try again later."
+  elseif code == 16654 then
+    title = tr('Connection Failed')
+    text = "Cannot connect to the game server.\n\nError: Connection refused.\n\nThe game server is offline. Check astraclient.local\nfor more information.\n\nFor more information take a look at the FAQs in the\nSupport section at astraclient.local."
+  elseif code == 16655 then
+    autoReconnectBlocked = true
+    removeAutoReconnectEvent()
+    removeLoginWaitEvents()
+    title = tr('Connection Failed')
+    text = "Couldn't authenticate your account.\n\nPlease try again later."
+  end
 
-function scheduleReconnect()
-  if isRecentManualLogout() then
-    return
+  errorBox = displayErrorBox(title, text)
+  errorBox.onOk = function()
+    if errorBox then errorBox:destroy() end
+    errorBox = nil
+    if code == 16655 then
+      CharacterList.hide(true)
+    else
+      CharacterList.showAgain()
+    end
   end
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
+
+  -- Online connection errors are followed by onGameEnd in the engine.
+  if not g_game.isOnline() then
+    CharacterList.showAgain()
   end
-  autoReconnectEvent = scheduleEvent(executeReconnect, CharacterList.scheduleTime * 1000)
 end
 
 function onGameUpdateNeeded(signature)
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   CharacterList.destroyLoadBox()
   errorBox = displayErrorBox(tr("Update needed"), tr('Enter with your account again to update your client.'))
   errorBox.onOk = function()
@@ -399,51 +519,47 @@ function onGameUpdateNeeded(signature)
   end
 end
 
-function onGameEnd()
+local function onGameEnd()
   local background = modules.client_background
   if background and background.isReturningToCastList and background.isReturningToCastList() then
     return
   end
+  CharacterList.destroyLoadBox()
+  removeAutoReconnectEvent()
   CharacterList.showAgain()
 end
 
 function onLogout()
   lastLogout = g_clock.millis()
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
-  end
-
-  local characterName = g_game.getCharacterName()
-  if characterName then
-    saveAutoReconnect(characterName, g_settings.getBoolean('autoReconnect', false))
-  end
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
+  CharacterList.destroyLoadBox()
 end
 
 function scheduleAutoReconnect()
-  if isRecentManualLogout() then
+  removeAutoReconnectEvent()
+  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+      or autoReconnectBlocked or g_game.isOnline() or waitingWindow
+      or LoginEvent.event or LoginEvent:getLoadBox() then
     return
-  end
-
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
   end
   autoReconnectEvent = scheduleEvent(executeAutoReconnect, 2500)
 end
 
 function executeAutoReconnect()
-  -- disconnect por recorder
+  autoReconnectEvent = nil
+  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+      or autoReconnectBlocked or g_game.isOnline() or g_game.isLogging()
+      or waitingWindow or LoginEvent.event or LoginEvent:getLoadBox() then
+    return
+  end
+
   if not characterList then
     return
   end
   local selected = characterList:getFocusedChild()
   if not selected then return end
-
-  local autoReconnect = getAutoReconnect(selected.characterName)
-
-  if autoReconnect == false or g_game.isOnline() then
-    return
-  end
 
   if errorBox then
     errorBox:destroy()
@@ -456,11 +572,12 @@ end
 -- public functions
 function CharacterList.init()
   if USE_NEW_ENERGAME then return end
+  g_settings.remove('autoReconnectSettings')
   connect(g_game, { onLoginError = onGameLoginError })
   connect(g_game, { onLoginToken = onGameLoginToken })
   connect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   connect(g_game, { onConnectionError = onGameConnectionError })
-  connect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  connect(g_game, { onGameStart = CharacterList.onGameStart })
   connect(g_game, { onLoginWait = onLoginWait })
   connect(g_game, { onGameEnd = onGameEnd })
   connect(g_game, { onLogout = onLogout })
@@ -473,11 +590,14 @@ end
 
 function CharacterList.terminate()
  if USE_NEW_ENERGAME then return end
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   disconnect(g_game, { onLoginError = onGameLoginError })
   disconnect(g_game, { onLoginToken = onGameLoginToken })
   disconnect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   disconnect(g_game, { onConnectionError = onGameConnectionError })
-  disconnect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  disconnect(g_game, { onGameStart = CharacterList.onGameStart })
   disconnect(g_game, { onLoginWait = onLoginWait })
   disconnect(g_game, { onGameEnd = onGameEnd })
   disconnect(g_game, { onLogout = onLogout })
@@ -486,7 +606,6 @@ function CharacterList.terminate()
   if charactersWindow then
     characterList = nil
     panelSort = nil
-    lastSortButton = nil
     g_client.setInputLockWidget(nil)
     charactersWindow:destroy()
     charactersWindow = nil
@@ -498,31 +617,18 @@ function CharacterList.terminate()
     LoginEvent:destroyLoadBox()
   end
 
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
-  end
-
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
-  if resendWaitEvent then
-    removeEvent(resendWaitEvent)
-    resendWaitEvent = nil
-  end
-
   LoginEvent:reset()
 
   if lastWidget then
     lastWidget = nil
   end
+  autoReconnectButton = nil
 
   CharacterList = nil
 end
 
 function CharacterList.create(characters, account, otui)
+  removeAutoReconnectEvent()
   if not otui then otui = 'characterlist' end
   if charactersWindow then
     charactersWindow:destroy()
@@ -531,6 +637,8 @@ function CharacterList.create(characters, account, otui)
   charactersWindow = g_ui.displayUI(otui)
   characterList = charactersWindow:getChildById('characters')
   panelSort = charactersWindow:getChildById('characterTable')
+  autoReconnectButton = charactersWindow:getChildById('autoReconnect')
+  updateAutoReconnectButton()
   CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
 
   charactersWindow.static = not g_game.isOnline()
@@ -542,6 +650,9 @@ function CharacterList.create(characters, account, otui)
   lastWidget = nil
 
   local showOutfit = Options.getOption("characterSelectionShowOutfits")
+  if showOutfit == nil then
+    showOutfit = true
+  end
   if not showOutfit then
     charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
   else
@@ -549,19 +660,13 @@ function CharacterList.create(characters, account, otui)
   end
 
   local outfitCheckBox = charactersWindow:recursiveGetChildById('checkBoxOutfit')
-  outfitCheckBox:setChecked(showOutfit, true)
-  onReorderCharacterList()
+  setCheckedWithoutCallback(outfitCheckBox, showOutfit)
 
   characterList.onChildFocusChange = function(self, focusChild, oldFocusChild)
-    characterList:ensureChildVisible(focusChild)
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
+    if focusChild then self:ensureChildVisible(focusChild) end
+    removeAutoReconnectEvent()
   end
-
-  if focusLabel then
-    characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
-  end
+  CharacterList.rebuildCharactersList()
 
   -- account
   local status = ''
@@ -603,7 +708,6 @@ function CharacterList.destroy()
   CharacterList.hide(true)
   if charactersWindow then
     characterList = nil
-    lastSortButton = nil
     charactersWindow:destroy()
     charactersWindow = nil
     panelSort = nil
@@ -630,15 +734,22 @@ function CharacterList.show()
   end
 
   charactersWindow:setPosition(charactersWindow.startPos)
+  updateAutoReconnectButton()
 
   local camRecord = g_settings.getBoolean("recordSession", false)
-  CharacterList.camRecordCheck:setOn(camRecord)
+  if CharacterList.camRecordCheck then
+    CharacterList.camRecordCheck:setOn(camRecord)
+  end
 end
 
 function CharacterList.hide(showLogin)
-
+  removeAutoReconnectEvent()
   showLogin = showLogin or false
-  charactersWindow:hide()
+  if showLogin then
+    autoReconnectBlocked = true
+    removeLoginWaitEvents()
+  end
+  if charactersWindow then charactersWindow:hide() end
   g_client.setInputLockWidget(nil)
 
   if showLogin and EnterGame and not g_game.isOnline() then
@@ -664,6 +775,7 @@ function CharacterList.showAgain()
     end
   
     charactersWindow:setPosition(charactersWindow.startPos)
+    scheduleAutoReconnect()
   end
 end
 
@@ -675,7 +787,8 @@ function CharacterList.isVisible()
 end
 
 function CharacterList.doLogin()
-
+  removeAutoReconnectEvent()
+  if not characterList then return end
   local selected = characterList:getFocusedChild()
   if selected then
     local charInfo = { worldHost = selected.worldHost,
@@ -684,6 +797,7 @@ function CharacterList.doLogin()
                        vocation = selected.vocationName,
                        characterName = selected.characterName, }
     CharacterList.hide()
+    autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
     LoginEvent:setNewEvent(charInfo)
   else
@@ -692,6 +806,7 @@ function CharacterList.doLogin()
 end
 
 function CharacterList.doLoginExtended(options)
+  removeAutoReconnectEvent()
   if options then
     local charInfo = { worldHost = options.worldHost,
                        worldPort = options.worldPort,
@@ -701,6 +816,7 @@ function CharacterList.doLoginExtended(options)
 
 
     CharacterList.hide()
+    autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
     LoginEvent:setNewEvent(charInfo)
   else
@@ -713,53 +829,42 @@ function CharacterList.destroyLoadBox()
   LoginEvent:destroyLoadBox()
 
   if g_game.isOnline() then
-    if waitingWindow then
-      waitingWindow:destroy()
-      waitingWindow = nil
-    end
+    removeAutoReconnectEvent()
+    removeLoginWaitEvents()
     if errorBox then
       errorBox:destroy()
       errorBox = nil
     end
 
     LoginEvent.loginTries = 0
-
-    CharacterList.waiting = false
-    CharacterList.scheduleTime = 5
   end
 end
 
+function CharacterList.onGameStart()
+  autoReconnectBlocked = false
+  removeAutoReconnectEvent()
+  CharacterList.destroyLoadBox()
+end
+
+function CharacterList.toggleAutoReconnect()
+  local enabled = not g_settings.getBoolean('autoReconnect', false)
+  g_settings.set('autoReconnect', enabled)
+  updateAutoReconnectButton()
+  if not enabled then removeAutoReconnectEvent() end
+end
+
 function CharacterList.cancelWait()
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   consoleln("[+] CharacterList.cancelWait()")
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
-  end
-
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
   LoginEvent:reset()
-
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
-  end
-
-  if resendWaitEvent then
-    removeEvent(resendWaitEvent)
-    resendWaitEvent = nil
-  end
 
   if errorBox then
     errorBox:destroy()
     errorBox = nil
   end
 
-  CharacterList.scheduleTime = 5
-  CharacterList.waiting = false
   CharacterList.destroyLoadBox()
   CharacterList.showAgain()
   charactersWindow:recursiveFocus(2)
@@ -776,11 +881,6 @@ function onUpdateOnStates(self)
     children[i]:setColor("#f4f4f4")
     if children[i]:getId() == "pin" then
       children[i]:setVisible(true)
-      if Options.getOption("characterSelectionShowOutfits") then
-        children[i]:setChecked(isCharacterPinned(children[3]:getText()))
-      else
-        children[i]:setChecked(isCharacterPinned(children[2]:getText()))
-      end
     end
   end
 
@@ -798,242 +898,135 @@ function onUpdateOnStates(self)
     if lastWidget.vocation then
       lastWidget.vocation:setColor("#c0c0c0")
     end
-    if lastWidget.worldName then
-      lastWidget.worldName:setColor("#c0c0c0")
+    local worldLabel = lastWidget:getChildById('worldName')
+    if worldLabel then
+      worldLabel:setColor("#c0c0c0")
     end
   end
 
   lastWidget = self
 end
 
-function onPinCharacter(self)
-  self:setChecked(not self:isChecked())
-  local focusedOption = characterList:getFocusedChild()
-  if not focusedOption then
-    return
-  end
-
-  Options.managePinnedCharacters(focusedOption.name:getText(), self:isChecked())
-  onReorderCharacterList()
+function onPinCharacter(widget, isChecked)
+  if suppressCheckCallbacks then return end
+  local row = widget and widget:getParent()
+  if not row or not row.characterName then return end
+  setCharacterPinned(row.characterName, row.worldName, isChecked)
+  CharacterList.rebuildCharactersList(row.characterName, row.worldName)
 end
 
-function isCharacterPinned(name)
-  return table.contains(Options.pinnedCharacters, name)
+function onSortButtonClick(button, columnIndex)
+  if not SORT_BUTTON_IDS[columnIndex] then return end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  if sortColumn == columnIndex then
+    sortAscending = not sortAscending
+  else
+    sortColumn = columnIndex
+    sortAscending = true
+  end
+  g_settings.set(SORT_COLUMN_SETTING, sortColumn)
+  g_settings.set(SORT_ASCENDING_SETTING, sortAscending)
+  CharacterList.rebuildCharactersList()
 end
 
-function setupSortButton(button, sortType, sortIndex)
-  if lastSortButton and lastSortButton ~= button then
-    lastSortButton:setChecked(false)
-    lastSortButton:setOn(false)
-  end
+function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverride)
+  if not characterList then return end
 
-  button:setOn(true)
-  if lastSortButton == button then
-    button:setChecked(not button:isChecked(), true)
-  end
-
-  lastSortButton = button
-  Options.setOption("characterSelectionSortColumn", sortIndex)
-  Options.setOption("characterSelectionSortAscendingOrder", button:isChecked())
-
-  if sortType ~= "status" then
-    onReorderCharacterList()
-  end
-end
-
-function onReorderCharacterList()
-  if not G.characters then
-    return
-  end
-
-  local sortIndex = Options.getOption("characterSelectionSortColumn") or 1
-  local sortAscend = Options.getOption("characterSelectionSortAscendingOrder")
-  local showOutfit = Options.getOption("characterSelectionShowOutfits")
+  local focused = characterList:getFocusedChild()
+  local focusName = focusNameOverride or (focused and focused.characterName) or g_settings.get('last-used-character')
+  local focusWorld = focusWorldOverride or (focused and focused.worldName) or g_settings.get('last-used-world')
+  local pinnedLookup = getPinnedCharacters()
+  local characters = buildCharacters(pinnedLookup)
+  local showOutfit = Options.getOption('characterSelectionShowOutfits') ~= false
   if charactersWindow.characterTable then
-    if not showOutfit then
-      charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
-    else
-      charactersWindow.characterTable.characterSort:setTextOffset("-73 0")
-    end
-  end
-
-  if lastWidget and lastWidget.pin then
-    lastWidget:setBackgroundColor(lastWidget.realColor)
-    lastWidget.pin:setVisible(false)
-    lastWidget.name:setColor("#c0c0c0")
-    lastWidget.level:setColor("#c0c0c0")
-    lastWidget.vocation:setColor("#c0c0c0")
-    lastWidget.worldName:setColor("#c0c0c0")
+    charactersWindow.characterTable.characterSort:setTextOffset(showOutfit and '-73 0' or '-206 0')
   end
 
   lastWidget = nil
-  local characters = table.copy(G.characters)
-  local focusLabel = nil
   characterList:destroyChildren()
-
-  if sortIndex == 1 then
-    panelSort.characterSort:setOn(true)
-    lastSortButton = panelSort.characterSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          if sortAscend then
-              return a.name > b.name
-          else
-              return a.name < b.name
-          end
-      end
-    end)
-  end
-
-  if sortIndex == 2 then
-    panelSort.statusSort:setOn(true)
-    lastSortButton = panelSort.statusSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      end
-    end)
-  end
-
-  if sortIndex == 3 then
-    panelSort.levelSort:setOn(true)
-    lastSortButton = panelSort.levelSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.level > b.level or not sortAscend and a.level < b.level
-      end
-    end)
-  end
-
-  if sortIndex == 4 then
-    panelSort.vocationSort:setOn(true)
-    lastSortButton = panelSort.vocationSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.vocation > b.vocation or not sortAscend and a.vocation < b.vocation
-      end
-    end)
-  end
-
-  if sortIndex == 5 then
-    panelSort.worldSort:setOn(true)
-    lastSortButton = panelSort.worldSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      local checked = lastSortButton:isChecked()
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.worldName > b.worldName or not sortAscend and a.worldName < b.worldName
-      end
-    end)
-  end
-
+  local focusLabel
+  local firstWidget
   for i, characterInfo in ipairs(characters) do
     local widget = g_ui.createWidget(showOutfit and 'CharacterWidgetOn' or 'CharacterWidgetOff', characterList)
-    widget.realColor = (i % 2 == 0 and "#414141" or "#484848")
+    widget.realColor = i % 2 == 0 and '#414141' or '#484848'
     widget:setBackgroundColor(widget.realColor)
 
-    for key,value in pairs(characterInfo) do
+    local pvpType = PvPTypes[characterInfo.pvpType] or PvPTypes[0] or ''
+    local comingSoon = worldIsComingSoon(characterInfo.worldId)
+    for key, value in pairs(characterInfo) do
       local subWidget = widget:getChildById(key)
       if key == 'name' then
-        widget:setId("ui_"..value)
-      end
-
-      if key == 'mainCharacter' then
+        widget:setId('ui_' .. value)
+      elseif key == 'mainCharacter' then
         widget.main:setVisible(value)
-      end
-
-      if key == 'dailyRewardState' then
-        local source = value and "dailyreward_collected" or "dailyreward_notcollected"
-        widget.statusDailyReward:setImageSource("/images/game/entergame/" .. source)
+      elseif key == 'dailyRewardState' then
+        local source = value and 'dailyreward_collected' or 'dailyreward_notcollected'
+        widget.statusDailyReward:setImageSource('/images/game/entergame/' .. source)
       end
 
       if subWidget then
-        if key == 'outfit' and showOutfit then -- it's an exception
+        if key == 'outfit' and showOutfit then
           subWidget:setOutfit(value)
         else
           local text = value
-
-          local pvpType = PvPTypes[characterInfo.pvpType] or PvPTypes[0] or ""
-          if key == 'worldName' and worldIsComingSoon(characterInfo.worldId) then
-            subWidget:setImageShader("text_coming")
-            pvpType = "Coming Soon"
+          local worldPvpType = pvpType
+          if key == 'worldName' and comingSoon then
+            subWidget:setImageShader('text_coming')
+            worldPvpType = 'Coming Soon'
           end
-
           if subWidget.baseText and subWidget.baseTranslate then
             text = tr(subWidget.baseText, text)
           elseif subWidget.baseText then
-            text = string.format(subWidget.baseText, text, pvpType)
+            text = string.format(subWidget.baseText, text, worldPvpType)
           end
           subWidget:setText(text)
         end
       end
     end
 
-    -- these are used by login
+    -- Keep both the new row identity and Astra's login fields.
     widget.characterName = characterInfo.name
+    widget.worldName = characterInfo.worldName
     widget.gameworldName = characterInfo.worldName
     widget.worldHost = characterInfo.worldHost or characterInfo.worldIp
     widget.worldPort = characterInfo.worldPort
     widget.vocationName = characterInfo.vocation
+    local pin = widget:getChildById('pin')
+    setCheckedWithoutCallback(pin, isCharacterPinned(widget.characterName, widget.worldName, pinnedLookup))
 
-    connect(widget, { onDoubleClick = function () CharacterList.doLogin() return true end } )
-
-    if i == 1 or (g_settings.get('last-used-character') == widget.characterName and g_settings.get('last-used-world') == widget.worldName) then
+    connect(widget, { onDoubleClick = function() CharacterList.doLogin() return true end })
+    if not firstWidget then firstWidget = widget end
+    if focusName == widget.characterName and focusWorld == widget.worldName then
       focusLabel = widget
     end
   end
 
+  focusLabel = focusLabel or firstWidget
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+    characterList:ensureChildVisible(focusLabel)
+    local currentList = characterList
+    local visibleName, visibleWorld = focusLabel.characterName, focusLabel.worldName
+    addEvent(function()
+      if characterList ~= currentList then return end
+      local selected = currentList:getFocusedChild()
+      if selected and selected.characterName == visibleName and selected.worldName == visibleWorld then
+        currentList:ensureChildVisible(selected)
+      end
+    end)
   end
+  updateSortButtons()
 end
 
 function onShowOutfits(button, isChecked)
+  if suppressCheckCallbacks then return end
   Options.setOption("characterSelectionShowOutfits", isChecked)
-  onReorderCharacterList()
+  CharacterList.rebuildCharactersList()
 end
 
 function onRecordSession(widget, isChecked)
   g_settings.set("recordSession", isChecked)
-end
-
-function saveAutoReconnect(characterName, setting)
-  local settings = g_settings.getNode('autoReconnectSettings') or {}
-  settings[characterName] = setting
-  g_settings.setNode('autoReconnectSettings', settings)
-end
-
-function getAutoReconnect(characterName)
-  local settings = g_settings.getNode('autoReconnectSettings') or {}
-  return settings[characterName] or false
 end
 
 function GetCharacterInfoByWorldID(worldID)

@@ -32,6 +32,7 @@
 #include "localplayer.h"
 #include "game.h"
 #include "gameconfig.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 
 #include <framework/graphics/graphics.h>
@@ -43,6 +44,8 @@
 #include <framework/graphics/texturemanager.h>
 #include <framework/graphics/atlas.h>
 #include <framework/graphics/shadermanager.h>
+
+#include <algorithm>
 
 #include <framework/util/extras.h>
 #include <framework/core/adaptiverenderer.h>
@@ -186,6 +189,10 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
 
     auto& tiles = m_cachedVisibleTiles[floor];
     size_t lightFloorStart = m_lightView ? m_lightView->size() : 0;
+    const bool negativeOffsetPass = g_game.getFeature(Otc::GameNegativeOffset) &&
+        std::any_of(tiles.begin(), tiles.end(), [](const TilePtr& tile) {
+            return tile && tile->hasNegativeDisplacementCreature();
+        });
 
     // light
     if (m_lightView) {
@@ -198,7 +205,35 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
         }
     }
 
-    if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
+    if (negativeOffsetPass) {
+        // Large displaced creatures can overlap several neighboring tiles.
+        // Queue every lower layer before any creature so a later tile cannot
+        // cover artwork that was already queued from an earlier tile.
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawGround(tileDrawPos, m_lightView.get(), true);
+        }
+
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawBottom(tileDrawPos, m_lightView.get(), true);
+            tile->drawLootHighlights(tileDrawPos, m_lightView.get());
+
+            if (m_crosshair && tile == crosshairTile) {
+                g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),
+                                             m_crosshair, Rect(0, 0, m_crosshair->getSize()));
+            }
+        }
+
+        // Keep creatures, effects, and top objects in the normal per-tile
+        // painter order. Only the layers that may overwrite displaced artwork
+        // need to be globally queued before creatures.
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawCreatures(tileDrawPos, m_lightView.get(), true);
+            tile->drawTop(tileDrawPos, m_lightView.get(), true);
+        }
+    } else if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         // ground
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
@@ -271,7 +306,10 @@ void MapView::drawMapForeground(const Rect& rect)
             continue;
 
         PointF jumpOffset = creature->getJumpOffset();
-        Point creatureOffset = Point(16 * g_sprites.getOffsetFactor() - creature->getDisplacementX(), -creature->getDisplacementY() - 2 * g_sprites.getOffsetFactor());
+        const bool negativeDisplacement = creature->usesNegativeDisplacement();
+        const int displacementX = negativeDisplacement ? 0 : creature->getDisplacementX();
+        const int displacementY = negativeDisplacement ? 0 : creature->getDisplacementY();
+        Point creatureOffset = Point(16 * g_sprites.getOffsetFactor() - displacementX, -displacementY - 2 * g_sprites.getOffsetFactor());
         Position pos = creature->getPrewalkingPosition();
         Point p = transformPositionTo2D(pos, cameraPosition) - drawOffset;
         p += (creature->getDrawOffset() + creatureOffset) - Point(jumpOffset.x, jumpOffset.y);

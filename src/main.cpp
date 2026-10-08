@@ -24,18 +24,34 @@
 #include <framework/core/config.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/eventdispatcher.h>
+#ifdef __EMSCRIPTEN__
+#include <framework/core/startuptimer.h>
+#endif
 #include <framework/util/stats.h>
 #include <framework/luaengine/luainterface.h>
 #include <framework/http/http.h>
 #include <framework/platform/crashhandler.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <client/client.h>
 
 #include <algorithm>
 #include <array>
 #include <stdexcept>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 
 namespace {
+
+void shutdownApplicationRuntime()
+{
+    g_app.deinit();
+    g_http.terminate();
+    g_client.terminate();
+    g_app.terminate();
+    g_stats.clearAll();
+}
 
 bool hasRendererArgument(const std::vector<std::string>& args)
 {
@@ -87,15 +103,42 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
 
 }
 
+#ifdef __EMSCRIPTEN__
+void shutdownBrowserApplication()
+{
+    static bool shuttingDown = false;
+    if (shuttingDown)
+        return;
+    shuttingDown = true;
+    shutdownApplicationRuntime();
+}
+#endif
+
 int main(int argc, const char* argv[]) {
+#ifdef __EMSCRIPTEN__
+    // PROXY_TO_PTHREAD runs main on a different thread from static initialization.
+    // The browser loop owns both logic and graphics on this application thread.
+    g_mainThreadId = g_dispatcherThreadId = g_graphicsThreadId = std::this_thread::get_id();
+#endif
     std::vector<std::string> args(argv, argv + argc);
+#ifdef __EMSCRIPTEN__
+    g_app.enableStartupDiagnostics(MAIN_THREAD_EM_ASM_INT({ return !!(globalThis.ASTRA_CONFIG && ASTRA_CONFIG.performance); }) != 0);
+    const auto startupPhase = [&](const char* name, auto&& operation) {
+        StartupTimer timer(name);
+        operation();
+    };
+#endif
 
 #ifdef CRASH_HANDLER
     installCrashHandler();
 #endif
 
     // initialize resources
+#ifdef __EMSCRIPTEN__
+    startupPhase("resourceManagerInit", [&] { g_resources.init(argv[0]); });
+#else
     g_resources.init(argv[0]);
+#endif
     std::string compactName = g_resources.getCompactName();
     g_logger.setLogFile(compactName + ".log");
 
@@ -124,10 +167,20 @@ int main(int argc, const char* argv[]) {
     applyConfiguredRenderer(args);
 
     // initialize application framework and otclient
+#ifdef __EMSCRIPTEN__
+    startupPhase("applicationInit", [&] { g_app.init(args); });
+    g_app.setStartupStage("Loading resources...");
+    startupPhase("resourceSetup", [&] { g_resources.setup(); });
+    g_app.setStartupStage("Initializing client...");
+    startupPhase("clientInit", [&] { g_client.init(args); });
+    startupPhase("httpInit", [&] { g_http.init(); });
+    g_app.setStartupStage("Loading modules...");
+#else
     g_app.init(args);
     g_resources.setup();
     g_client.init(args);
     g_http.init();
+#endif
 
     bool testMode = std::find(args.begin(), args.end(), "--test") != args.end();
     if (testMode) {
@@ -135,7 +188,13 @@ int main(int argc, const char* argv[]) {
     }
 
     // run the main script from the resource path discovered before client initialization
+#ifdef __EMSCRIPTEN__
+    bool initSucceeded = false;
+    startupPhase("initLua", [&] { initSucceeded = g_lua.safeRunScript("init.lua"); });
+    if (!initSucceeded) {
+#else
     if (!g_lua.safeRunScript("init.lua")) {
+#endif
         if (g_resources.isLoadedFromArchive() && !g_resources.isLoadedFromMemory() &&
             g_resources.loadDataFromSelf(true)) {
             g_logger.error("Unable to run script init.lua! Trying to run version from memory.");
@@ -147,6 +206,11 @@ int main(int argc, const char* argv[]) {
             g_logger.fatal("Unable to run script init.lua!");
         }
     }
+#ifdef __EMSCRIPTEN__
+    g_app.setStartupStage("Building interface...");
+#elif defined(WIN32)
+    setNativeSplashProgress(95, "Preparing the first client frame...");
+#endif
 
     if (testMode) {
         if (!g_lua.safeRunScript("test.lua")) {
@@ -167,14 +231,8 @@ int main(int argc, const char* argv[]) {
     uninstallCrashHandler();
 #endif
 
-    // unload modules
-    g_app.deinit();
-
-    // terminate everything and free memory
-    g_http.terminate();
-    g_client.terminate();
-    g_app.terminate();
-    g_stats.clearAll();
+    // unload modules and terminate everything in dependency order
+    shutdownApplicationRuntime();
     return 0;
 }
 

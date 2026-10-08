@@ -335,9 +335,11 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
         if (x1 == x2 || y1 == y2) return;
 
         float scale = std::min<float>((float)dest.height() / (y2 - y1), (float)dest.width() / (x2 - x1));
+        const int centeredX = center ? (dest.width() - static_cast<int>((x2 - x1) * scale)) / 2 : 0;
+        const int centeredY = center ? (dest.height() - static_cast<int>((y2 - y1) * scale)) / 2 : 0;
         for (auto& rect : rects) {
             int x = rect->left() - x1, y = rect->top() - y1; // offset
-            *rect = Rect(dest.left() + x * scale, dest.top() + y * scale, rect->size() * scale);
+            *rect = Rect(dest.left() + centeredX + x * scale, dest.top() + centeredY + y * scale, rect->size() * scale);
         }
     }
 }

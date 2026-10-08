@@ -31,7 +31,7 @@ end
 
 function LoginEvent:tryLogin()
   consoleln("[+] LoginEvent.tryLogin()")
-    local autoReconnect = getAutoReconnect(self.charInfo.characterName)
+    local autoReconnect = g_settings.getBoolean('autoReconnect', false)
 
     -- Validate and sanitize character info
     local function validateField(field, fieldName)
@@ -79,7 +79,11 @@ function LoginEvent:tryLogin()
       g_game.safeLogout()
       g_game.doThing(true)
     end
-    self.event = scheduleEvent(function() self.internalTries = self.internalTries + 1;self:tryLogin() end, 100)
+    self.event = scheduleEvent(function()
+      self.event = nil
+      self.internalTries = self.internalTries + 1
+      self:tryLogin()
+    end, 100)
     return
   end
 

@@ -66,6 +66,7 @@ void Protocol::connect(const std::string& host, uint16 port)
 {
     const std::weak_ptr<Protocol> weakSelf = asProtocol();
 
+#ifndef __EMSCRIPTEN__
     if (host == "proxy" || host == "0.0.0.0" || (host == "127.0.0.1" && g_proxy.isActive())) {
         m_disconnected = false;
         m_proxy = g_proxy.addSession(port,
@@ -79,6 +80,7 @@ void Protocol::connect(const std::string& host, uint16 port)
                                      });
         return onConnect();
     }
+#endif
     m_connection = std::make_shared<Connection>();
     m_connection->setErrorCallback([weakSelf](const boost::system::error_code& error) {
         if (const auto self = weakSelf.lock())
@@ -105,9 +107,11 @@ void Protocol::disconnect()
     }
 
     if (m_proxy) {
+#ifndef __EMSCRIPTEN__
         if (g_proxy.isWorking()) {
             g_proxy.removeSession(m_proxy);
         }
+#endif
         m_proxy = 0;
     }
 
@@ -188,8 +192,10 @@ void Protocol::send(const OutputMessagePtr& outputMessage, bool rawPacket)
     }
 
     if (m_proxy) {
+#ifndef __EMSCRIPTEN__
         auto packet = std::make_shared<ProxyPacket>(outputMessage->getHeaderBuffer(), outputMessage->getWriteBuffer());
         g_proxy.send(m_proxy, packet);
+#endif
         outputMessage->reset();
         return;
     }

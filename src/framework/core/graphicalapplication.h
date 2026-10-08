@@ -26,6 +26,9 @@
 
 #include "application.h"
 #include <atomic>
+#ifdef __EMSCRIPTEN__
+#include <chrono>
+#endif
 #include <framework/graphics/declarations.h>
 #include <framework/core/inputevent.h>
 #include <framework/core/adaptiverenderer.h>
@@ -38,9 +41,18 @@ public:
     void deinit();
     void terminate();
     void run();
+#ifdef __EMSCRIPTEN__
+    void browserMainLoop();
+#endif
     void poll();
     void pollGraphics();
     void close();
+#ifdef __EMSCRIPTEN__
+    void setStartupStage(const std::string& stage);
+    void enableStartupDiagnostics(bool enabled) { m_startupDiagnostics = enabled; m_startupBegin = std::chrono::steady_clock::now(); }
+    bool isStartupDiagnosticsEnabled() const { return m_startupDiagnostics && !m_startupFinished; }
+    void recordStartupPhase(const char* name, double milliseconds);
+#endif
 
     bool willRepaint() const { return m_mustRepaint.load(); }
     void repaint() { m_mustRepaint = true; }
@@ -83,20 +95,27 @@ protected:
     void inputEvent(InputEvent event);
 
 private:
-    int m_iteration = 0;
-    std::atomic<float> m_scaling = 1.0;
-    std::atomic<float> m_lastScaling = 1.0;
-    std::atomic_int m_maxFps = 100;
-    std::atomic_bool m_vsyncRequested = false;
-    std::atomic_bool m_unlimitedFps = false;
-    std::atomic_bool m_mapSmooth = true;
-    std::atomic_bool m_cacheUI = true;
-    std::atomic_bool m_mustRepaint = false;
-    stdext::boolean<false> m_onInputEvent;
-    FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
-    FrameCounter m_graphicsFrames;
-    FrameCounter m_processingFrames;
-    stdext::timer m_windowPollTimer;
+#ifdef __EMSCRIPTEN__
+  void finishStartup();
+  std::atomic_bool m_startupFinished = false;
+  bool m_startupDiagnostics = false;
+  std::chrono::steady_clock::time_point m_startupBegin;
+  void runBrowser();
+#endif
+  int m_iteration = 0;
+  std::atomic<float> m_scaling = 1.0;
+  std::atomic<float> m_lastScaling = 1.0;
+  std::atomic_int m_maxFps = 100;
+  std::atomic_bool m_vsyncRequested = false;
+  std::atomic_bool m_unlimitedFps = false;
+  std::atomic_bool m_mapSmooth = true;
+  std::atomic_bool m_cacheUI = true;
+  std::atomic_bool m_mustRepaint = false;
+  stdext::boolean<false> m_onInputEvent;
+  FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
+  FrameCounter m_graphicsFrames;
+  FrameCounter m_processingFrames;
+  stdext::timer m_windowPollTimer;
 };
 
 extern GraphicalApplication g_app;

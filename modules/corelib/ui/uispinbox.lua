@@ -55,13 +55,13 @@ function UISpinBox:onKeyPress()
 end
 
 function UISpinBox:onTextChange(text, oldText)
-  if text:len() == 0 then
+  if text:len() == 0 or (text == '-' and self.minimum < 0) then
     return
   end
 
   local number = tonumber(text)
   if not number then
-    self:setText(number)
+    self:setText(oldText or tostring(self.value))
     return
   else
     if number < self.minimum then
@@ -82,8 +82,8 @@ end
 
 function UISpinBox:onFocusChange(focused)
   if not focused then
-    if self:getText():len() == 0 then
-      self:setText(self.minimum)
+    if self:getText():len() == 0 or self:getText() == '-' then
+      self:setText(self.value)
     end
   end
 end
@@ -221,6 +221,7 @@ end
 function UISpinBox:setMinimum(minimum)
   minimum = minimum or -9223372036854775808
   self.minimum = minimum
+  self:setValidCharacters(minimum < 0 and '-0123456789' or '0123456789')
   if self.minimum > self.maximum then
     self.maximum = self.minimum
   end

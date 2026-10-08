@@ -7,13 +7,14 @@
 #include <atomic>
 #include <mutex>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <set>
 #include <utility>
 
-// NOT THREAD SAFE
+// Object counters are thread-safe; widget-tree inspection remains dispatcher-thread only.
 
 enum StatsTypes{
     STATS_FIRST = 0,
@@ -50,6 +51,23 @@ class UIWidget;
 
 class Stats {
 public:
+    struct ObjectCount {
+        int64_t created, destroyed;
+        int64_t alive() const { return created - destroyed; }
+    };
+    struct ObjectCounts {
+        ObjectCount widgets, textures, things, creatures;
+    };
+    // Allocation-free sampling: never walks widgets or builds source/tree reports.
+    ObjectCounts getObjectCounts() const {
+        const auto count = [](const std::atomic<int64_t>& created, const std::atomic<int64_t>& destroyed) {
+            const auto dead = destroyed.load(std::memory_order_relaxed);
+            return ObjectCount{created.load(std::memory_order_relaxed), dead};
+        };
+        return {count(createdWidgets, destroyedWidgets), count(createdTextures, destroyedTextures),
+                count(createdThings, destroyedThings), count(createdCreatures, destroyedCreatures)};
+    }
+
     void add(int type, std::unique_ptr<Stat> stats);
 
     std::string get(int type, int limit, bool pretty);
@@ -92,14 +110,14 @@ private:
     } stats[STATS_LAST + 1];
 
     std::set<UIWidget*> widgets;
-    int createdWidgets = 0;
-    int destroyedWidgets = 0;
-    int createdTextures = 0;
-    int destroyedTextures = 0;
-    int createdThings = 0;
-    int destroyedThings = 0;
-    int createdCreatures = 0;
-    int destroyedCreatures = 0;
+    std::atomic<int64_t> createdWidgets{0};
+    std::atomic<int64_t> destroyedWidgets{0};
+    std::atomic<int64_t> createdTextures{0};
+    std::atomic<int64_t> destroyedTextures{0};
+    std::atomic<int64_t> createdThings{0};
+    std::atomic<int64_t> destroyedThings{0};
+    std::atomic<int64_t> createdCreatures{0};
+    std::atomic<int64_t> destroyedCreatures{0};
     std::mutex m_mutex;
 };
 

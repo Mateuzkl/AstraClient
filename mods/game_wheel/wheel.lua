@@ -96,6 +96,8 @@ function terminate()
   if WheelOfDestiny.cancelPendingEvents then
     WheelOfDestiny.cancelPendingEvents()
   end
+  WheelOfDestiny.closeDialogs()
+  GemAtelier.closeDialogs()
   disconnect(g_game, {
     onGameEnd = onGameEnd,
     onGameStart = WheelOfDestiny.loadWheelPresets,
@@ -183,6 +185,8 @@ function onGameEnd()
   if WheelOfDestiny.cancelPendingEvents then
     WheelOfDestiny.cancelPendingEvents()
   end
+  WheelOfDestiny.closeDialogs()
+  GemAtelier.closeDialogs()
   WheelOfDestiny.saveWheelPresets()
 
   if not wheelWindow then

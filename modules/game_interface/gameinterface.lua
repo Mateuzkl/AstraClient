@@ -107,6 +107,30 @@ local function getSidePanelsWidth(container)
   return width
 end
 
+local function getDefaultSidePanelWidth()
+  if gameRightPanels and gameRightPanels:getChildCount() > 0 then
+    local p = gameRightPanels:getChildByIndex(1)
+    if p and p:getWidth() > 0 then
+      return p:getWidth()
+    end
+  end
+  return g_app.isMobile() and 200 or 178
+end
+
+function updateBottomSplitterLeftMargin()
+  local leftPanelCount = getPersistentSidePanelCount(gameLeftPanels)
+  local margin = 0
+  if not isClassicViewActive() and leftPanelCount == 0 then
+    margin = getDefaultSidePanelWidth()
+  end
+  if bottomSplitter then
+    bottomSplitter:setMarginLeft(margin)
+  end
+  if g_app.isMobile() and gameBottomPanel then
+    gameBottomPanel:setMarginLeft(margin)
+  end
+end
+
 local function updatePanelArrowVisibility()
   if not gameRootPanel then return end
 
@@ -413,6 +437,7 @@ function init()
   setupLeftActions()
   refreshViewMode()
   applyMouseCursorOptions()
+  updateBottomSplitterLeftMargin()
 
   lastAction = 0
   bindKeys()
@@ -1252,6 +1277,7 @@ function removePanel(side)
   -- Set width and save settings based on side
   if side == "left" then
     setLeftHorizontalWidth()
+    updateBottomSplitterLeftMargin()
     g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   else
     setRightHorizontalWidth()
@@ -1446,10 +1472,6 @@ local function isWorldGroundItem(thing)
     return false
   end
 
-  if callThingBool(thing, 'isPickupable') then
-    return false
-  end
-
   return true
 end
 
@@ -1476,6 +1498,11 @@ local function isQuickLootCorpseThing(thing)
     return false
   end
 
+  -- The container type is supplied by the server and does not depend on DAT flags.
+  if callThingBool(thing, 'hasLootHighlight') then
+    return true
+  end
+
   if callThingBool(thing, 'isCorpse') or callThingBool(thing, 'isLyingCorpse') then
     return true
   end
@@ -1486,10 +1513,6 @@ local function isQuickLootCorpseThing(thing)
 
   -- Astra/TFS 8.60 corpses are ground containers; server validates the target.
   if not isQuickLootFeatureEnabled() or not isWorldGroundItem(thing) or not callThingBool(thing, 'isContainer') then
-    return false
-  end
-
-  if callThingBool(thing, 'isForceUse') or callThingBool(thing, 'isMultiUse') then
     return false
   end
 
@@ -1669,7 +1692,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   end
 
   if not g_app.isMobile() then shortcut = '(Alt)' else shortcut = nil end
-  if useThing and not useThing:isStatic() then
+  if useThing then
     if not isDecorationKitThing(useThing) then
       if useThing:isContainer() then
         if useThing:getParentContainer() then
@@ -1742,7 +1765,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   end
 
   local localPlayer = g_game.getLocalPlayer()
-  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() and not useThing:isStatic() then
+  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() then
     menu:addSeparator()
     local parentContainer = lookThing:getParentContainer()
     if parentContainer and parentContainer:hasParent() then
@@ -1752,7 +1775,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if lookThing:isMarketable() and localPlayer:isInMarket() then
       menu:addOption(tr('Show in Market'), function() modules.game_tibia_market.onRedirect(lookThing) end)
     end
-  elseif useThing and not useThing:isCreature() and not useThing:isNotMoveable() and useThing:isPickupable() and not useThing:isStatic() then
+  elseif useThing and not useThing:isCreature() and not useThing:isNotMoveable() and useThing:isPickupable() then
     menu:addSeparator()
     menu:addOption(tr('Trade with ...'), function() startTradeWith(useThing) end)
     if useThing:isMarketable() and localPlayer:isInMarket() then
@@ -1765,7 +1788,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     menu:addOption(tr('Manage Loot containers'), function() modules.game_quickloot.showQuickLoot() end)
   end
 
-  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() and not useThing:isStatic() then
+  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() then
     if not useThing:isContainer() then
       menu:addSeparator()
     end
@@ -2451,6 +2474,7 @@ function addLeftPanel()
   keepMinimapExpansionReservationAtEdge(gameLeftPanels, 'left')
 
   setLeftHorizontalWidth()
+  updateBottomSplitterLeftMargin()
   g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
   return panel
@@ -2738,6 +2762,8 @@ function refreshViewMode()
     end
   end
 
+  updateBottomSplitterLeftMargin()
+
   if not g_game.isOnline() then
     return
   end
@@ -2830,7 +2856,7 @@ function refreshViewMode()
     gameRightActionPanel:setBorderWidthLeft(0)
     -- Same behavior as Mehah's extended view: keep the normal tile zoom and
     -- use the larger server aware range to fill the widescreen map panel.
-    gameMapPanel:setZoom(11)
+    gameMapPanel:setZoom(15)
 
     modules.client_topmenu.getTopMenu():setImageColor('#ffffff66')
     if g_app.isMobile() then
@@ -2905,6 +2931,7 @@ function updateSize()
     gameMapPanel:setMarginBottom(0)
   end
 
+  updateBottomSplitterLeftMargin()
   scheduleHealthCircleResizeUpdates()
 end
 

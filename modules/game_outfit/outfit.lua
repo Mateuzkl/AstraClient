@@ -636,32 +636,71 @@ function showPresets()
   window.presetList.selectionList:focusChild(nil)
 end
 
--- Async batch-populate helper.
--- Calls builder(data[i]) for each item in data, BATCH_SIZE items per frame.
--- A new populate cancels any in-flight populate for the same tab.
-local BATCH_SIZE = 20
+-- Populate a small number of previews per dispatcher tick. scheduleEvent is
+-- required here because addEvent callbacks created while polling are drained in
+-- that same poll, which would build the whole list before the next frame.
+local BATCH_SIZE = 10
 local function batchPopulate(data, builder, onDone)
     cancelPopulate()
     local gen = _outfitPopulateGen
     local idx = 1
+    local populateStartedAt = g_clock.millis()
     local function step()
         _outfitPopulateEvent = nil
         if _outfitPopulateGen ~= gen or not window or window:isDestroyed() then
             return
         end
-        local count = 0
-        while idx <= #data and count < BATCH_SIZE do
-            builder(data[idx])
-            idx = idx + 1
-            count = count + 1
+
+        local list = window.ScrollBar.selectionList
+        if not list or list:isDestroyed() then
+            return
         end
+
+        local layout = list:getLayout()
+        if layout then
+            layout:disableUpdates()
+        end
+
+        local chunkStartedAt = g_clock.millis()
+        local ok, errorMessage = xpcall(function()
+            local count = 0
+            while idx <= #data and count < BATCH_SIZE do
+                builder(data[idx])
+                idx = idx + 1
+                count = count + 1
+            end
+        end, debug.traceback)
+
+        if layout then
+            layout:enableUpdates()
+            layout:update()
+        end
+
+        if not ok then
+            error(errorMessage, 0)
+        end
+
+        if DEVELOPERMODE then
+            local elapsed = g_clock.millis() - chunkStartedAt
+            if elapsed > 16 then
+                g_logger.warning(string.format("[Outfit] widget chunk took %d ms", elapsed))
+            end
+        end
+
         if idx <= #data then
-            _outfitPopulateEvent = addEvent(step)
+            _outfitPopulateEvent = scheduleEvent(step, 1)
         elseif onDone then
             onDone()
         end
+
+        if idx > #data and DEVELOPERMODE then
+            local elapsed = g_clock.millis() - populateStartedAt
+            if elapsed > 16 then
+                g_logger.warning(string.format("[Outfit] populated %d previews in %d ms", #data, elapsed))
+            end
+        end
     end
-    _outfitPopulateEvent = addEvent(step)
+    _outfitPopulateEvent = scheduleEvent(step, 1)
 end
 
 function showOutfits(searchText)

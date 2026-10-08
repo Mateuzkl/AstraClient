@@ -62,6 +62,7 @@ function init()
 end
 
 function terminate()
+	offline()
 	BestiaryTracker.cancelRender()
 	disconnect(g_game, {
 		onMonsterTrackerData = Trackers.onMonsterTrackerData,
@@ -69,7 +70,12 @@ function terminate()
 		onGameStart = online,
 		onGameEnd = offline
 	})
-
+	for _, window in ipairs({bossTrackerWindow, bestiaryTrackerWindow, imbuementTrackerWindow}) do
+		window:destroy()
+	end
+	bossTrackerWindow = nil
+	bestiaryTrackerWindow = nil
+	imbuementTrackerWindow = nil
 end
 
 function online()

@@ -271,6 +271,60 @@ local function testRecorder()
   assertEqual(ui.recording:isOn(), false, "removed config disables recording")
 end
 
+local function testEditorScheduling()
+  for _, profile in ipairs({ "cavebot_1.3", "vBot_4.8" }) do
+    local now, width, cellSize = 1000, 200, nil
+    local context = { _scheduler = {} }
+    local env = setmetatable({
+      G = { botContext = context },
+      g_clock = { millis = function() return now end },
+      scheduleEvent = function() error("editor must not use the global scheduler") end
+    }, { __index = _G })
+    local main = assert(loadfile('modules/game_bot/functions/main.lua'))
+    setfenv(main, env); main()
+
+    local grid = {
+      getWidth = function() return width end,
+      getLayout = function() return {
+        setCellSize = function(_, value) cellSize = value end
+      } end
+    }
+    local panel = { buttons = grid, autoRecording = {}, pos = { setText = function() end } }
+    local editorEnv = setmetatable({
+      CaveBot = {}, schedule = context.schedule, scheduleEvent = context.scheduleEvent,
+      UI = { createWidget = function() return panel end },
+      onPlayerPositionChange = function() end,
+      posx = function() return 100 end, posy = function() return 100 end,
+      posz = function() return 7 end
+    }, { __index = _G })
+    local editor = assert(loadfile('modules/game_bot/default_configs/' .. profile .. '/cavebot/editor.lua'))
+    setfenv(editor, editorEnv); editor()
+    editorEnv.CaveBot.Editor.ExampleFunctions = {{ 'example', '' }}
+    editorEnv.CaveBot.Editor.registerAction = function() end
+    editorEnv.CaveBot.Editor.setup()
+    assertEqual(#context._scheduler, 1, profile .. " schedules grid setup in the bot queue")
+    assertEqual(context._scheduler[1].execution, now + 1, "grid setup delay")
+    assertEqual(cellSize, nil, "grid setup is deferred")
+    local task = table.remove(context._scheduler, 1)
+    task.callback()
+    assertEqual(cellSize.width, 99, "wide editor uses two columns")
+    assertEqual(cellSize.height, 24, "editor keeps button height")
+    width = 160
+    grid.onGeometryChange(grid)
+    assertEqual(cellSize.width, 160, "narrow editor uses one column")
+
+    -- Existing /bot copies still call scheduleEvent(callback, timeout).
+    local called = false
+    editorEnv.scheduleEvent(function() called = true end, 5)
+    assertEqual(#context._scheduler, 1, "legacy scheduling uses the managed bot queue")
+    assertEqual(context._scheduler[1].execution, now + 5, "legacy callback-first delay")
+    assertEqual(called, false, "legacy callback is not synchronous")
+    table.remove(context._scheduler, 1).callback()
+    assertEqual(called, true, "legacy callback executes")
+  end
+end
+
 testCallbackLifecycle()
 testRecorder()
+testEditorScheduling()
 print("game_bot auto recording: OK")

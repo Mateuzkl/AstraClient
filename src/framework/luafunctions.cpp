@@ -49,6 +49,7 @@
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/atlas.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <framework/graphics/fontmanager.h>
 #include <framework/graphics/shadermanager.h>
 #include <framework/ui/ui.h>
@@ -120,6 +121,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_platform", "getFileModificationTime", &Platform::getFileModificationTime, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getMacAddresses", &Platform::getMacAddresses, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getUserName", &Platform::getUserName, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "isBrowser", &Platform::isBrowser, &g_platform);
 #ifdef UNSAFE_LUA_FUNCTIONS
     g_lua.bindSingletonFunction("g_platform", "getDlls", &Platform::getDlls, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getProcesses", &Platform::getProcesses, &g_platform);
@@ -326,6 +328,16 @@ void Application::registerLuaFunctions()
 
 #ifdef FW_GRAPHICS
     // GraphicalApplication
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    g_lua.bindSingletonFunction("g_app", "setNativeSplashEnabled", [](bool enabled) {
+        // init.lua decides before module loading; false must never flash the splash.
+        if (!g_app.isRunning() && !g_app.hasStartupOption("--test")) {
+            setNativeSplashEnabled(enabled);
+            if (enabled)
+                setNativeSplashProgress(25, "Loading libraries...");
+        }
+    });
+#endif
     g_lua.bindSingletonFunction("g_app", "setMaxFps", &GraphicalApplication::setMaxFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "getMaxFps", &GraphicalApplication::getMaxFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "setVerticalSyncRequested", &GraphicalApplication::setVerticalSyncRequested, &g_app);
@@ -894,11 +906,13 @@ void Application::registerLuaFunctions()
 #endif
 
     // Server
+#ifndef __EMSCRIPTEN__
     g_lua.registerClass<Server>();
     g_lua.bindClassStaticFunction<Server>("create", &Server::create);
     g_lua.bindClassMemberFunction<Server>("close", &Server::close);
     g_lua.bindClassMemberFunction<Server>("isOpen", &Server::isOpen);
     g_lua.bindClassMemberFunction<Server>("acceptNext", &Server::acceptNext);
+#endif
 
     // Connection
     g_lua.registerClass<Connection>();

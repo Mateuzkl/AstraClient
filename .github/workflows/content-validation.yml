@@ -5,6 +5,32 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/indexed_spr*'
+      - 'src/client/indexedspr.h'
+      - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/native_splash_config.lua'
+      - '.github/tests/memleak_lifecycle.lua'
+      - '.github/tests/memleak_history.cpp'
+      - '.github/tests/memleak_metrics.cpp'
+      - 'src/client/memleakhistory.h'
+      - 'src/client/memleakmanager.*'
+      - 'src/framework/util/stats.*'
+      - 'src/framework/core/eventdispatcher.h'
+      - 'src/framework/platform/win32platform.cpp'
+      - '.github/tests/module_lifecycle.lua'
+      - '.github/tests/wheel_lifecycle.lua'
+      - '.github/tests/game_bot_auto_recording.lua'
+      - 'src/client/spritedecoder.h'
+      - 'src/client/spritemanager.*'
+      - 'src/framework/core/module.cpp'
+      - '.github/tests/npc_dialog_travel.lua'
+      - '.github/tests/npc_trade_subtypes.lua'
+      - 'src/client/spellcooldown.h'
+      - 'src/client/protocolgameparse.cpp'
+      - 'src/client/protocolgamesend.cpp'
+      - 'src/client/const.h'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -13,6 +39,32 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/indexed_spr*'
+      - 'src/client/indexedspr.h'
+      - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/native_splash_config.lua'
+      - '.github/tests/memleak_lifecycle.lua'
+      - '.github/tests/memleak_history.cpp'
+      - '.github/tests/memleak_metrics.cpp'
+      - 'src/client/memleakhistory.h'
+      - 'src/client/memleakmanager.*'
+      - 'src/framework/util/stats.*'
+      - 'src/framework/core/eventdispatcher.h'
+      - 'src/framework/platform/win32platform.cpp'
+      - '.github/tests/module_lifecycle.lua'
+      - '.github/tests/wheel_lifecycle.lua'
+      - '.github/tests/game_bot_auto_recording.lua'
+      - 'src/client/spritedecoder.h'
+      - 'src/client/spritemanager.*'
+      - 'src/framework/core/module.cpp'
+      - '.github/tests/npc_dialog_travel.lua'
+      - '.github/tests/npc_trade_subtypes.lua'
+      - 'src/client/spellcooldown.h'
+      - 'src/client/protocolgameparse.cpp'
+      - 'src/client/protocolgamesend.cpp'
+      - 'src/client/const.h'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -56,6 +108,93 @@ jobs:
             modules/game_bot/bot.lua \
             modules/game_bot/panels/waypoints.lua
 
+      - name: Test Store catalog chunks
+        run: |
+          luajit .github/tests/store_catalog_chunks.lua \
+            mods/game_store/storeprotocol.lua
+
+      - name: Test NPC travel dialog lifecycle
+        run: |
+          luajit .github/tests/npc_dialog_travel.lua \
+            modules/game_npctrade/npcdialog.lua
+
+      - name: Test NPC automated sale subtype safety
+        run: |
+          luajit .github/tests/npc_trade_subtypes.lua \
+            modules/game_npctrade/npctrade.lua \
+            modules/game_npctrade/npcsession.lua \
+            modules/game_npctrade/npcsellqueue.lua
+
+      - name: Test Quick Loot corpse detection
+        run: |
+          luajit .github/tests/quick_loot_detection.lua \
+            modules/game_interface/gameinterface.lua \
+            src/client/luafunctions_client.cpp \
+            src/client/uimap.cpp
+
+      - name: Test Bestiary notification identity
+        run: |
+          luajit .github/tests/bestiary_notification.lua \
+            modules/gamelib/thing.lua \
+            modules/game_notifications/infobanner.lua \
+            src/client/protocolgameparse.cpp \
+            src/client/protocolgamesend.cpp \
+            src/client/const.h
+
+      - name: Test spell cooldown packets
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            .github/tests/spell_cooldown.cpp -I. \
+            -o /tmp/spell_cooldown_test
+          /tmp/spell_cooldown_test
+
+      - name: Test streaming sprite decoder
+        run: |
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+            .github/tests/sprite_decoder.cpp -I. \
+            -o /tmp/sprite_decoder_test
+          /tmp/sprite_decoder_test
+
+      - name: Test startup module lifecycle
+        run: luajit .github/tests/startup_lifecycle.lua
+
+      - name: Test indexed sprite selection and lifecycle
+        run: |
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+            .github/tests/indexed_spr.cpp -I. -o /tmp/indexed_spr_test
+          /tmp/indexed_spr_test
+          luajit .github/tests/indexed_spr_lifecycle.lua
+
+      - name: Test native splash configuration
+        run: luajit .github/tests/native_splash_config.lua
+
+      - name: Test optional memory monitor history and lifecycle
+        run: |
+          luajit .github/tests/memleak_lifecycle.lua
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+            .github/tests/memleak_history.cpp -o /tmp/memleak_history_test
+          /tmp/memleak_history_test
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic -pthread \
+            .github/tests/memleak_metrics.cpp -o /tmp/memleak_metrics_test
+          /tmp/memleak_metrics_test
+
+      - name: Test audited module lifecycle and lazy startup
+        run: luajit .github/tests/module_lifecycle.lua
+
+      - name: Test Wheel lifecycle and preset vocation
+        run: luajit .github/tests/wheel_lifecycle.lua
+
+      - name: Test negative DAT offsets
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            .github/tests/negative_offset.cpp -I. \
+            -o /tmp/negative_offset_test
+          /tmp/negative_offset_test
+          luajit .github/tests/negative_offset.lua \
+            modules/game_features/features.lua
+          luajit .github/tests/dat_offset_spinbox.lua \
+            modules/corelib/ui/uispinbox.lua
+
       - name: Test DAT/SPR asset lifecycle
         run: |
           luajit - modules/game_things/things.lua <<'LUA'
@@ -91,7 +230,8 @@ jobs:
             g_resources = {
               getGeneration = function() return state.generation end,
               fileExists = function(path) return state.modernOtfi and path:sub(-5) == '.otfi' end,
-              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end
+              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end,
+              guessFilePath = function(path, extension) return path .. '.' .. extension end
             }
             g_game = {
               getClientVersion = function() return state.version end,

@@ -79,6 +79,15 @@ bool Module::load()
 
         for(const std::string& script : m_scripts) {
             g_lua.loadScript(script);
+#ifdef __EMSCRIPTEN__
+            // Lua 5.1 does not consistently inherit a thread environment for
+            // newly loaded chunks the same way LuaJIT does. Assign the module
+            // sandbox to the chunk explicitly before executing it.
+            if (m_sandboxed) {
+                g_lua.getRef(m_sandboxEnv);
+                g_lua.setEnv();
+            }
+#endif
             auto error = std::make_shared<std::string>();
             g_lua.safeCall(0, 0, error);
             if (!error->empty()) {
@@ -206,6 +215,13 @@ int Module::getSandbox(LuaInterface* lua)
 
 void Module::discover(const OTMLNodePtr& moduleNode)
 {
+    // Rediscovery replaces a definition; it must not accumulate executable
+    // scripts, dependencies or callbacks from earlier discovery passes.
+    m_dependencies.clear();
+    m_scripts.clear();
+    m_loadLaterModules.clear();
+    m_onLoadFunc = {};
+    m_onUnloadFunc = {};
     const static std::string none = "none";
     m_description = moduleNode->valueAt("description", none);
     m_author = moduleNode->valueAt("author", none);

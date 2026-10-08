@@ -114,6 +114,36 @@ enum ThingAttr : uint8 {
     ThingLastAttr             = 255
 };
 
+namespace ThingTypeFormat
+{
+constexpr int serializedAttribute(const ThingAttr attribute, const int clientVersion)
+{
+    const int value = static_cast<int>(attribute);
+    if(clientVersion >= 1000) {
+        if(attribute == ThingAttrNoMoveAnimation)
+            return 16;
+        return value >= ThingAttrPickupable ? value + 1 : value;
+    }
+    if(clientVersion >= 860)
+        return value;
+    if(clientVersion >= 780) {
+        if(attribute == ThingAttrChargeable)
+            return 8;
+        return value >= ThingAttrWritable ? value + 1 : value;
+    }
+    return value;
+}
+
+static_assert(serializedAttribute(ThingAttrChargeable, 780) == 8);
+static_assert(serializedAttribute(ThingAttrWritable, 780) == 9);
+static_assert(serializedAttribute(ThingAttrWritableOnce, 854) == 10);
+static_assert(serializedAttribute(ThingAttrDisplacement, 854) == 25);
+static_assert(serializedAttribute(ThingAttrDisplacement, 860) == 24);
+static_assert(serializedAttribute(ThingAttrDisplacement, 986) == 24);
+static_assert(serializedAttribute(ThingAttrNoMoveAnimation, 1000) == 16);
+static_assert(serializedAttribute(ThingAttrDisplacement, 1000) == 25);
+}
+
 enum SpriteMask {
     SpriteMask = 1,
 };
@@ -238,6 +268,14 @@ public:
     Point getDisplacement() { return m_displacement; }
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
+    bool hasNegativeDisplacement() const;
+    bool setDisplacement(const Point& displacement);
+    bool setDisplacementEnabled(bool enabled);
+    bool hasPendingDisplacementChange() const { return m_displacementEdited; }
+    bool patchDisplacement(
+        std::string& datContents, uint8 serializedAttr, size_t& insertionOffset, size_t& removalOffset) const;
+    void shiftDatOffsets(size_t changedOffset, int amount);
+    void markDisplacementSaved(size_t insertedAt = 0, size_t removedAt = 0);
     int getElevation() { return m_elevation; }
     const Point& getBones(int direction) {
         static const Point empty;
@@ -321,6 +359,9 @@ private:
 
     Size m_size;
     Point m_displacement;
+    uint32 m_displacementFileOffset = 0;
+    uint32 m_attributeTerminatorFileOffset = 0;
+    bool m_displacementEdited = false;
     AnimatorPtr m_animator;
     AnimatorPtr m_idleAnimator;
     std::vector<Point> m_bones;

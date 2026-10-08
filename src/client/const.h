@@ -508,8 +508,11 @@ namespace Otc
         GameAstraEchoRaidVisuals = 147,
         GameShopCountU16 = 148,
         GameAstraStoreBasePrice = 149,
+        GameNegativeOffset = 150,
+        GameAstraBestiaryBannerCreatureData = 151,
+        GameAstraExtendedSpellIds = 152,
 
-        LastGameFeature = 150
+        LastGameFeature = 153
     };
 
     enum PathFindResult {

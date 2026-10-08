@@ -37,6 +37,7 @@
 #include "player.h"
 #include "localplayer.h"
 #include "map.h"
+#include "memleakmanager.h"
 #include "minimap.h"
 #include "thingtypemanager.h"
 #include "spritemanager.h"
@@ -57,6 +58,28 @@
 
 void Client::registerLuaFunctions()
 {
+    g_lua.registerSingletonClass("g_memLeak");
+    g_lua.bindSingletonFunction("g_memLeak", "uiInit", &MemLeakManager::uiInit, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "uiTerminate", &MemLeakManager::uiTerminate, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "toggle", &MemLeakManager::toggle, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "hide", &MemLeakManager::hide, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "isWindowVisible", &MemLeakManager::isWindowVisible, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateMemoryDisplay", &MemLeakManager::updateMemoryDisplay, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateObjectCounts", &MemLeakManager::updateObjectCounts, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateEventDisplay", &MemLeakManager::updateEventDisplay, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateMemoryBreakdown", &MemLeakManager::updateMemoryBreakdown, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "addLog", &MemLeakManager::addLog, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getLogText", &MemLeakManager::getLogText, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "clearLog", &MemLeakManager::clearLog, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "takeSnapshot", &MemLeakManager::takeSnapshot, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "computeDiff", &MemLeakManager::computeDiff, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "clearAlerts", &MemLeakManager::clearAlerts, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "forceGC", &MemLeakManager::forceGC, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "setAlertThreshold", &MemLeakManager::setAlertThreshold, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getAlertThreshold", &MemLeakManager::getAlertThreshold, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "setAlertCooldown", &MemLeakManager::setAlertCooldown, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getAlertCooldown", &MemLeakManager::getAlertCooldown, &g_memLeak);
+
     g_lua.registerSingletonClass("g_gameConfig");
     g_lua.bindSingletonFunction("g_gameConfig", "getMapViewPort", &GameConfig::getMapViewPort, &g_gameConfig);
     g_lua.bindSingletonFunction("g_gameConfig", "getMapMaxZ", &GameConfig::getMapMaxZ, &g_gameConfig);
@@ -67,6 +90,7 @@ void Client::registerLuaFunctions()
 
     g_lua.registerSingletonClass("g_things");
     g_lua.bindSingletonFunction("g_things", "loadDat", &ThingTypeManager::loadDat, &g_things);
+    g_lua.bindSingletonFunction("g_things", "saveDatDisplacementToWorkDir", &ThingTypeManager::saveDatDisplacementToWorkDir, &g_things);
 #ifdef WITH_ENCRYPTION
     g_lua.bindSingletonFunction("g_things", "saveDat", &ThingTypeManager::saveDat, &g_things);
     g_lua.bindSingletonFunction("g_things", "dumpTextures", &ThingTypeManager::dumpTextures, &g_things);
@@ -82,6 +106,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "getThingType", &ThingTypeManager::getThingType, &g_things);
     g_lua.bindSingletonFunction("g_things", "getItemType", &ThingTypeManager::getItemType, &g_things);
     g_lua.bindSingletonFunction("g_things", "getThingTypes", &ThingTypeManager::getThingTypes, &g_things);
+    g_lua.bindSingletonFunction("g_things", "isValidDatId", &ThingTypeManager::isValidDatId, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypeByClientId", &ThingTypeManager::findItemTypeByClientId, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypeByName", &ThingTypeManager::findItemTypeByName, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypesByName", &ThingTypeManager::findItemTypesByName, &g_things);
@@ -692,6 +717,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ThingType>("getDisplacement", &ThingType::getDisplacement);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementX", &ThingType::getDisplacementX);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementY", &ThingType::getDisplacementY);
+    g_lua.bindClassMemberFunction<ThingType>("setDisplacement", &ThingType::setDisplacement);
+    g_lua.bindClassMemberFunction<ThingType>("setDisplacementEnabled", &ThingType::setDisplacementEnabled);
     g_lua.bindClassMemberFunction<ThingType>("getExactSize", &ThingType::getExactSize);
     g_lua.bindClassMemberFunction<ThingType>("getRealSize", &ThingType::getRealSize);
     g_lua.bindClassMemberFunction<ThingType>("getLayers", &ThingType::getLayers);
@@ -810,6 +837,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("setTooltip", &Item::setTooltip);
     g_lua.bindClassMemberFunction<Item>("getQuickLootFlags", &Item::getQuickLootFlags);
     g_lua.bindClassMemberFunction<Item>("setQuickLootFlags", &Item::setQuickLootFlags);
+    g_lua.bindClassMemberFunction<Item>("hasLootHighlight", &Item::hasLootHighlightForLua);
     g_lua.bindClassMemberFunction<Item>("getObtainFlags", &Item::getObtainFlags);
     g_lua.bindClassMemberFunction<Item>("setObtainFlags", &Item::setObtainFlags);
     g_lua.bindClassMemberFunction<Item>("isAmmo", &Item::isAmmo);
@@ -1064,6 +1092,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UICreature>("isAnimating", &UICreature::isAnimating);
     g_lua.bindClassMemberFunction<UICreature>("setCenter", &UICreature::setCenter);
     g_lua.bindClassMemberFunction<UICreature>("setOldScaling", &UICreature::setOldScaling);
+    g_lua.bindClassMemberFunction<UICreature>("setDrawMountOnly", &UICreature::setDrawMountOnly);
+    g_lua.bindClassMemberFunction<UICreature>("setIgnoreDisplacement", &UICreature::setIgnoreDisplacement);
     g_lua.bindClassMemberFunction<UICreature>("isColoredOutfit", &UICreature::isColoredOutfit);
     g_lua.bindClassMemberFunction<UICreature>("isColoredMount", &UICreature::isColoredMount);
 

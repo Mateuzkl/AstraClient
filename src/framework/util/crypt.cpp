@@ -40,6 +40,8 @@
 #include <openssl/md5.h>
 #include <openssl/bn.h>
 #include <openssl/err.h>
+#else
+#include "browserrsa.h"
 #endif
 #include <zlib.h>
 
@@ -52,6 +54,8 @@ Crypt::Crypt()
 {
 #ifndef __EMSCRIPTEN__
     m_rsa = RSA_new();
+#else
+    m_browserRsa = std::make_unique<astra_browser::RsaPublicKey>();
 #endif
 }
 
@@ -378,6 +382,9 @@ void Crypt::rsaSetPublicKey(const std::string& n, const std::string& e)
     BN_dec2bn(&be, e.c_str());
     RSA_set0_key(m_rsa, bn, be, nullptr);
 #endif
+#else
+    if (!m_browserRsa->set(n, e))
+        g_logger.error("Invalid browser RSA public key");
 #endif
 }
 
@@ -454,7 +461,7 @@ bool Crypt::rsaEncrypt(unsigned char *msg, int size)
         return false;
     return RSA_public_encrypt(size, msg, msg, m_rsa, RSA_NO_PADDING) != -1;
 #else
-    return false;
+    return m_browserRsa->encrypt(msg, size);
 #endif
 }
 
@@ -474,7 +481,7 @@ int Crypt::rsaGetSize()
 #ifndef __EMSCRIPTEN__
     return RSA_size(m_rsa);
 #else
-    return 0;
+    return m_browserRsa->size();
 #endif
 }
 

@@ -51,6 +51,14 @@ public:
 
     ImagePtr getSpriteImage(int id);
     bool isLoaded() { return m_loaded; }
+    size_t getImageCacheSize() const { return m_imageCache.size(); }
+    size_t getImageCacheBytes() const { return m_imageCacheBytes; }
+    size_t getCachedDataCount() const { return m_cachedData.size(); }
+    size_t getCachedDataBytes() const {
+        size_t bytes = 0;
+        for (const auto& entry : m_cachedData) bytes += entry.second.size();
+        return bytes;
+    }
 
     int spriteSize() { return m_spriteSize; }
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
@@ -76,6 +84,7 @@ private:
         uint32 spriteCount = 0;
         uint32 fileSize = 0;
         FileStreamPtr file;
+        std::vector<uint32> addresses;
     };
 
     bool loadCasualSpr(std::string file);
@@ -101,6 +110,7 @@ private:
     FileStreamPtr m_spritesFile;
     std::vector<SprPart> m_parts;
     std::vector<uint32> m_index;
+    std::vector<uint32> m_spriteAddresses;
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
     std::unordered_map<int, ImageCacheEntry> m_imageCache;

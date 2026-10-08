@@ -403,7 +403,10 @@ function Tracker.Imbuement.terminate()
         imbuementTrackerButton:destroy()
         imbuementTrackerButton = nil
     end
-    imbuementTracker:destroy()
+    if imbuementTracker then
+        imbuementTracker:destroy()
+        imbuementTracker = nil
+    end
 end
 
 function Tracker.Imbuement.onGameStart()

@@ -2,6 +2,11 @@
 APP_NAME = "otclientv8" -- important, change it, it's name for config dir and files in appdata
 APP_VERSION = 1341       -- client version for updater and login to identify outdated client
 DEFAULT_LAYOUT = "" -- on android it's forced to "mobile", check code bellow
+ENABLE_NATIVE_SPLASH = false -- Windows startup splash: true = enabled, false = disabled
+
+if g_app.setNativeSplashEnabled then
+  g_app.setNativeSplashEnabled(ENABLE_NATIVE_SPLASH)
+end
 
 -- If you don't use updater or other service, set it to updater = ""
 Services = {

@@ -100,9 +100,6 @@ function BattleClass:configure(windowId, window)
 
   self.panel = battlePanel
   self.buttons = {}
-  for i = 1, 30 do
-    self:createButton()
-  end
 
   local _filterPanel = self.window:recursiveGetChildById('filterPanel')
   local _toggleFilterButton = self.window:recursiveGetChildById('toggleFilterButton')

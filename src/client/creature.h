@@ -53,7 +53,7 @@ public:
     virtual ~Creature();
 
     virtual void draw(const Point& dest, bool animate = true, LightView* lightView = nullptr);
-    virtual void drawOutfit(const Rect& destRect, Otc::Direction direction = Otc::InvalidDirection, const Color& color = Color::white, bool animate = false, bool ui = false, bool oldScaling = false);
+    virtual void drawOutfit(const Rect& destRect, Otc::Direction direction = Otc::InvalidDirection, const Color& color = Color::white, bool animate = false, bool ui = false, bool oldScaling = false, bool mountOnly = false, bool ignoreDisplacement = false);
 
     void drawInformation(const Point& point, bool useGray, const Rect& parentRect, int drawFlags);
 
@@ -141,6 +141,7 @@ public:
     virtual Point getDisplacement();
     virtual int getDisplacementX();
     virtual int getDisplacementY();
+    bool usesNegativeDisplacement() const;
     virtual int getExactSize(int layer = 0, int xPattern = 0, int yPattern = 0, int zPattern = 0, int animationPhase = 0);
     PointF getJumpOffset() { return m_jumpOffset; }
     bool isTimedSquareVisible() { return m_showTimedSquare; }

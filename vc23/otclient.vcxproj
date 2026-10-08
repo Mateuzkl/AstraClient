@@ -68,7 +68,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
-    <WholeProgramOptimization>PGOptimize</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
@@ -324,7 +324,7 @@
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
-      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -334,6 +334,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
@@ -475,6 +476,7 @@
     <ClCompile Include="..\src\client\luafunctions_client.cpp" />
     <ClCompile Include="..\src\client\luavaluecasts_client.cpp" />
     <ClCompile Include="..\src\client\map.cpp" />
+    <ClCompile Include="..\src\client\memleakmanager.cpp" />
     <ClCompile Include="..\src\client\mapio.cpp" />
     <ClCompile Include="..\src\client\mapview.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'">4834</DisableSpecificWarnings>
@@ -580,6 +582,7 @@
     <ClCompile Include="..\src\framework\otml\otmlexception.cpp" />
     <ClCompile Include="..\src\framework\otml\otmlnode.cpp" />
     <ClCompile Include="..\src\framework\otml\otmlparser.cpp" />
+    <ClCompile Include="..\src\framework\platform\nativesplash.cpp" />
     <ClCompile Include="..\src\framework\platform\platform.cpp" />
     <ClCompile Include="..\src\framework\platform\platformwindow.cpp" />
     <ClCompile Include="..\src\framework\platform\win32crashhandler.cpp" />
@@ -648,6 +651,8 @@
     <ClInclude Include="..\src\client\itemtype.h" />
     <ClInclude Include="..\src\client\lightview.h" />
     <ClInclude Include="..\src\client\localplayer.h" />
+    <ClInclude Include="..\src\client\memleakhistory.h" />
+    <ClInclude Include="..\src\client\memleakmanager.h" />
     <ClInclude Include="..\src\client\luavaluecasts_client.h" />
     <ClInclude Include="..\src\client\map.h" />
     <ClInclude Include="..\src\client\mapview.h" />
@@ -659,6 +664,7 @@
     <ClInclude Include="..\src\client\protocolcodes.h" />
     <ClInclude Include="..\src\client\protocolgame.h" />
     <ClInclude Include="..\src\client\spritemanager.h" />
+    <ClInclude Include="..\src\client\indexedspr.h" />
     <ClInclude Include="..\src\client\statictext.h" />
     <ClInclude Include="..\src\client\thing.h" />
     <ClInclude Include="..\src\client\thingstype.h" />
@@ -761,6 +767,7 @@
     <ClInclude Include="..\src\framework\otml\otmlparser.h" />
     <ClInclude Include="..\src\framework\pch.h" />
     <ClInclude Include="..\src\framework\platform\crashhandler.h" />
+    <ClInclude Include="..\src\framework\platform\nativesplash.h" />
     <ClInclude Include="..\src\framework\platform\platform.h" />
     <ClInclude Include="..\src\framework\platform\platformwindow.h" />
     <ClInclude Include="..\src\framework\platform\win32window.h" />
@@ -830,7 +837,16 @@
   <ItemGroup>
     <Image Include="..\src\otcicon.ico" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyNativeSplash" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\data\images\splash.png')">
+    <MakeDir Directories="$(TargetDir)data\images" />
+    <Copy SourceFiles="$(ProjectDir)..\data\images\splash.png" DestinationFiles="$(TargetDir)data\images\splash.png" SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
