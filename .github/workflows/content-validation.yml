@@ -7,6 +7,8 @@ on:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/indexed_spr*'
+      - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
       - '.github/tests/native_splash_config.lua'
       - '.github/tests/memleak_lifecycle.lua'
@@ -39,6 +41,8 @@ on:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/indexed_spr*'
+      - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
       - '.github/tests/native_splash_config.lua'
       - '.github/tests/memleak_lifecycle.lua'
@@ -153,6 +157,13 @@ jobs:
 
       - name: Test startup module lifecycle
         run: luajit .github/tests/startup_lifecycle.lua
+
+      - name: Test indexed sprite selection and lifecycle
+        run: |
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+            .github/tests/indexed_spr.cpp -I. -o /tmp/indexed_spr_test
+          /tmp/indexed_spr_test
+          luajit .github/tests/indexed_spr_lifecycle.lua
 
       - name: Test native splash configuration
         run: luajit .github/tests/native_splash_config.lua

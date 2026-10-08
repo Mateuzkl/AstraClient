@@ -73,7 +73,7 @@ void playMeleeAttackEffect(const CreaturePtr& target, uint8 weaponType)
     const auto settings = g_configs.getSettings();
     if (settings && settings->getValue("disableMeleeAttackAnimations") == "true")
         return;
-    
+
     if (!target || weaponType < 1 || weaponType > 6)
         return;
 

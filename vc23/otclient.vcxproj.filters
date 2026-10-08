@@ -1043,6 +1043,9 @@
     <ClInclude Include="..\src\client\spritemanager.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\client\indexedspr.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\client\statictext.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>

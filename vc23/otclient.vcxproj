@@ -664,6 +664,7 @@
     <ClInclude Include="..\src\client\protocolcodes.h" />
     <ClInclude Include="..\src\client\protocolgame.h" />
     <ClInclude Include="..\src\client\spritemanager.h" />
+    <ClInclude Include="..\src\client\indexedspr.h" />
     <ClInclude Include="..\src\client\statictext.h" />
     <ClInclude Include="..\src\client\thing.h" />
     <ClInclude Include="..\src\client\thingstype.h" />
