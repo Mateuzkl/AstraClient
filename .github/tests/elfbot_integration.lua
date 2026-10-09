@@ -179,6 +179,7 @@ local function fixture()
   loadProduction('modules/corelib/json.lua',env)
   env.g_clock={millis=function() return now end,realMillis=function() return now end}
   env.g_game={isOnline=function() return online end,getLocalPlayer=function() return player end,
+    getWorldName=function() return 'Test' end,
     getClientVersion=function() return 860 end,getPing=function() return 20 end,getContainers=function() return {} end,
     getAttackingCreature=function() return attacked end,
     attack=function(creature) attacked=creature end,cancelAttackAndFollow=function() attacked=nil end,
@@ -235,6 +236,7 @@ local function fixture()
   local console=setmetatable({}, {__index=env})
   loadProduction('modules/game_console/console.lua',console);env.modules.game_console=console
   local state={env=env,bot=bot,events=events,widgets=widgets,warnings=warnings,root=root,map=map,player=player,files=files}
+  state.profileDir='/elfbot/characters/world-Test/player-Tester'
   function state.advance(milliseconds)
     now=now+milliseconds
     local due={};for event in pairs(events) do if event.due<=now then due[#due+1]=event end end
@@ -308,18 +310,131 @@ do
   local s=fixture();local env=s.env;env.init();env.toggle()
   assert(env.loadElfText('say "exura"'));s.advance(1)
   assert(not env.isEnabled(),'import must not start automation automatically')
-  assert(s.files['/elfbot/before-import.json'],'pre-import backup missing')
-  env.saveSlot(1);assert(s.files['/elfbot/slot1.json'])
-  local data=env.json.decode(s.files['/elfbot/slot1.json']);equal(#data.elfbot.hotkeys,1)
-  data.elfbot.botEnabled=true;s.files['/elfbot/slot1.json']=env.json.encode(data)
+  assert(s.files[s.profileDir..'/before-import.json'],'pre-import backup missing')
+  env.saveSlot(1);assert(s.files[s.profileDir..'/slot1.json'])
+  local data=env.json.decode(s.files[s.profileDir..'/slot1.json']);equal(#data.elfbot.hotkeys,1)
+  data.elfbot.botEnabled=true;s.files[s.profileDir..'/slot1.json']=env.json.encode(data)
   assert(env.loadSlot(1));assert(not env.isEnabled(),'saved enable flag must not start automation')
-  s.files['/elfbot/slot2.json']=string.rep(' ',env.ElfBotSettingsImport.maxBytes+1)
+  s.files[s.profileDir..'/slot2.json']=string.rep(' ',env.ElfBotSettingsImport.maxBytes+1)
   assert(not env.loadSlot(2),'oversized slot accepted')
   local writes=count(s.files);assert(env.loadElfText('say "later"'));env.terminate();s.advance(1)
   equal(count(s.events),0,'pending import cancelled');equal(count(s.files),writes,'cancelled import did not write')
   env.init();env.toggle();s.failWrites();assert(not env.saveSlot(1),'write failure was ignored')
   assert(not pcall(env.loadElfText,''),'empty input accepted')
   env.terminate()
+end
+
+-- Real slot buttons replace settings after the click unwinds, save independently and isolate characters.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  local initialWidgets=count(s.widgets)
+  local legacy=env.json.encode({elfbot={lists={friends='Legacy global profile'}}})
+  s.files['/elfbot/slot2.json']=legacy
+  env.init();env.toggle()
+  local function menuButton(text)
+    local menu=s.getWidget('ElfBot OTC v.1');menu:raise()
+    for _,v in ipairs(menu:getChildren()) do if v:getText()==text then return v,menu end end
+    error('missing menu button '..text)
+  end
+  local function choose(index)
+    local v,menu=menuButton(tostring(index));s.click(v)
+    assert(not menu:isDestroyed(),'slot replacement must wait for the native click callback')
+    s.advance(1)
+    local current=latest.context
+    equal(current.storage.elfbot.slot,index);equal(current.currentElfSlot(),index)
+    local selected,newMenu=menuButton(tostring(index));assert(selected:isOn(),'selected slot must be highlighted')
+    assert(newMenu.titleBar:getText():find('Slot '..index,1,true),'caption must match the selected profile')
+    assert(not env.isEnabled(),'switching slots must never start saved automation')
+    assert(not current.CaveBot.isOn() and not current.TargetBot.isOn(),'switching slots must stop both controllers')
+    return current
+  end
+  local c=latest.context
+  for index=1,5 do
+    c=choose(index);local data=c.storage.elfbot
+    equal(data.lists.friends,'','new slot must not inherit another slot or a global legacy file')
+    equal(#data.waypoints,0);equal(#data.hotkeys,0)
+    s.click(menuButton('Healing'));local healing=s.root:getFocusedChild();local refs=healing.originalControls
+    refs[1023]:setText('spell '..index);refs[1018]:setText(tostring(20+index));refs[1018].onEnter()
+    refs[1003]:setCurrentOption(index%2==0 and 'health' or 'uhealth')
+    assert(not data.awaitingLoad,'first Healing edit must mark a new slot as configured')
+    equal(data.healing.hiSpell,'spell '..index);equal(data.healing.hiHealth,20+index)
+    s.click(healing.closeButton)
+    local lists=menuButton('Lists');s.click(lists)
+    local panel=s.root:getFocusedChild();local friends
+    for _,v in ipairs(panel:getChildren()) do if v:getStyleName()=='ElfBotMultilineTextEdit' then friends=v;break end end
+    assert(friends);friends:setText('Friends for slot '..index)
+    equal(data.lists.friends,friends:getText(),'list edits must be captured before a slot switch')
+    s.click(panel.closeButton)
+    data.hotkeys={{key='F'..index,script='say "slot '..index..'"',enabled=true}}
+    c.CaveBot.addAction('label','route '..index);c.CaveBot.save()
+    data.hud.dragPositions={elfbotHudSkills={x=index/10,y=index/10,space='window'}}
+    data.controlIcons={target={offState={ids={3200+index}},onState={ids={3200+index}}}}
+    c.saveConfig()
+    if index==3 then env.setEnabled(true);c.CaveBot.setOn();c.TargetBot.setOn() end
+    if index%2==0 then s.click(menuButton('Save')) end
+    -- Odd slots rely on save-before-switch instead of the explicit Save button.
+    if index==5 then s.click(menuButton('Save')) end
+  end
+  for index=1,5 do
+    c=choose(index);local data=c.storage.elfbot
+    equal(data.lists.friends,'Friends for slot '..index);equal(data.healing.hiSpell,'spell '..index)
+    equal(data.healing.hiHealth,20+index);equal(data.healing.hpType,index%2==0 and 'health' or 'uhealth')
+    equal(data.hotkeys[1].key,'F'..index);equal(data.waypoints[1][2],'route '..index)
+    equal(data.hud.dragPositions.elfbotHudSkills.x,index/10)
+    equal(data.controlIcons.target.offState.ids[1],3200+index,'icon appearance belongs to its slot')
+    local saved=env.json.decode(assert(s.files[s.profileDir..'/slot'..index..'.json']))
+    equal(saved.elfbot.slot,index);equal(saved.elfbot.lists.friends,data.lists.friends)
+  end
+  equal(s.files['/elfbot/slot2.json'],legacy,'legacy global profiles must not be modified')
+  -- Replaced buttons cannot enqueue another profile switch.
+  local stale=menuButton('2').onClick;c=choose(1);local pending=count(s.events);stale()
+  equal(count(s.events),pending,'disposed UI callback must be inert')
+  -- Reject corrupt destinations and preserve both the active profile and corrupt file.
+  local slot4=s.profileDir..'/slot4.json';s.files[slot4]='{broken'
+  s.click(menuButton('4'));s.advance(1);equal(latest.context,c);equal(c.currentElfSlot(),1)
+  equal(s.files[slot4],'{broken');assert(c.ElfBot.status:find('invalid settings',1,true))
+  -- A failed outgoing write must block a switch rather than silently discard edits.
+  local write=env.g_resources.writeFileContents
+  c.storage.elfbot.lists.friends='Unsaved change';c.saveConfig();s.failWrites()
+  s.click(menuButton('3'));s.advance(1);equal(latest.context,c)
+  assert(c.ElfBot.status:find('not saved',1,true));env.g_resources.writeFileContents=write
+  c=choose(2);equal(env.json.decode(s.files[s.profileDir..'/slot1.json']).elfbot.lists.friends,'Unsaved change')
+  -- Save pending edits to the captured old character, even if the player has already changed at logout.
+  c.storage.elfbot.lists.friends='Tester final edit';c.saveConfig()
+  s.player.getName=function() return 'Other Player' end;s.setOnline(false);s.emit(env.g_game,'onGameEnd')
+  equal(env.json.decode(s.files[s.profileDir..'/slot2.json']).elfbot.lists.friends,'Tester final edit')
+  s.setOnline(true);s.emit(env.g_game,'onGameStart');assert(not env.isRunning());env.toggle()
+  c=choose(2);equal(c.storage.elfbot.lists.friends,'','another character must start with an independent slot')
+  c.storage.elfbot.lists.friends='Other character';s.click(menuButton('Save'))
+  local other='/elfbot/characters/world-Test/player-Other%20Player'
+  equal(c.elfProfileDirectory,other);equal(env.json.decode(s.files[other..'/slot2.json']).elfbot.lists.friends,'Other character')
+  equal(env.json.decode(s.files[s.profileDir..'/slot2.json']).elfbot.lists.friends,'Tester final edit')
+  -- Same character name on another world is a separate profile, too.
+  env.g_game.getWorldName=function() return 'Second World' end
+  s.emit(env.g_game,'onGameStart');env.toggle();c=choose(2);equal(c.storage.elfbot.lists.friends,'')
+  -- Explicit Load can migrate an old global slot; selection must never apply it implicitly.
+  assert(env.loadSlot(2));c=latest.context;equal(c.storage.elfbot.lists.friends,'Legacy global profile')
+  assert(env.saveSlot(2));equal(s.files['/elfbot/slot2.json'],legacy)
+  local migrated='/elfbot/characters/world-Second%20World/player-Other%20Player/slot2.json'
+  assert(s.files[migrated]);env.terminate()
+  equal(count(s.widgets),initialWidgets);equal(count(s.events),0);equal(s.connectionCount(),0)
+  -- Startup leaves saved files untouched until an explicit selection.
+  env.init();env.toggle();equal(latest.context.storage.elfbot.lists.friends,'')
+  choose(2);equal(latest.context.storage.elfbot.lists.friends,'Legacy global profile')
+  env.terminate();equal(count(s.events),0)
+end
+
+-- Profile directory components cannot escape into another character or a reserved Windows path.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  s.player.getName=function() return '../CON\\Player %' end
+  env.g_game.getWorldName=function() return 'World/..\\' end
+  env.init();env.toggle();assert(env.saveSlot(1))
+  local path='/elfbot/characters/world-World%2F%2E%2E%5C/player-%2E%2E%2FCON%5CPlayer%20%25'
+  equal(latest.context.elfProfileDirectory,path);assert(s.files[path..'/slot1.json'])
+  env.terminate();equal(count(s.events),0)
 end
 
 -- Editing empty slots appends a real row; unchanged focus changes preserve running jobs.
@@ -623,6 +738,18 @@ do
     assert(p.x+size.width<=bounds.x+bounds.width and p.y+size.height<=bounds.y+bounds.height,'option outside Aimbot')
   end end
   s.click(aim.closeButton)
+  for _,case in ipairs({{'Aimbot',536,433},{'Extras',336,255},{'Lists',546,347}}) do
+    local panel=open(case[1]);local size=panel:getSize();local bounds=panel:getPaddingRect()
+    assert(size.width<=case[2] and size.height<=case[3],'oversized '..case[1]..' window')
+    for _,child in ipairs(panel:getChildren()) do
+      local p,dimensions=child:getPosition(),child:getSize()
+      assert(p.x>=bounds.x and p.y>=bounds.y and p.x+dimensions.width<=bounds.x+bounds.width and p.y+dimensions.height<=bounds.y+bounds.height,'control outside '..case[1]..': '..child:getText())
+      if child:getStyleName()=='ElfBotCheck' or child:getStyleName()=='ElfBotLabel' then
+        assert(child:getTextSize().height<=dimensions.height,'clipped text in '..case[1]..': '..child:getText())
+      elseif child:getStyleName()=='ElfBotButton' then assert(child:getTextSize().width<=dimensions.width,'clipped button in '..case[1]) end
+    end
+    s.click(panel.closeButton)
+  end
   local cave=open('Cavebot');local refs=cave.originalControls
   local rows=refs[1009]:getChildren();equal(#rows,2,'saved routes displayed')
   s.click(rows[1]);equal(refs[1041]:getText(),'First route','mouse selects first saved route')
@@ -665,6 +792,18 @@ do
   end
   assert(files and report and path and report.editable==false)
   equal(#files:getChildren(),2,'list includes saves/imports but excludes recovery backup')
+  local profileFile=c.elfProfileDirectory..'/slot1.json'
+  s.files[profileFile]=env.json.encode({elfbot={lists={friends='Character save'}}})
+  local directoryFiles=env.g_resources.listDirectoryFiles
+  env.g_resources.listDirectoryFiles=function(dir)
+    if dir==c.elfProfileDirectory then return {'slot1.json'} end
+    return directoryFiles(dir)
+  end
+  s.click(assert(buttons['Refresh files']));equal(#files:getChildren(),3)
+  local profileRow=files:getChildren()[1];equal(profileRow:getText(),'Player: slot1.json','short label instead of a long profile directory')
+  s.click(profileRow);equal(path:getText(),profileFile)
+  assert(profileRow:getTextSize().width<=files:getSize().width,'per-character profile label must fit the compact list')
+  env.g_resources.listDirectoryFiles=directoryFiles;s.click(buttons['Refresh files'])
   s.click(files:getChildren()[2]);equal(path:getText(),'/elfbot/imports/heal.txt')
   assert(report:getText():find('1 hotkeys',1,true),'selecting a file populates the preview')
   assert(not env.isEnabled(),'preview cannot start automation')
@@ -819,7 +958,7 @@ do
   s.click(icon('target'));assert(not c.TargetBot.isOn());equal(s.attack(),nil)
   equal(#data.icons,0,'using built-ins never creates personal icon records')
   local lateChange=enable.onCheckChange;lateClick=icon('waypoint').onClick
-  assert(env.loadSlot(1));c=latest.context;data=c.storage.elfbot
+  assert(env.loadElfFile('/elfbot/slot1.json'));s.advance(1);c=latest.context;data=c.storage.elfbot
   equal(#data.icons,1);equal(data.icons[1].name,'Saved icon');equal(#data.hotkeys,1);equal(#data.waypoints,1)
   assert(not data.iconsEnabled and not env.isEnabled(),'only Load applies settings; it cannot enable automation')
   assert(not icon('waypoint') and not icon('target'),'loading a disabled layer cannot show built-ins')
@@ -909,7 +1048,7 @@ do
   equal(icon('waypoint').borderWidth,0);equal(icon('waypoint').caption.color,'#123456','live appearance changes persist in the saved slot')
   equal(icon('target'):getPosition().x,400);equal(icon('target').items:getChildren()[1].itemId,3031)
   assert(data.iconsEnabled and not env.isEnabled());equal(#data.icons,0)
-  local loaded=env.json.decode(s.files['/elfbot/slot1.json']).elfbot.controlIcons
+  local loaded=env.json.decode(s.files[s.profileDir..'/slot1.json']).elfbot.controlIcons
   assert(not loaded.waypoint.builtinController and not loaded.waypoint.lclick,'profiles save appearance, not executable/controller overrides')
   c.CaveBot.addAction('label','Ready');local targetBefore=icon('target'):getPosition()
   menu=s.getWidget('ElfBot OTC v.1');menu:setPosition({x=500,y=500});s.click(icon('waypoint'))
@@ -1007,9 +1146,18 @@ do
   equal(saved.space,'window')
   -- The other block can be positioned independently.
   c.storage.elfbot.hud.general=true;s.advance(500)
-  local stats=panel('elfbotHudStats');startDrag(stats)
+  local stats=panel('elfbotHudStats')
+  c.storage.elfbot.hud.general=false;c.storage.elfbot.hud.healing=true;c.storage.elfbot.hud.damage=true;s.advance(500)
+  local function fitStats()
+    local width=1
+    for _,row in ipairs(stats:getChildren()) do if row:isVisible() then width=math.max(width,row:getTextSize().width+2) end end
+    equal(stats:getSize().width,width,'HUD background must fit only visible text')
+    assert(width<380,'Healing/DPS must not leave a wide empty background')
+  end
+  fitStats();startDrag(stats)
   assert(stats.onDragMove(stats,{x=336,y=346}));assert(stats.onDragLeave(stats))
   equal(stats:getPosition().x,330);equal(stats:getPosition().y,340);equal(saves,2)
+  fitStats();c.storage.elfbot.hud.damage=false;s.advance(500);fitStats()
   equal(skills:getPosition().x,300);equal(skills:getPosition().y,230,'moving stats must not move skills')
   -- Move beyond the old map boundary, over the right-side inventory area.
   startDrag(skills);assert(skills.onDragMove(skills,{x=1206,y=166}))

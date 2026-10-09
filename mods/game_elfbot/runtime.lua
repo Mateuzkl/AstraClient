@@ -6,9 +6,36 @@ local storage={elfbot={}}
 local slot=1
 local saveEvent
 local lastSaved
-local settingsInvalid=false
+local profileDir
 local pendingImportEvent
 local readinessEvent
+local function emptySettings()
+  return {elfbot={awaitingLoad=true,botEnabled=false,hotkeysEnabled=false,shortkeysEnabled=false,
+    symbol='',hotkeys={},shortkeys={},persistent='',icons={},iconsEnabled=false,routes={},waypoints={},loot={},
+    targeting={monsters={},weights={danger=0,proximity=0,health=0,order=0},stick=false},
+    aimbot={enabled=false,command='',enemiesOnly=false,skulledOnly=false,triggers={}},
+    hud={enabled=true,skills=true,general=false,active=false},lists={friends='',subfriends='',enemies='',subenemies='',leaders=''},
+    extras={nonPvp=false},healing={enabled=false,hiEnabled=false,loEnabled=false,uhEnabled=false,hpEnabled=false,mpEnabled=false,
+      hiSpell='',loSpell='',hiHealth=0,loHealth=0,hiMana=0,loMana=0,uhHealth=0,hpHealth=0,mpMana=0,hpType='uhealth',mpType='gmana',delay=0}}}
+end
+local function pathComponent(value)
+  -- Escape separators, '%' and non-ASCII bytes without collisions or Windows device names.
+  return value:gsub('[^%w_%-]',function(byte) return string.format('%%%02X',byte:byte()) end)
+end
+local function characterDirectory()
+  local player=g_game.getLocalPlayer()
+  local name=player and player:getName()
+  if not g_game.isOnline() or type(name)~='string' or name=='' then return end
+  local world=g_game.getWorldName and g_game.getWorldName() or ''
+  return '/elfbot/characters/world-'..pathComponent(world)..'/player-'..pathComponent(name)
+end
+local function ensureDirectory(path)
+  local current=''
+  for part in path:gmatch('[^/]+') do
+    current=current..'/'..part
+    if not g_resources.directoryExists(current) then assert(g_resources.makeDir(current),'Cannot create ElfBot settings directory') end
+  end
+end
 local function worldReady()
   local player=g_game.getLocalPlayer()
   local p=player and player:getPosition()
@@ -24,10 +51,12 @@ local function flushSettings()
   removeEvent(saveEvent);saveEvent=nil
   if storage.elfbot.awaitingLoad then return true end
   local ok,err=pcall(function()
+    assert(profileDir,'No character selected for ElfBot settings')
     local encoded=encodeSettings()
     if encoded==lastSaved then return end
-    if not g_resources.directoryExists('/elfbot') then assert(g_resources.makeDir('/elfbot'),'Cannot create ElfBot settings directory') end
-    assert(g_resources.writeFileContents(settingsInvalid and '/elfbot/settings.recovered.json' or '/elfbot/settings.json',encoded)~=false,'Cannot save ElfBot settings')
+    ensureDirectory(profileDir)
+    assert(g_resources.writeFileContents(profileDir..'/slot'..slot..'.json',encoded)~=false,'Cannot save ElfBot slot')
+    assert(g_resources.writeFileContents(profileDir..'/settings.json',encoded)~=false,'Cannot save ElfBot settings')
     lastSaved=encoded
   end)
   if not ok then report('error','Settings were not saved: '..tostring(err)) end
@@ -63,6 +92,15 @@ local function stop()
   end
   if not g_game.isOnline() then session=nil end
 end
+local function ensureProfile()
+  local dir=characterDirectory()
+  if not dir then return false end
+  if dir~=profileDir then
+    -- Flush using the old owner's captured directory, even after the local player changes.
+    stop();profileDir=dir;storage=emptySettings();slot=1;storage.elfbot.slot=slot;lastSaved=nil;session=nil
+  end
+  return true
+end
 local function pulse()
   tickEvent=nil
   if not runtime then return end
@@ -85,29 +123,51 @@ local function settingsNotice(text)
     modules.game_textmessage.displayStatusMessage(text)
   end
 end
-function loadSlot(index)
+local function readSlot(index,legacy)
+  local path=profileDir..'/slot'..index..'.json'
+  -- Legacy global files are imported only by an explicit Load, never by slot selection.
+  if legacy and not g_resources.fileExists(path) then path='/elfbot/slot'..index..'.json' end
+  if not g_resources.fileExists(path) then return end
+  local source=g_resources.readFileContents(path)
+  assert(type(source)=='string' and #source<=ElfBotSettingsImport.maxBytes,'ElfBot slot exceeds 8 MB')
+  local decoded=json.decode(source)
+  assert(type(decoded)=='table' and type(decoded.elfbot)=='table','Invalid ElfBot settings')
+  return decoded
+end
+local function replaceSlot(index,select)
   index=tonumber(index)
-  if not index or index%1~=0 or index<1 or index>5 then return false end
-  local path='/elfbot/slot'..index..'.json'
-  if not g_resources.fileExists(path) then
+  if not index or index%1~=0 or index<1 or index>5 or not ensureProfile() then return false end
+  if select and index==slot and not storage.elfbot.awaitingLoad then return true end
+  local ok,decoded=pcall(readSlot,index,not select)
+  if not ok then settingsNotice('Unable to load slot '..index..': invalid settings');return false end
+  if not decoded and not select then
     settingsNotice('Slot '..index..' is empty. Click Save to create it.')
     return false
   end
-  local ok,decoded=pcall(function()
-    local source=g_resources.readFileContents(path)
-    assert(type(source)=='string' and #source<=ElfBotSettingsImport.maxBytes,'ElfBot slot exceeds 8 MB')
-    return json.decode(source)
-  end)
-  if not ok or type(decoded)~='table' or type(decoded.elfbot)~='table' then
-    settingsNotice('Unable to load slot '..index..': invalid settings')
-    return false
+  if select and not flushSettings() then
+    settingsNotice('Unable to switch slots: current settings were not saved');return false
   end
+  local empty=not decoded
+  decoded=decoded or emptySettings()
   local previous,previousSlot=storage,slot
-  stop();storage=decoded;storage.elfbot.botEnabled=false;storage.elfbot.lastImport=nil;storage.elfbot.selectedImportPath=nil;storage.elfbot.awaitingLoad=nil;slot=index
-  if start() then runtime.ui.show();wake();return true end
-  storage=previous;slot=previousSlot
+  stop();storage=decoded;slot=index;lastSaved=nil
+  storage.elfbot.botEnabled=false;storage.elfbot.masterResume=nil;storage.elfbot.lastImport=nil;storage.elfbot.selectedImportPath=nil
+  storage.elfbot.awaitingLoad=empty and true or nil;storage.elfbot.slot=index
+  if start() then runtime.ui.show();wake();settingsNotice('Slot '..index..(empty and ' is empty. Configure it and click Save.' or ' loaded. Automation is OFF.'));return true end
+  storage=previous;slot=previousSlot;lastSaved=nil
   if start() then runtime.ui.show();wake();settingsNotice('Unable to load slot '..index..'; previous settings restored') end
   return false
+end
+function loadSlot(index) return replaceSlot(index,false) end
+local function queueSlot(index,select,context)
+  if not runtime or runtime.context~=context then return false end
+  removeEvent(pendingImportEvent)
+  -- Replacing the interface destroys its buttons: unwind the mouse callback first.
+  pendingImportEvent=scheduleEvent(function()
+    pendingImportEvent=nil
+    if runtime and runtime.context==context then replaceSlot(index,select) end
+  end,1)
+  return true
 end
 -- Build and validate a replacement before stopping the current bot.
 function previewElfFile(path)
@@ -127,19 +187,19 @@ local function queueImport(result,name)
     local nextData=ElfBotSettingsImport.apply(storage.elfbot,result)
     nextData.botEnabled=false;nextData.awaitingLoad=nil;nextData.lastImport=nil;nextData.selectedImportPath=nil;nextData.slot=slot
     local ok,err=pcall(function()
-      if not g_resources.directoryExists('/elfbot') then g_resources.makeDir('/elfbot') end
-      assert(g_resources.writeFileContents('/elfbot/before-import.json',json.encode(previous,2))~=false,'Cannot back up existing settings')
+      ensureDirectory(profileDir)
+      assert(g_resources.writeFileContents(profileDir..'/before-import.json',json.encode(previous,2))~=false,'Cannot back up existing settings')
       if result.originalBinary then
-        assert(g_resources.writeFileContents('/elfbot/original-last.bin',result.originalBinary)~=false,'Cannot preserve original binary')
-        assert(g_resources.writeFileContents('/elfbot/translated-last.json',json.encode(result.converted,2))~=false,'Cannot save translated settings')
+        assert(g_resources.writeFileContents(profileDir..'/original-last.bin',result.originalBinary)~=false,'Cannot preserve original binary')
+        assert(g_resources.writeFileContents(profileDir..'/translated-last.json',json.encode(result.converted,2))~=false,'Cannot save translated settings')
       end
     end)
     if not ok then settingsNotice('Import stopped: '..tostring(err));return end
-    stop();storage={elfbot=nextData}
+    stop();storage={elfbot=nextData};lastSaved=nil
     if start() then
       runtime.ui.show();wake();if result.format:find('partial',1,true) then report('warn',table.concat(result.warnings,' | ')) end;settingsNotice((result.format:find('partial',1,true) and 'Partially imported ' or 'Loaded ')..name..'. '..ElfBotSettingsImport.summary(result));saveSettings()
     else
-      storage=previous
+      storage=previous;lastSaved=nil
       if start() then runtime.ui.show();wake();settingsNotice('Import failed; previous settings restored') end
     end
   end,1)
@@ -154,17 +214,20 @@ function loadElfText(text)
 end
 function saveSlot(index)
   index=tonumber(index)
-  if not index or index%1~=0 or index<1 or index>5 then return false end
+  if not index or index%1~=0 or index<1 or index>5 or not ensureProfile() then return false end
+  local previousSlot,previousAwaiting=slot,storage.elfbot.awaitingLoad
   storage.elfbot.awaitingLoad=nil
-  local ok,err=pcall(function() assert(g_resources.writeFileContents('/elfbot/slot'..index..'.json',encodeSettings())~=false,'Cannot save ElfBot slot') end)
-  if not ok then settingsNotice('Slot was not saved: '..tostring(err));return false end
-  flushSettings();slot=index
+  slot=index;storage.elfbot.slot=index
+  if not flushSettings() then
+    slot=previousSlot;storage.elfbot.slot=slot;storage.elfbot.awaitingLoad=previousAwaiting
+    settingsNotice('Slot was not saved');return false
+  end
   if runtime then runtime.context.ElfBot.status='Saved settings slot '..index end
   return true
 end
 function start()
+  if not ensureProfile() then return false end
   if runtime then return true end
-  if not g_game.isOnline() then return false end
   if not worldReady() then
     removeEvent(readinessEvent);readinessEvent=scheduleEvent(function() readinessEvent=nil;start() end,100)
     return false
@@ -172,7 +235,11 @@ function start()
   removeEvent(readinessEvent);readinessEvent=nil
   removeEvent(reconnectEvent);reconnectEvent=nil
   local prepared
-  local ok,result=pcall(modules.game_bot.executeBot,'ElfBot',storage,nil,report,saveSettings,function() stop();start() end,{}, nil, {
+  local function editedSettings()
+    if not prepared or prepared._disposed or prepared.storage~=storage then return end
+    storage.elfbot.awaitingLoad=nil;saveSettings()
+  end
+  local ok,result=pcall(modules.game_bot.executeBot,'ElfBot',storage,nil,report,editedSettings,function() stop();start() end,{}, nil, {
     standalone=true,
     prepare=function(c)
       prepared=c
@@ -182,7 +249,9 @@ function start()
         local window=g_ui.createWidget(style,g_ui.getRootWidget());window.elfWidget=true;return window
       end
       c.requestElfReconnect=function() reconnectOnce=true;g_game.safeLogout() end
-      c.saveElfSlot=saveSlot;c.loadElfSlot=loadSlot;c.currentElfSlot=function() return slot end
+      c.saveElfSlot=saveSlot;c.loadElfSlot=function(index) return queueSlot(index,false,c) end
+      c.selectElfSlot=function(index) return queueSlot(index,true,c) end
+      c.currentElfSlot=function() return slot end;c.elfProfileDirectory=profileDir
       c.setElfEnabled=setEnabled;c.isElfEnabled=isEnabled
       c.toggleElfController=toggleController
       c.previewElfFile=previewElfFile;c.loadElfFile=loadElfFile;c.loadElfText=loadElfText
@@ -207,6 +276,7 @@ function start()
 end
 function isEnabled() return storage.elfbot.botEnabled~=false end
 function setEnabled(value)
+  if not ensureProfile() then return end
   value=value==true
   local changed=isEnabled()~=value
   if value and modules.game_bot.disableCommunityBot then modules.game_bot.disableCommunityBot() end
@@ -276,18 +346,12 @@ function init()
   g_ui.importStyle('interface.otui')
   if not g_resources.directoryExists('/elfbot') then g_resources.makeDir('/elfbot') end
   if not g_resources.directoryExists('/elfbot/scripts') then g_resources.makeDir('/elfbot/scripts') end
-  -- Each client launch starts empty; saved files are applied only through Custom/Load.
+  -- Each client launch starts empty; saved files need explicit slot selection or Load.
   -- Built-in Cavebot/Target controls are separate from these user settings.
-  storage={elfbot={awaitingLoad=true,botEnabled=false,hotkeysEnabled=false,shortkeysEnabled=false,
-    symbol='',hotkeys={},shortkeys={},persistent='',icons={},iconsEnabled=false,routes={},waypoints={},loot={},
-    targeting={monsters={},weights={danger=0,proximity=0,health=0,order=0},stick=false},
-    aimbot={enabled=false,command='',enemiesOnly=false,skulledOnly=false,triggers={}},
-    hud={enabled=true,skills=true,general=false,active=false},lists={friends='',subfriends='',enemies='',subenemies='',leaders=''},
-    extras={nonPvp=false},healing={enabled=false,hiEnabled=false,loEnabled=false,uhEnabled=false,hpEnabled=false,mpEnabled=false,
-      hiSpell='',loSpell='',hiHealth=0,loHealth=0,hiMana=0,loMana=0,uhHealth=0,hpHealth=0,mpMana=0,hpType='uhealth',mpType='gmana',delay=0}}}
+  storage=emptySettings();slot=1;storage.elfbot.slot=slot;profileDir=nil;lastSaved=nil
   launcher=modules.client_topmenu.addRightGameToggleButton('elfbotButton','ElfBot OTC (Ctrl+Shift+F11)','/game_elfbot/launcher',toggle,false,99998)
   launcher:setOn(false)
-  local game={onGameStart=function() if isEnabled() then start() end end,onGameEnd=stop}
+  local game={onGameStart=function() if ensureProfile() and isEnabled() then start() end end,onGameEnd=stop}
   local specs={
     {g_game,game},
     {g_ui.getRootWidget(),{

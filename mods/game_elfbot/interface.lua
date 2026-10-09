@@ -76,7 +76,7 @@ function attachElfBot(c)
   end
   local function button(parent,x,y,w,text,callback)
     local v=widget('ElfBotButton',parent,x,y,w,24,text)
-    v.onClick=function() local ok,err=pcall(callback);if not ok then e.status=tostring(err);c.warn('ElfBot: '..e.status) end end
+    v.onClick=function() if not alive then return end;local ok,err=pcall(callback);if not ok then e.status=tostring(err);c.warn('ElfBot: '..e.status) end end
     return v
   end
   local function edit(parent,x,y,w,text) return widget('ElfBotTextEdit',parent,x,y,w,22,text or '') end
@@ -103,7 +103,7 @@ function attachElfBot(c)
   local function status(v,x,y,w)
     local s=label(v,x,y,w,'Ready');s:setTextWrap(true);s:setHeight(32);statusLabels[#statusLabels+1]=s;return s
   end
-  local function save() data.awaitingLoad=nil;c.saveConfig();e.status='ElfBot settings saved' end
+  local function save() if not alive then return end;data.awaitingLoad=nil;c.saveConfig();e.status='ElfBot settings saved' end
   local function guardCompile(source)
     local ok,p=pcall(e.compile,source);assert(ok,p);return p
   end
@@ -326,28 +326,28 @@ function attachElfBot(c)
   local function healing()
     data.healing=data.healing or {enabled=false,hiSpell='exura',hiHealth=90,hiMana=20,loSpell='exura vita',loHealth=50,loMana=160,hpHealth=40,hpType='uhealth',mpMana=40,mpType='gmana',paralysis=false,delay=1000}
     local h=data.healing;local win,r=originalDialog(4000);panels.healing=win
-    local function text(id,key) r[id]:setText(h[key] or '');r[id].onTextChange=function(_,value) h[key]=value end end
-    local function number(id,key,default,low,high) changeNumber(r[id],h[key] or default,low,high,function(n) h[key]=n end) end
+    local function text(id,key) r[id]:setText(h[key] or '');r[id].onTextChange=function(_,value) if alive then h[key]=value;save() end end end
+    local function number(id,key,default,low,high) changeNumber(r[id],h[key] or default,low,high,function(n) if alive and h[key]~=n then h[key]=n;save() end end) end
     text(1023,'hiSpell');text(1009,'loSpell')
     number(1018,'hiHealth',90,0,100);number(1020,'hiMana',20,0,1000000000)
     number(1013,'loHealth',50,0,100);number(1011,'loMana',160,0,1000000000)
     number(1016,'uhHealth',40,0,100);number(1006,'hpHealth',40,0,100);number(1029,'mpMana',40,0,100)
     local function potion(id,key,values)
-      setOptions(r[id],values,h[key]);r[id].onOptionChange=function(_,value) h[key]=value end
+      setOptions(r[id],values,h[key]);r[id].onOptionChange=function(_,value) if alive then h[key]=value;save() end end
     end
     potion(1003,'hpType',{'health','shealth','ghealth','uhealth','gshealth'})
     potion(1032,'mpType',{'mana','smana','gmana','gsmana'})
     local function timing(id,key,default)
       local values={'200','300','500','750','1000','1500','2000','3000'}
       local value=tostring(h[key] or default);local found=false;for _,v in ipairs(values) do if v==value then found=true end end;if not found then values[#values+1]=value end
-      setOptions(r[id],values,value);r[id].onOptionChange=function(_,v) h[key]=tonumber(v) end
+      setOptions(r[id],values,value);r[id].onOptionChange=function(_,v) if alive then h[key]=tonumber(v);save() end end
     end
     timing(1014,'potionWait',1000);timing(1034,'delay',1000)
     local keys={'hiEnabled','loEnabled','uhEnabled','hpEnabled','mpEnabled'}
     local function enabled()
       local active=h.paralysis or h.friendEnabled
       for _,key in ipairs(keys) do active=active or h[key] end
-      h.enabled=active==true;if h.enabled then e.paused=false end
+      h.enabled=active==true;if h.enabled then e.paused=false end;save()
     end
     for i,row in ipairs({{'hiEnabled',14},{'loEnabled',25},{'uhEnabled',36},{'hpEnabled',48},{'mpEnabled',59}}) do
       local key=row[1];if h[key]==nil then h[key]=key~='uhEnabled' and h.enabled==true end
@@ -359,7 +359,7 @@ function attachElfBot(c)
     r[1026].onOptionChange=function(_,value) h.friendEnabled=value~='Disabled';h.friendHealth=tonumber(value) or 60;h.friend=h.friend or 'friend';enabled() end
     local mana={'0','20','50','100','160','200','300','500','1000'};local current=tostring(h.friendMana or 160)
     local found=false;for _,v in ipairs(mana) do if v==current then found=true end end;if not found then mana[#mana+1]=current end
-    setOptions(r[1024],mana,current);r[1024].onOptionChange=function(_,value) h.friendMana=tonumber(value) end
+    setOptions(r[1024],mana,current);r[1024].onOptionChange=function(_,value) if alive then h.friendMana=tonumber(value);save() end end
     r[1026]:setTooltip('Heal the configured friend, or a player from Lists / Friends. Disabled turns friend healing off.')
     return win
   end
@@ -578,49 +578,54 @@ function attachElfBot(c)
     e.selectMonsterSetting=load;refresh();load();profiles();blocks();return win
   end
   local function listsPanel()
-    local win=window('Lists',650,410);panels.lists=win
+    local win=window('Lists',530,310);panels.lists=win
     local entries={}
     for i,row in ipairs({{'friends','Friend names'},{'subfriends','Subfriend names'},{'enemies','Enemy names'},{'subenemies','Subenemy names'},{'leaders','Aim leaders'}}) do
-      local x=((i-1)%3)*215;local y=math.floor((i-1)/3)*167
-      label(win,x,y,205,row[2]);entries[row[1]]=widget('ElfBotMultilineTextEdit',win,x,y+23,205,133,data.lists[row[1]])
+      local x=((i-1)%3)*180;local y=math.floor((i-1)/3)*130
+      label(win,x,y,170,row[2]);entries[row[1]]=widget('ElfBotMultilineTextEdit',win,x,y+22,170,100,data.lists[row[1]])
+      local field,key=entries[row[1]],row[1]
+      field.onTextChange=function() if alive then data.lists[key]=field:getText();save() end end
     end
-    button(win,430,190,200,'Save lists',function() for key,v in pairs(entries) do data.lists[key]=v:getText() end;save() end)
-    check(win,430,230,200,'Color listed players',data.lists.colors,function(v) data.lists.colors=v end)
-    status(win,0,368,630);return win
+    button(win,360,152,170,'Save lists',function() for key,v in pairs(entries) do data.lists[key]=v:getText() end;save() end)
+    check(win,360,190,170,'Color listed players',data.lists.colors,function(v) data.lists.colors=v;save() end):setTextWrap(true)
+    status(win,0,274,530);return win
   end
   local function aimbot()
-    local a=data.aimbot;local win=window('Aimbot',580,460);panels.aimbot=win
-    group(win,0,0,580,224,'Core Aimbot');group(win,0,232,284,228,'Trigger Aimbot')
+    local a=data.aimbot;local win=window('Aimbot',520,396);panels.aimbot=win
+    group(win,0,0,520,208,'Core Aimbot');group(win,0,216,520,180,'Trigger Aimbot')
     local function option(x,y,text,value,callback)
-      local v=check(win,x,y,266,text,value,callback);v:setTextWrap(true);v:setHeight(28);v:setTooltip(text);return v
+      local v=check(win,x,y,242,text,value,callback);v:setTextWrap(true);v:setHeight(24);v:setTooltip(text);return v
     end
-    local function pending(x,y,text)
+    local function pending(x,y,text,original)
       local v=option(x,y,text,false,function() end)
       if v.setEnabled then v:setEnabled(false) end
-      v:setTooltip(text..'\nThis original ElfBot feature is not supported by this client port.')
+      v:setTooltip((original or text)..'\nThis original ElfBot feature is not supported by this client port.')
     end
-    for i,text in ipairs({'Prioritize mages with least cur mp','Prioritize mages with most miss. mp','Choose enemies with lowest cur hp',"Lock on leader's target",'Auto-combo paralyze/leader target'}) do
-      if i==3 then option(14,28+(i-1)*30,text,a.lowestHealth~=false,function(v) a.lowestHealth=v;save() end)
-      else pending(14,28+(i-1)*30,text) end
+    for i,text in ipairs({'Prefer mages with least mana','Prefer mages missing mana','Prefer enemies with lowest HP','Lock on leader target','Paralyze / leader auto-combo'}) do
+      if i==3 then option(12,24+(i-1)*24,text,a.lowestHealth~=false,function(v) a.lowestHealth=v;save() end)
+      else pending(12,24+(i-1)*24,text) end
     end
-    for i,text in ipairs({'Trace shots','Display best target','Discount Protection zones','Lock on paralyzed sub/enemies','Choose subenemy if no enemy'}) do pending(300,28+(i-1)*30,text) end
-    label(win,14,200,84,'Aim leaders:');local leaders=edit(win,100,198,180,data.lists.leaders or '');leaders.onEnter=function() data.lists.leaders=leaders:getText();save() end
-    label(win,300,180,80,'Aim type:');local command=edit(win,382,178,184,a.command or '')
+    for i,text in ipairs({'Trace shots','Display best target','Ignore protection zones','Lock on paralyzed enemies','Subenemy if no enemy'}) do pending(268,24+(i-1)*24,text) end
+    label(win,12,178,84,'Aim leaders:');local leaders=edit(win,98,176,152,data.lists.leaders or '')
+    leaders.onTextChange=function() if alive then data.lists.leaders=leaders:getText();save() end end
+    label(win,268,150,78,'Aim type:');local command=edit(win,350,148,158,a.command or '')
     command:setTooltip('client attack command or spell text; the original aim-type modes remain incomplete.')
     command.onEnter=function() assert(not e.compileAttack(command:getText()).interval,'Attack cannot contain auto');a.command=command:getText();save() end
-    label(win,300,205,80,'Combo rate:');local rate=numberField(win,382,202,82,a.frequency or 200)
+    command.onFocusChange=function(_,focus) if alive and not focus then local ok,err=pcall(command.onEnter);if not ok then e.status=tostring(err) end end end
+    label(win,268,180,78,'Combo rate:');local rate=numberField(win,350,178,82,a.frequency or 200)
     rate.onEnter=function() a.frequency=readNumber(rate,200,60000);save() end
+    rate.onFocusChange=function(_,focus) if alive and not focus then local ok,err=pcall(rate.onEnter);if not ok then e.status=tostring(err) end end end
     a.triggerWords=a.triggerWords or {}
     for i,name in ipairs({'Combo','Sync combo','Paralyze','Single'}) do
-      local key=name;label(win,14,251+(i-1)*28,94,name..':');local field=edit(win,110,248+(i-1)*28,160,a.triggerWords[key] or '')
-      field.onEnter=function() a.triggerWords[key]=field:getText();a.triggers={};for _,word in pairs(a.triggerWords) do if word~='' then a.triggers[#a.triggers+1]={word=word,command=a.command or ''} end end;save() end
+      local key=name;label(win,12,242+(i-1)*24,90,name..':');local field=edit(win,106,240+(i-1)*24,144,a.triggerWords[key] or '')
+      field.onTextChange=function() if not alive then return end;a.triggerWords[key]=field:getText();a.triggers={};for _,word in pairs(a.triggerWords) do if word~='' then a.triggers[#a.triggers+1]={word=word,command=a.command or ''} end end;save() end
     end
-    option(14,374,'Word triggering enabled',a.wordTriggers,function(v) a.wordTriggers=v end)
-    option(14,402,'Execute automatically',a.enabled,function(v) a.enabled=v;if v then e.paused=false end end)
-    pending(14,430,"Target others if can't be shot")
-    pending(300,248,'Ignore lower priority leaders')
-    option(300,280,'Target enemies only if skulled/war',a.skulledOnly,function(v) a.skulledOnly=v end):setTooltip('Current client mode filters all eligible players by skull; war emblems are not implemented.')
-    pending(300,312,'Target subenemies if skulled/war');pending(300,344,'Target others if skulled/war')
+    option(12,344,'Enable word triggers',a.wordTriggers,function(v) a.wordTriggers=v;save() end)
+    option(12,368,'Run automatically',a.enabled,function(v) a.enabled=v;if v then e.paused=false end;save() end)
+    pending(268,240,'Ignore lower priority leaders')
+    option(268,268,'Target skulled enemies',a.skulledOnly,function(v) a.skulledOnly=v;save() end):setTooltip('Current client mode filters all eligible players by skull; war emblems are not implemented.')
+    pending(268,296,'Target skulled subenemies');pending(268,324,'Target other skulled players')
+    pending(268,352,'Target others if shot blocked',"Target others if can't be shot")
     return win
   end
   local hudLayer=g_ui.createWidget('ElfBotHudLayer',g_ui.getRootWidget())
@@ -644,13 +649,13 @@ function attachElfBot(c)
     return win
   end
   local function extras()
-    local win=window('Extras',440,325);panels.extras=win
+    local win=window('Extras',320,218);panels.extras=win
     for i,row in ipairs({{'fullLight','Full light'},{'nonPvp','Non-pvp mode (safe fight)'},{'lootDistant','Loot distant targets'},{'loadAtLogin','Open ElfBot at login'},{'openBackpacks','Open backpack at login'},{'openNextBp','Open next backpack when full'}}) do
-      check(win,0,(i-1)*31,400,row[2],data.extras[row[1]],function(v) data.extras[row[1]]=v;save() end)
+      check(win,0,(i-1)*22,320,row[2],data.extras[row[1]],function(v) data.extras[row[1]]=v;save() end)
     end
-    button(win,0,233,150,'Pause all automation',function() e.paused=true;c.CaveBot.setOff();c.TargetBot.setOff();data.aimbot.enabled=false;data.hotkeysEnabled=false;data.shortkeysEnabled=false;if data.healing then data.healing.enabled=false end;e.jobs={};e.status='All automation paused' end)
-    button(win,160,233,130,'Restart scripts',function() data.hotkeysEnabled=true;data.shortkeysEnabled=true;e.reload() end)
-    status(win,0,276,425);return win
+    button(win,0,144,164,'Pause all automation',function() e.paused=true;c.CaveBot.setOff();c.TargetBot.setOff();data.aimbot.enabled=false;data.hotkeysEnabled=false;data.shortkeysEnabled=false;if data.healing then data.healing.enabled=false end;e.jobs={};save();e.status='All automation paused' end)
+    button(win,172,144,148,'Restart scripts',function() data.hotkeysEnabled=true;data.shortkeysEnabled=true;e.reload();save() end)
+    status(win,0,184,320);return win
   end
   local iconDragging
   local iconControllers={}
@@ -866,14 +871,17 @@ function attachElfBot(c)
     local resources=c.g_resources
     local function refreshFiles()
       files:destroyChildren()
-      for _,dir in ipairs({'/elfbot','/elfbot/imports','/elfbot/scripts'}) do
+      local dirs={'/elfbot','/elfbot/imports','/elfbot/scripts'}
+      if c.elfProfileDirectory then table.insert(dirs,1,c.elfProfileDirectory) end
+      for _,dir in ipairs(dirs) do
         local ok,names=pcall(resources.listDirectoryFiles,dir,false,false)
         if ok and type(names)=='table' then
           table.sort(names)
           for _,name in ipairs(names) do
             local full=dir..'/'..name
             if resources.fileExists(full) and name~='before-import.json' then
-              local row=createRow('ElfBotRow',files);row:setText((dir~='/elfbot' and dir:sub(9)..'/' or '')..name)
+              local row=createRow('ElfBotRow',files)
+              row:setText((dir==c.elfProfileDirectory and 'Player: ' or dir~='/elfbot' and dir:sub(9)..'/' or '')..name)
               row:setTooltip(full)
               row.onFocusChange=function(_,focused) if focused then path:setText(full);preview() end end
               row.onDoubleClick=function() path:setText(full);if preview() then c.loadElfFile(full) end end
@@ -1082,7 +1090,10 @@ function attachElfBot(c)
     {{'Targeting',function() open('targeting',targeting) end},{'Icons',function() open('icons',icons) end}}
   }
   for y,row in ipairs(rows) do for x,entry in ipairs(row) do button(menu,(x-1)*96,(y-1)*26,94,entry[1],entry[2]) end end
-  for i=1,5 do local index=i;button(menu,388+(i-1)*32,0,30,tostring(i),function() data.slot=index;e.status='Selected settings slot '..index end) end
+  for i=1,5 do
+    local index=i;local v=button(menu,388+(i-1)*32,0,30,tostring(i),function() c.selectElfSlot(index) end)
+    v:setOn(index==(data.slot or 1));v:setTooltip('Switch to slot '..index..' for this character. Current changes are saved first.')
+  end
   local function chooseSettingsFile()
     if g_platform.selectElfBotFile then
       local resources=c.g_resources;resources.makeDir('/elfbot')

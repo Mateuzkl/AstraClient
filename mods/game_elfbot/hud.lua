@@ -9,7 +9,7 @@ function createElfBotHud(e,c,data,layer,mapPanel)
     local p=dragging[key] and dragging[key].position or type(h.dragPositions)=='table' and h.dragPositions[key]
     if type(p)=='table' and finite(p.x) and finite(p.y) then return {x=clamp(p.x,1),y=clamp(p.y,1),space=p.space} end
   end
-  local function fitSkills(v,width,rows)
+  local function fitText(v,width,rows)
     local natural=1
     for _,row in ipairs(rows) do natural=math.max(natural,row:getTextSize().width+2) end
     width=math.min(width,natural);v:setWidth(width)
@@ -25,10 +25,8 @@ function createElfBotHud(e,c,data,layer,mapPanel)
     v.onMouseRelease=function() return true end
     v.onDragEnter=function(self,mouse)
       if self:isDestroyed() or not self:isVisible() then return false end
-      if id=='elfbotHudSkills' then
-        local rows={};for _,row in ipairs(self:getChildren()) do if row:isVisible() then rows[#rows+1]=row end end
-        fitSkills(self,self:getSize().width,rows)
-      end
+      local rows={};for _,row in ipairs(self:getChildren()) do if row:isVisible() then rows[#rows+1]=row end end
+      fitText(self,self:getSize().width,rows)
       local p=self:getPosition()
       dragging[id]={offset={x=mouse.x-p.x,y=mouse.y-p.y}}
       self:raise();layer:raise();return true
@@ -213,7 +211,7 @@ function createElfBotHud(e,c,data,layer,mapPanel)
     end
     for i=visible+1,#pool do pool[i]:hide() end
     parent:setHeight(math.max(1,used));parent:setVisible(used>0)
-    return used
+    return used,visible
   end
   function api.hide() dragging={};if not layer:isDestroyed() then layer:hide() end end
   function api.update(visible,session)
@@ -237,11 +235,9 @@ function createElfBotHud(e,c,data,layer,mapPanel)
     local reserve=not beside and #sk>0 and math.min(#sk*14+8,math.floor(available/2)) or 0
     local function draw(v,pool,lines,p,dx,dy,w,budget)
       if p and p.space=='window' then w=math.min(v==skills and 230 or 380,rect.width-16) end
-      local used=render(v,pool,lines,dx,dy,w,p and rect.height or math.max(0,budget))
-      if p and v==skills then
-        local rows={};for i=1,math.min(#lines,#pool) do rows[#rows+1]=pool[i] end
-        w=fitSkills(v,w,rows)
-      end
+      local used,visible=render(v,pool,lines,dx,dy,w,p and rect.height or math.max(0,budget))
+      local rows={};for i=1,visible do rows[#rows+1]=pool[i] end
+      w=fitText(v,w,rows)
       if p then
         -- Existing profiles used map-relative fractions; preserve their placement.
         local bounds=p.space=='window' and rect or map
