@@ -10,7 +10,7 @@ local function lex(source)
   while i <= #source do
     local c = source:sub(i,i)
     if c == '\r' or c == ' ' or c == '\t' then i=i+1
-    elseif c == '\n' then add('|','|'); i=i+1
+    elseif c == '\n' then add('|','|');out[#out].newline=true;i=i+1
     elseif c == "'" or c == '"' then
       local q, value, start = c, '', i; i=i+1
       while i <= #source and source:sub(i,i) ~= q do
@@ -92,6 +92,19 @@ function L.compile(source, commands)
     if peek().kind=='{' then take();local b=sequence(depth+1);expect('}');return b end
     return {statement(depth+1)}
   end
+  local function conditional(kind,condition,depth,invert)
+    local node={kind=kind,condition=condition,invert=invert,body=body(depth)}
+    if kind~='while' then
+      -- Else also belongs to legacy predicates (isdistance, hplower, etc.).
+      -- Newlines are whitespace here only when an else actually follows.
+      local nextPos=pos
+      while tokens[nextPos].newline do nextPos=nextPos+1 end
+      if tokens[nextPos].kind=='word' and tokens[nextPos].value:lower()=='else' then
+        pos=nextPos+1;node.otherwise=body(depth)
+      end
+    end
+    return node
+  end
   statement=function(depth)
     assert(depth<=48,'Script is too deeply nested');nodes=nodes+1;assert(nodes<=2048,'Script has too many statements')
     if peek().kind=='{' then take();local b=sequence(depth+1);expect('}');return {kind='block',body=b} end
@@ -109,21 +122,19 @@ function L.compile(source, commands)
       hpmissinglower={'hpmissing','<'},hpmissinghigher={'hpmissing','>'},mpmissinglower={'mpmissing','<'},mpmissinghigher={'mpmissing','>'},
       targethplower={'target.hppc','<'},counthigher={'count','>'},countlower={'count','<'},caplower={'cap','<'},caphigher={'cap','>'},isposz={'posz','=='}}
     if comparisons[name] then
-      local p=comparisons[name];return {kind='if',condition={kind='binary',op=p[2],left={kind='variable',name=p[1]},right=argument()},body=body(depth)}
+      local p=comparisons[name];return conditional('if',{kind='binary',op=p[2],left={kind='variable',name=p[1]},right=argument()},depth)
     end
-    if name=='islocation' or name=='isnotlocation' then return {kind='if',condition={kind='predicate',name=name,args={}},body=body(depth)} end
+    if name=='islocation' or name=='isnotlocation' then return conditional('if',{kind='predicate',name=name,args={}},depth) end
     if name=='isonscreen' or name=='isnotonscreen' or name=='isattackedname' or name=='istargetname' or name=='isdistance' or name=='isnotdistance' then
-      return {kind='if',condition={kind='predicate',name=name,args={argument()}},body=body(depth)}
+      return conditional('if',{kind='predicate',name=name,args={argument()}},depth)
     end
     if name=='if' or name=='ifnot' or name=='while' then
       local condition
       if peek().kind=='[' then take();condition=expression(1);expect(']') else condition=argument() end
-      local node={kind=name=='while' and 'while' or 'if',condition=condition,invert=name=='ifnot',body=body(depth)}
-      if name~='while' and peek().kind=='word' and peek().value:lower()=='else' then take();node.otherwise=body(depth) end
-      return node
+      return conditional(name=='while' and 'while' or 'if',condition,depth,name=='ifnot')
     elseif predicates[name] then
       local variable=predicates[name];local invert=variable:sub(1,1)=='!'
-      return {kind='if',condition={kind='variable',name=invert and variable:sub(2) or variable},invert=invert,body=body(depth)}
+      return conditional('if',{kind='variable',name=invert and variable:sub(2) or variable},depth,invert)
     end
     assert(commands[name] or name=='wait' or name=='end' or name=='loop' or name=='set' or name=='inc' or name=='dec' or name=='clear', 'Unsupported ElfBot command: '..name)
     local args={}

@@ -27,8 +27,28 @@ function createElfBotEngine(c, data)
     return b
   end
   local function say(text) return c.saySpell(text,1000) end
+  local itemNames={['gold coin']=3031,['platinum coin']=3035,['crystal coin']=3043,
+    ['ultimate healing rune']=data.items.uh,['sudden death rune']=data.items.sd,
+    ['mana potion']=data.items.mana,['strong mana potion']=data.items.smana,['great mana potion']=data.items.gmana,
+    ['health potion']=data.items.health,['strong health potion']=data.items.shealth,['great health potion']=data.items.ghealth,
+    ['ultimate health potion']=data.items.uhealth,['great spirit potion']=data.items.gsmana}
+  function e.itemId(value)
+    local id=tonumber(value)
+    if not id then
+      local name=tostring(value):lower()
+      -- NPC offers provide server-specific names/IDs; retain them after trade closes.
+      if not itemNames[name] then
+        for _,method in ipairs({'getBuyItems','getSellItems'}) do
+          for _,offer in ipairs(c.NPC[method]()) do if type(offer.name)=='string' then itemNames[offer.name:lower()]=offer.id end end
+        end
+      end
+      id=itemNames[name]
+    end
+    assert(id and id%1==0 and id>0 and id<=65535,'Unknown item name or invalid ID: '..tostring(value))
+    return id
+  end
   local function countItem(value)
-    local id=tonumber(value);assert(id,'itemcount currently needs a numeric item ID')
+    local id=e.itemId(value)
     local count=0
     for _,container in pairs(c.getContainers()) do
       for _,item in ipairs(container:getItems()) do if item:getId()==id then count=count+item:getCount() end end
@@ -91,6 +111,7 @@ function createElfBotEngine(c, data)
   commands.npcsay=function(a) c.NPC.say(join(a)) end
   commands.gamesay=function(a) c.talkChannel(7,join(a)) end
   commands.guildsay=function(a) c.talkChannel(0,join(a)) end
+  commands.tradesay=function(a) c.talkChannel(5,join(a)) end
   commands.statusmessage=function(a) e.status=join(a);c.info(e.status) end
   commands.log=commands.statusmessage
   commands.setcaption=function(a) local text=join(a);e.caption=text~='' and text or nil end
@@ -112,6 +133,7 @@ function createElfBotEngine(c, data)
   commands.setcavebot=function(a) local b=bot('CaveBot');if boolean(a[1]) then b.setOn() else b.setOff();e.actionJobs={} end end
   commands.setfollowwaypoints=commands.setcavebot
   commands.gotolabel=function(a,env) assert(bot('CaveBot').gotoLabel(join(a)),'Waypoint label not found: '..join(a));env.stop=true end
+  commands.skip=function(_,env) env.stop=true end
   commands.loadcavebot=function(a) local b=bot('CaveBot');assert(b.setCurrentProfile,'Profile switching is unavailable');b.setCurrentProfile(join(a)) end
   commands.countitems=function(a) e.variables.count=countItem(a[1]) end
   commands.countitemsvisible=commands.countitems
@@ -122,7 +144,14 @@ function createElfBotEngine(c, data)
   commands.usegroundxyz=function(a) local tile=c.g_map.getTile({x=number(a[1]),y=number(a[2]),z=number(a[3])});assert(tile and tile:getTopUseThing(),'Ground tile unavailable');c.use(tile:getTopUseThing()) end
   commands.useongroundxyz=function(a) local tile=c.g_map.getTile({x=number(a[2]),y=number(a[3]),z=number(a[4])});assert(tile and tile:getTopUseThing(),'Ground tile unavailable');c.useWith(number(a[1]),tile:getTopUseThing()) end
   commands.useoninventoryitem=function(a) local item=c.findItem(number(a[2]));assert(item,'Inventory item not found');c.useWith(number(a[1]),item) end
-  commands.buyitems=function(a) c.g_game.buyItem(Item.create(number(a[1])),number(a[2]),0,false,true) end
+  commands.buyitems=function(a) c.NPC.buy(e.itemId(a[1]),number(a[2]),false,true) end
+  commands.buyitemsupto=function(a)
+    local id=e.itemId(a[1]);local wanted=number(a[2]);assert(wanted>=0 and wanted%1==0 and wanted<=1000000,'Invalid purchase target')
+    local owned=a[3]~=nil and number(a[3]) or countItem(id)
+    assert(owned>=0 and owned%1==0,'Invalid owned item count')
+    local missing=wanted-owned
+    if missing>0 then c.NPC.buy(id,math.min(100,missing),false,true) end
+  end
   commands.sellitems=function(a) c.g_game.sellItem(Item.create(number(a[1])),number(a[2]),0,true) end
   commands.setattackmode=function(a) c.g_game.setFightMode(number(a[1]));if a[2] then c.g_game.setChaseMode(number(a[2])) end end
   local directions={turnn=0,turne=1,turns=2,turnw=3,walkn=0,walke=1,walks=2,walkw=3,walkne=4,walkse=5,walksw=6,walknw=7}

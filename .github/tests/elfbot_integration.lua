@@ -66,7 +66,9 @@ local function fixture()
     elseif self.parent and self.anchored then
       local p=self.parent:getPaddingRect();return {x=p.x+(self.marginLeft or 0),y=p.y+(self.marginTop or 0)}
     elseif self.parent and self.parent.style=='ElfBotList' then
-      local p=self.parent:getPaddingRect();return {x=p.x,y=p.y+(self.parent:getChildIndex(self)-1)*20}
+      local p=self.parent:getPaddingRect();local y=p.y
+      for _,row in ipairs(self.parent.children) do if row==self then break end;y=y+row:getSize().height end
+      return {x=p.x,y=y}
     end
     return self.position or {x=0,y=0}
   end
@@ -217,6 +219,7 @@ local function fixture()
   env.retranslateKeyComboDesc=function(key) return key end
   local communityStops, logins=0,0
   env.modules={game_interface={getMapPanel=function() return map end},
+    game_npctrade={},
     client_options={getOption=function() return 50 end},
     client_topmenu={addRightGameToggleButton=function() return widget('Launcher',root) end},
     client_entergame={CharacterList={doLogin=function() logins=logins+1 end}}}
@@ -303,6 +306,109 @@ local function fixture()
     return executor,executor.context
   end
   return state
+end
+
+-- Optional, read-only audit of external original profiles. Never run their commands.
+if arg[1]=='--audit-profiles' then
+  local s=fixture();local executor,c=s.context()
+  local report={files=0,imported=0,actions=0,compiled=0,missing={},examples={},syntax={},failed={}}
+  for i=2,#arg do
+    local path=arg[i];report.files=report.files+1
+    local ok,result=pcall(s.env.ElfBotSettingsImport.parse,read(path),c.ElfBot.compile,path)
+    if not ok then report.failed[path]=tostring(result)
+    else
+      report.imported=report.imported+1
+      for _,row in ipairs(result.patch.waypoints or {}) do if row[1]=='elfaction' then
+        report.actions=report.actions+1
+        local compiled,err=pcall(c.ElfBot.compile,row[2])
+        if compiled then report.compiled=report.compiled+1
+        else
+          local missing=tostring(err):match('Unsupported ElfBot command: ([%w_]+)')
+          if missing then
+            report.missing[missing]=(report.missing[missing] or 0)+1
+            if not report.examples[missing] then local at=row[2]:lower():find(missing,1,true) or 1;report.examples[missing]=row[2]:sub(math.max(1,at-100),at+180) end
+          else
+            local key=tostring(err):gsub(' at %d+',' at <offset>')
+            report.syntax[key]=report.syntax[key] or {count=0,example=row[2]:sub(1,240)}
+            report.syntax[key].count=report.syntax[key].count+1
+          end
+        end
+      end end
+    end
+  end
+  executor.dispose();print(s.env.json.encode(report,2));return
+end
+
+-- Bounded, synthetic NG profiles cover the real site's empty records and HP sentinel.
+do
+  local s=fixture();local executor,c=s.context();local I=s.env.ElfBotSettingsImport
+  local function u32(n) return string.char(n%256,math.floor(n/256)%256,math.floor(n/65536)%256,math.floor(n/16777216)%256) end
+  local function compressed(fields)
+    local offsets={};for offset in pairs(fields) do offsets[#offsets+1]=offset end;table.sort(offsets)
+    local parts={string.char(160,254,255,255)};local at=0
+    local function zeros(n)
+      while n>0 do local run=math.min(n,16383);parts[#parts+1]=string.char(192+math.floor(run/256),run%256);n=n-run end
+    end
+    for _,offset in ipairs(offsets) do
+      assert(offset>=at);zeros(offset-at)
+      for ch in fields[offset]:gmatch('.') do parts[#parts+1]='\0'..ch end
+      at=offset+#fields[offset]
+    end
+    return table.concat(parts)
+  end
+  local fields={[0]=u32(100),[4]=u32(100),[8]=u32(7),[12]='Start\0',[44]=u32(65536+5),
+    [48]=u32(777),[96]=u32(100),[100]=u32(100),[104]=u32(7),[140]=u32(5),[0x21093]='skip | say "never"\0'}
+  local result=I.parse(compressed(fields),c.ElfBot.compile,'test.elfc')
+  equal(#result.patch.waypoints,3,'inactive record with residual coordinates must not become a waypoint')
+  equal(result.patch.waypoints[1][1],'label');equal(result.patch.waypoints[1][2],'Start')
+  equal(result.patch.waypoints[2][2],'skip | say "never"');equal(result.patch.waypoints[3][2],'','zero action reference stays empty')
+  fields[44]=u32(129*65536+5);assert(not pcall(I.parse,compressed(fields),c.ElfBot.compile,'bad.elfc'),'out-of-range reference accepted')
+  fields[44]=u32(65536+5);fields[0x21093]='unsupportedfuturecommand\0'
+  result=I.parse(compressed(fields),c.ElfBot.compile,'test.elfc')
+  equal(result.patch.waypoints[2][2],'unsupportedfuturecommand','invalid imported source must remain editable')
+  assert(table.concat(result.warnings,'\n'):find('Unsupported ElfBot command',1,true),'preview must warn before invalid actions can be run')
+  fields={[0]='Demon\0',[32]='\1',[104]=u32(101),[108]=u32(0)}
+  result=I.parse(compressed(fields),c.ElfBot.compile,'test.elft')
+  equal(result.targets,1);local rule=result.patch.targeting.monsters[1]
+  equal(rule.settings[1].hpMax,100);equal(rule.settings[1].originalHpMax,101);assert(rule.loot)
+  fields[104]=u32(102);assert(not pcall(I.parse,compressed(fields),c.ElfBot.compile,'bad.elft'),'invalid HP value accepted')
+  assert(not pcall(I.parse,string.char(160,254,255,255,0),c.ElfBot.compile,'bad.elfc'),'truncated literal accepted')
+  executor.dispose()
+end
+
+-- Original commands work identically in actions, hotkeys and icon click scripts.
+do
+  local s=fixture();local executor,c=s.context();local e=c.ElfBot;local said,buys,channels={},{},{}
+  c.saySpell=function(text) said[#said+1]=text end
+  c.talkChannel=function(id,text) channels[#channels+1]={id,text} end
+  c.NPC.buy=function(...) buys[#buys+1]={...} end
+  local offer={id=6000,name='Server Potion'};c.NPC.getBuyItems=function() return {offer} end;c.NPC.getSellItems=function() return {} end
+  local item={getId=function() return 238 end,getCount=function() return 75 end}
+  c.getContainers=function() return {{getItems=function() return {item} end}} end
+  local function run(source) local job=assert(e.run(source));assert(e.advance(job),job.error or 'one-pass command should complete');assert(not job.failed,job.error) end
+  run('if [1] {say "yes"}\nelse {say "no"}\nsay "after"');equal(said[1],'yes');equal(said[2],'after')
+  run('if [0] {say "no"}\n\nelse {say "else"}');equal(said[3],'else')
+  run('if [1] {skip | say "never"} | say "never"');equal(#said,3,'skip must stop the current script')
+  run('buyitemsupto 238 100');equal(buys[1][1],238);equal(buys[1][2],25);equal(buys[1][3],false);equal(buys[1][4],true)
+  run('buyitemsupto 238 50');equal(#buys,1,'do not buy when already above the target')
+  run('buyitemsupto 238 1000');equal(buys[2][2],100,'bound each request to the server trade limit')
+  run('buyitemsupto 238 100 90');equal(buys[3][2],10,'honor explicit owned-item variable')
+  run('buyitems "Server Potion" 10');equal(buys[4][1],6000)
+  c.NPC.getBuyItems=function() return {} end;equal(e.itemId('SERVER POTION'),6000,'remember names after NPC window closes')
+  equal(e.resolve('itemcount.great mana potion'),75);equal(e.resolve('winitemcount.great mana potion'),75)
+  assert(not pcall(e.itemId,'unknown potion'),'unknown item name must not silently return zero')
+  run('tradesay "test trade"');equal(channels[1][1],5);equal(channels[1][2],'test trade')
+  e.variables.MinValue=2;e.variables.MaxValue=4
+  for i=1,100 do local n=e.resolve('rand.$MinValue.$MaxValue');assert(n>=2 and n<=4) end
+  assert(not pcall(e.resolve,'rand.4.2'));equal(e.resolve('rand.3.3'),3)
+  s.setSpectators({s.player,{getName=function() return 'Captain Vip' end}});equal(e.resolve('screencount.Captain Vip'),1);equal(e.resolve('screencount.Rashid'),0)
+  local b=c.CaveBot;b.addAction('elfaction','isnotdistance 1 {skip}',false,{x=101,y=100,z=7});b.index=1
+  assert(e.predicate('isdistance',{1}));assert(not e.predicate('isnotdistance',{1}));assert(not e.predicate('islocation',{}))
+  b.actionList:getChildByIndex(1).actionPosition={x=100,y=100,z=7};assert(e.predicate('islocation',{}))
+  run('isdistance 20 {say "near"} else {say "far"}');equal(said[#said],'near','legacy predicates must accept else')
+  run('isnotdistance 20 {say "far"}\nelse {say "near"}');equal(said[#said],'near')
+  run('hplower 1 {say "low"} else {say "healthy"}');equal(said[#said],'healthy')
+  executor.dispose()
 end
 
 -- Imports are data-only, disabled until explicitly enabled, and pending imports are cancellable.
@@ -462,7 +568,7 @@ do
   source:setText('auto 200 say "changed"');source.onFocusChange(source,false)
   equal(reloads,2);equal(saves,2);equal(c.storage.elfbot.hotkeys[1].script,'auto 200 say "changed"')
   source.onFocusChange(source,false);equal(reloads,2,'unchanged edited row must not reload')
-  local empty=rowsList:getChildren()[50];empty.onFocusChange(empty,true)
+  local empty=rowsList:getChildren()[#rowsList:getChildren()];empty.onFocusChange(empty,true)
   s.click(panel.originalControls[1047]);local editor=s.root:getFocusedChild()
   equal(editor:getText(),'Edit Hotkey');local command,editorKey,saveButton
   for _,child in ipairs(editor:getChildren()) do
@@ -754,8 +860,51 @@ do
   local rows=refs[1009]:getChildren();equal(#rows,2,'saved routes displayed')
   s.click(rows[1]);equal(refs[1041]:getText(),'First route','mouse selects first saved route')
   s.click(rows[2]);equal(refs[1041]:getText(),'Second route','mouse selects second saved route')
+  local function inside(parent)
+    local bounds=parent:getPaddingRect()
+    for _,child in ipairs(parent:getChildren()) do
+      local p,dimensions=child:getPosition(),child:getSize()
+      assert(p.x>=bounds.x and p.y>=bounds.y and p.x+dimensions.width<=bounds.x+bounds.width and p.y+dimensions.height<=bounds.y+bounds.height,'compact control outside parent: '..child:getText()..' '..env.json.encode({p,dimensions,bounds}))
+      local style=child:getStyleName()
+      if style=='ElfBotLabel' or style=='ElfBotCheck' then assert(child:getTextSize().height<=dimensions.height,'compact label clipped: '..child:getText())
+      elseif style=='ElfBotButton' then assert(child:getTextSize().width<=dimensions.width,'compact button clipped: '..child:getText()) end
+      if style=='UIWidget' or style=='ElfBotGroup' then inside(child) end
+    end
+  end
+  inside(cave);assert(cave:getSize().width<=576 and cave:getSize().height<=373)
+  s.click(cave.elfTabs[2]);assert(refs[1035]:isVisible() and not refs[1028]:isVisible(),'Cavebot tabs hide inactive controls')
+  s.click(cave.elfTabs[3]);assert(refs[1100]:isVisible() and not refs[1035]:isVisible());s.click(refs[1100]);assert(latest.context.storage.elfbot.alerts.player.sound)
+  s.click(cave.elfTabs[1]);assert(refs[1028]:isVisible() and not refs[1100]:isVisible())
+  s.click(cave.closeButton)
+  local target=open('Targeting');inside(target);assert(target:getSize().width<=576 and target:getSize().height<=387)
+  for _,tab in ipairs(target.elfTabs) do s.click(tab);assert(tab:isOn(),'selected targeting tab highlighted') end
+  s.click(target.closeButton)
+  for _,name in ipairs({'Hotkeys','Shortkeys'}) do
+    local panel=open(name);inside(panel);assert(panel:getSize().width<=536 and panel:getSize().height<=283)
+    for _,child in ipairs(panel:getChildren()) do if child:getStyleName()=='ElfBotList' then
+      equal(child:getChildCount(),6,'empty script panel should not create hundreds of widgets')
+      for _,row in ipairs(child:getChildren()) do local fields=row:getChildren();equal(fields[2]:getSize().width,100,'shortcut field must fit modified keys');equal(fields[3]:getSize().width,374) end
+    end end
+    s.click(panel.closeButton)
+  end
+  cave=open('Cavebot');s.click(refs[1005]);assert(refs[1011]:isVisible())
+  assert(refs[1011].onDoubleClick());local editor=s.root:getFocusedChild();inside(editor)
+  local function editorFields(win)
+    local text,save
+    for _,child in ipairs(win:getChildren()) do if child:getStyleName()=='ElfBotMultilineTextEdit' then text=child elseif child:getText()=='Save' then save=child end end
+    return assert(text),assert(save)
+  end
+  local text,save=editorFields(editor);text:setText('say "action"\nwait 50\nskip');s.click(save)
+  equal(latest.context.CaveBot.actionList:getChildByIndex(1).value,'say "action"\nwait 50\nskip')
+  s.click(cave.closeButton)
+  local icons=open('Icons');local fields={}
+  for _,child in ipairs(icons:getChildren()) do if child:getStyleName()=='ElfBotTextEdit' then fields[#fields+1]=child end end
+  fields[1]:setText('Multiline test');assert(fields[2].onDoubleClick());editor=s.root:getFocusedChild();inside(editor)
+  text,save=editorFields(editor);text:setText('say "first"\nwait 50\nsay "second"');s.click(save)
+  equal(latest.context.storage.elfbot.icons[1].lclick,'say "first"\nwait 50\nsay "second"','multiline icon script saved without executing')
+  assert(not env.isEnabled(),'editing scripts must never start automation');s.click(icons.closeButton)
   assert(not env.isEnabled(),'UI interaction must not activate automation')
-  s.click(cave.closeButton);menu:raise();s.click(menu.closeButton)
+  menu:raise();s.click(menu.closeButton)
   assert(not latest.ui.isVisible(),'main close must hide all ElfBot panels')
   env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end

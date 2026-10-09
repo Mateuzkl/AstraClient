@@ -119,7 +119,7 @@ local function binary(text,compile)
   return {format='Original NG binary (partial import)',replacement={},patch=patch,warnings=warnings,hotkeys=#patch.hotkeys,shortkeys=#patch.shortkeys,icons=#patch.icons,healing=healingCount}
 end
 -- Original NG separate profiles use bounded zero-run compression (0xfffffea0).
-local function profile(text,path)
+local function profile(text,path,compile)
   local kind=(path or ''):lower():match('%.(elf[ct])$')
   assert(kind,'Select the original .elfc or .elft file with its extension')
   local size=kind=='elfc' and 0xa1093 or 0x1102d
@@ -145,12 +145,17 @@ local function profile(text,path)
     patch.waypoints={};local types={[1]='walk',[2]='rope',[3]='ladder',[4]='stand',[6]='shovel',[7]='node',[8]='lure'}
     for index=0,1023 do
       local off=index*48;local x,y,z=u32(off),u32(off+4),u32(off+8);local typ=word(off+44)
-      if x~=0 or y~=0 or typ~=0 then
+      -- Type zero marks an unused record, even if an old coordinate remains.
+      if typ~=0 then
         assert(x<=65535 and y<=65535 and z<=15,'Invalid waypoint position')
         local label=str(off+12,32);if label~='' then patch.waypoints[#patch.waypoints+1]={'label',label} end
         if typ==5 then
-          local actionIndex=word(off+46);assert(actionIndex>=1 and actionIndex<=128,'Invalid cavebot action reference')
-          patch.waypoints[#patch.waypoints+1]={'elfaction',str(0x21093+(actionIndex-1)*4096,4096),{x=x,y=y,z=z}}
+          local actionIndex=word(off+46);assert(actionIndex<=128,'Invalid cavebot action reference')
+          -- Zero is an empty action, not the first text slot or an out-of-bounds read.
+          local source=actionIndex==0 and '' or str(0x21093+(actionIndex-1)*4096,4096)
+          local ok,err=pcall(compile,source)
+          if not ok then warnings[#warnings+1]='Action '..(index+1)..': '..tostring(err)..'. Source retained; following stops at this action until it is corrected.' end
+          patch.waypoints[#patch.waypoints+1]={'elfaction',source,{x=x,y=y,z=z}}
         else assert(types[typ],'Unsupported original waypoint type '..typ);patch.waypoints[#patch.waypoints+1]={'elf'..types[typ],x..','..y..','..z} end
       end
     end
@@ -165,10 +170,11 @@ local function profile(text,path)
         for setting=0,3 do
           local pos=off+96+setting*56;local low,high=u32(pos+12),u32(pos+8)
           if high>0 then
-            assert(low<=high and high<=100,'Invalid targeting HP range')
+            -- NG profiles use 101 as the upper sentinel for a full 0..100% range.
+            assert(low<=100 and low<=high and high<=101,'Invalid targeting HP range')
             local stance=u32(pos+16);local attack=u32(pos+20);local mode=byte(pos+25)
             local mapped=({[0]='No Movement',[2]='Keep distance',[3]='Keep distance',[6]='Approach',[12]='Lure'})[stance] or 'No Movement'
-            rule.settings[#rule.settings+1]={hpMin=low,hpMax=high,danger=u32(pos),avoid=({[0]="Don't avoid",[1]='Avoid waves',[2]='Avoid beams'})[u32(pos+4)],stance=mapped,action='',fightMode=mode>0 and ((mode-1)%3+1) or nil,originalStance=stance,originalAttack=attack,originalRing=byte(pos+24)}
+            rule.settings[#rule.settings+1]={hpMin=low,hpMax=math.min(100,high),originalHpMax=high,danger=u32(pos),avoid=({[0]="Don't avoid",[1]='Avoid waves',[2]='Avoid beams'})[u32(pos+4)],stance=mapped,action='',fightMode=mode>0 and ((mode-1)%3+1) or nil,originalStance=stance,originalAttack=attack,originalRing=byte(pos+24)}
             if not ({[0]=true,[2]=true,[3]=true,[6]=true,[12]=true})[stance] or attack%64~=0 or byte(pos+24)~=0 then warnings[#warnings+1]=name..': original stance/spell/ring behavior needs further mapping; original values retained.' end
           end
         end
@@ -182,7 +188,7 @@ local function profile(text,path)
 end
 function I.parse(text,compile,path)
   assert(type(text)=='string' and #text>0 and #text<=I.maxBytes,'ElfBot file must contain 1 byte to 8 MB')
-  if text:sub(1,4)==string.char(160,254,255,255) then return profile(text,path) end
+  if text:sub(1,4)==string.char(160,254,255,255) then return profile(text,path,compile) end
   if text:find('\0',1,true) then return binary(text,compile) end
   text=text:gsub('^\239\187\191',''):gsub('\r\n','\n')
   local first=trim(text):sub(1,1)

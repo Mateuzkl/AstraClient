@@ -75,7 +75,15 @@ function prepareElfBotLegacy(e,c,d)
       local tile=c.g_map.getTile({x=coords[1],y=coords[2],z=coords[3]});local item=tile and tile:getTopUseThing();return item and item:getId() or 0
     end
     if kind=='curmsg' then return (e.currentMessage or {})[member] or 0 end
-    if kind=='winitemcount' then local total=0;for _,box in pairs(c.getContainers()) do for _,item in ipairs(box:getItems()) do if item:getId()==tonumber(member) then total=total+item:getCount() end end end;return total end
+    if kind=='screencount' then local total=0;for _,s in ipairs(c.getSpectators()) do if s:getName():lower()==member then total=total+1 end end;return total end
+    if kind=='rand' then
+      local originalMember=name:match('^[^%.]+%.(.+)$')
+      local lo,hi=originalMember:match('^([^%.]+)%.([^%.]+)$')
+      local function bound(v) return v and (v:sub(1,1)=='$' and tonumber(e.resolve(v:sub(2))) or tonumber(v)) end
+      lo,hi=bound(lo),bound(hi);assert(lo and hi and lo%1==0 and hi%1==0 and lo<=hi and lo>=-1000000 and hi<=1000000,'Invalid random range')
+      return math.random(lo,hi)
+    end
+    if kind=='winitemcount' then local id=e.itemId(member);local total=0;for _,box in pairs(c.getContainers()) do for _,item in ipairs(box:getItems()) do if item:getId()==id then total=total+item:getCount() end end end;return total end
     if kind=='key' then
       local vk=tonumber(member);local keys={[37]='Left',[38]='Up',[39]='Right',[40]='Down',[16]='Shift',[17]='Ctrl',[18]='Alt'}
       local keyName=keys[vk] or (vk and vk>=96 and vk<=105 and 'Numpad'..(vk-96)) or (vk and vk>=65 and vk<=90 and string.char(vk))
@@ -103,11 +111,13 @@ function prepareElfBotLegacy(e,c,d)
     return rawResolve(name)
   end
   function e.predicate(name,args)
-    local s=creature(args[1])
-    if name=='isonscreen' then return s~=nil elseif name=='isnotonscreen' then return s==nil
+    if name=='isonscreen' or name=='isnotonscreen' then
+      local s=creature(args[1]);return name=='isonscreen' and s~=nil or name=='isnotonscreen' and s==nil
     elseif name=='isattackedname' or name=='istargetname' then local t=name=='istargetname' and c.TargetBot.current or c.g_game.getAttackingCreature();return t and t:getName():lower()==tostring(args[1]):lower() end
     if name=='isdistance' or name=='isnotdistance' or name=='islocation' or name=='isnotlocation' then
-      local b=c.CaveBot;local row=b and b.actionList:getChildByIndex(b.index);local x,y,z;if row then x,y,z=row.value:match('^(%d+),(%d+),(%d+)') end
+      local b=c.CaveBot;local row=b and b.actionList:getChildByIndex(b.index);local x,y,z
+      if row and row.actionPosition then x,y,z=row.actionPosition.x,row.actionPosition.y,row.actionPosition.z
+      elseif row then x,y,z=row.value:match('^(%d+),(%d+),(%d+)') end
       if not x then return name=='isnotdistance' or name=='isnotlocation' end
       local p={x=tonumber(x),y=tonumber(y),z=tonumber(z)};local near=p.z==c.posz() and c.getDistanceBetween(c.pos(),p)<=(tonumber(args[1]) or 0)
       return (name=='isnotdistance' or name=='isnotlocation') and not near or (name=='isdistance' or name=='islocation') and near

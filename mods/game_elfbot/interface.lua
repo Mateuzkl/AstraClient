@@ -100,6 +100,18 @@ function attachElfBot(c)
     v:hide();return v
   end
   local function show(v) v:show();v:raise();v:focus() end
+  local function tabPages(win,names,w,h)
+    local pages,buttons={},{}
+    local width=math.floor((w-(#names-1)*8)/#names)
+    local function select(index)
+      for i,page in ipairs(pages) do page:setVisible(i==index);buttons[i]:setOn(i==index) end
+    end
+    for i,name in ipairs(names) do
+      local page=widget('UIWidget',win,0,32,w,h-32);page:setPhantom(true);pages[i]=page
+      local index=i;buttons[i]=button(win,(i-1)*(width+8),0,width,name,function() select(index) end)
+    end
+    select(1);win.elfTabs=buttons;return pages
+  end
   local function status(v,x,y,w)
     local s=label(v,x,y,w,'Ready');s:setTextWrap(true);s:setHeight(32);statusLabels[#statusLabels+1]=s;return s
   end
@@ -110,11 +122,11 @@ function attachElfBot(c)
   local panels={}
   local showBotTab
   local function scriptEditor(title,value,callback,saveLabel)
-    local win=window(title,650,350)
-    local text=widget('ElfBotMultilineTextEdit',win,0,0,650,285,value)
-    button(win,0,297,110,saveLabel or 'Save / Restart',function() callback(text:getText());save();win:destroy() end)
-    button(win,116,297,80,'Copy',function() g_window.setClipboardText(text:getText()) end)
-    button(win,202,297,80,'Paste',function() text:setText(g_window.getClipboardText()) end)
+    local win=window(title,520,270)
+    local text=widget('ElfBotMultilineTextEdit',win,0,0,520,230,value)
+    button(win,0,242,110,saveLabel or 'Save / Restart',function() callback(text:getText());save();win:destroy() end)
+    button(win,116,242,80,'Copy',function() g_window.setClipboardText(text:getText()) end)
+    button(win,202,242,80,'Paste',function() text:setText(g_window.getClipboardText()) end)
     show(win)
   end
   local function combo(parent,x,y,w,values,value)
@@ -224,10 +236,20 @@ function attachElfBot(c)
   end
   local function bindings(kind)
     local short=kind=='shortkeys';local rows=data[kind]
-    local win,r=originalDialog(short and 10000 or 3000);panels[kind]=win
-    r[1001]:setChecked(data[kind..'Enabled']);r[1001].onCheckChange=function(_,v) data[kind..'Enabled']=v end
+    local win=window(short and 'Custom Shortkeys' or 'Custom Hotkeys',520,246);panels[kind]=win
+    local r={};win.originalDialogId=short and 10000 or 3000;win.originalControls=r
+    r[1001]=check(win,0,2,174,short and 'Shortkeys enabled' or 'Hotkeys enabled',data[kind..'Enabled'],function(v) data[kind..'Enabled']=v;save() end)
+    r[1003]=button(win,364,0,156,short and 'Create Shortkey' or 'Create Hotkey',function() end)
+    if short then label(win,184,4,100,'Symbol:');r[1005]=edit(win,286,0,48,data.symbol)
+    else
+      r[1048]=check(win,184,2,104,'Persistent',false,function() end)
+      r[1047]=button(win,292,0,64,'Edit',function() end)
+    end
+    label(win,24,32,100,short and 'Command name' or 'Key / shortcut')
+    label(win,130,32,376,'ElfBot command / script')
     local persistent=false;local selected
-    local rowsList=list(win,dx(6),dy(27),dx(244),dy(148))
+    local rowsList=list(win,0,54,520,156)
+    label(win,0,222,520,'Double-click to edit. Press Enter to save an inline change.'):setColor('#475569')
     local refresh
     local function editEntry(index,source)
       if persistent then
@@ -237,15 +259,15 @@ function attachElfBot(c)
         end);return
       end
       local row=index and rows[index] or {key='',script=source or '',enabled=true}
-      local editor=window(short and 'Edit Shortkey' or 'Edit Hotkey',550,295)
-      label(editor,0,0,100,short and 'Shortkey:' or 'Hotkey:');local key=edit(editor,105,0,230,row.key)
+      local editor=window(short and 'Edit Shortkey' or 'Edit Hotkey',520,250)
+      label(editor,0,0,100,short and 'Shortkey:' or 'Hotkey:');local key=edit(editor,105,0,210,row.key)
       if not short then key.onKeyDown=function(_,code,mods) local combo=determineKeyComboDesc(code,mods);if combo and combo~='' then key:setText(combo);return true end end end
-      local enabled=check(editor,350,2,170,'Enabled',row.enabled,function() end)
-      label(editor,0,33,100,'Toggle key:');local toggleKey=edit(editor,105,33,230,row.toggleKey or (not short and row.key) or '')
+      local enabled=check(editor,330,2,180,'Enabled',row.enabled,function() end)
+      label(editor,0,30,100,'Toggle key:');local toggleKey=edit(editor,105,30,210,row.toggleKey or (not short and row.key) or '')
       toggleKey.onKeyDown=function(_,code,mods) local combo=determineKeyComboDesc(code,mods);if combo and combo~='' then toggleKey:setText(combo);return true end end
-      local command=widget('ElfBotMultilineTextEdit',editor,0,68,550,167,row.script)
+      local command=widget('ElfBotMultilineTextEdit',editor,0,60,520,146,row.script)
       command:setTooltip(row.importError or '')
-      button(editor,0,250,100,'Save',function()
+      button(editor,0,218,88,'Save',function()
         if not command:getText():match('%S') then
           if index then table.remove(rows,index) end
           selected=nil;e.reload();refresh();save();editor:destroy();return
@@ -258,10 +280,10 @@ function attachElfBot(c)
         if index then rows[index]=value else rows[#rows+1]=value end
         e.reload();refresh();save();editor:destroy()
       end)
-      button(editor,105,250,80,'Delete',function() assert(index,'Select an existing entry');table.remove(rows,index);selected=nil;e.reload();refresh();save();editor:destroy() end)
-      button(editor,190,250,80,'Copy',function() g_window.setClipboardText(command:getText()) end)
-      button(editor,275,250,80,'Paste',function() command:setText(g_window.getClipboardText()) end)
-      button(editor,450,250,100,'Cancel',function() editor:destroy() end);show(editor)
+      button(editor,96,218,72,'Delete',function() assert(index,'Select an existing entry');table.remove(rows,index);selected=nil;e.reload();refresh();save();editor:destroy() end)
+      button(editor,176,218,72,'Copy',function() g_window.setClipboardText(command:getText()) end)
+      button(editor,256,218,72,'Paste',function() command:setText(g_window.getClipboardText()) end)
+      button(editor,432,218,88,'Cancel',function() editor:destroy() end);show(editor)
     end
     refresh=function()
       rowsList:destroyChildren();selected=nil
@@ -269,10 +291,10 @@ function attachElfBot(c)
       if persistent then
         displayed={};for line in data.persistent:gmatch('[^\r\n]+') do displayed[#displayed+1]={key='',script=line,enabled=true} end
       end
-      -- Original dialogs keep empty editable slots visible even with no saved commands.
-      for i=1,math.max(100,#displayed) do
+      -- Keep a few useful empty rows, not hundreds of invisible widgets.
+      for i=1,math.max(6,#displayed+1) do
         local index=i;local existing=displayed[i];local storedIndex=existing and i;local row=existing or {key='',script='',enabled=false}
-        local v=createRow('ElfBotRow',rowsList);v:setHeight(24);v:setSize({width=dx(244)-14,height=24});v:setTooltip(row.importError or row.script)
+        local v=createRow('ElfBotRow',rowsList);v:setHeight(26);v:setSize({width=506,height=26});v:setTooltip(row.importError or row.script)
         v.onFocusChange=function(_,focus) if focus then selected=index end end
         local enabled;local keyField;local sourceField
         local function commit()
@@ -297,8 +319,8 @@ function attachElfBot(c)
           end);if not ok then e.status=tostring(err) end
         end
         enabled=check(v,0,0,18,'',row.enabled,function() if sourceField then commit() end end)
-        keyField=edit(v,21,0,39,row.key or '');keyField:setHeight(17)
-        sourceField=edit(v,64,0,dx(244)-82,row.script);sourceField:setHeight(17)
+        keyField=edit(v,24,0,100,row.key or '')
+        sourceField=edit(v,130,0,374,row.script)
         sourceField.onEnter=function() if sourceField:getText():match('%S') and not existing then enabled:setChecked(true) end;commit() end
         keyField.onEnter=commit
         for _,field in ipairs({keyField,sourceField}) do field.onFocusChange=function(_,focus) if focus then selectRow(v) else commit() end end end
@@ -314,7 +336,7 @@ function attachElfBot(c)
       end) end
     end
     if short then
-      r[1005]:setText(data.symbol);r[1005].onTextChange=function(_,text) if #text<=4 then data.symbol=text end end
+      r[1005]:setText(data.symbol);r[1005].onTextChange=function(_,text) if #text<=4 then data.symbol=text;save() end end
       rowsList:setTooltip('Double-click a shortkey to edit it.')
     else
       r[1047].onClick=function() assert(persistent or selected,'Select a hotkey first');editEntry(selected and rows[selected] and selected or nil) end
@@ -364,7 +386,49 @@ function attachElfBot(c)
     return win
   end
   local function cavebot()
-    local win,r=originalDialog(14000);panels.cavebot=win
+    local win=window('Cavebot',560,336);panels.cavebot=win
+    local pages=tabPages(win,{'Waypoints','Loot & options','Alerts'},560,336)
+    local routePage,optionsPage,alertsPage=unpack(pages)
+    local r={};win.originalDialogId=14000;win.originalControls=r
+    group(routePage,0,0,256,304,'Waypoints')
+    r[1028]=list(routePage,8,24,240,176)
+    for _,row in ipairs({{1027,'<',8,28},{1026,'>',44,28},{1051,'Clear',80,48},{1018,'Label',136,56},{1038,'Del',200,48}}) do
+      r[row[1]]=button(routePage,row[3],208,row[4],row[2],function() end)
+    end
+    r[1020]=check(routePage,8,234,110,'Show labels',false,function() end)
+    r[1012]=check(routePage,128,234,120,'Follow route',false,function() end)
+    label(routePage,8,256,240,'Select an Action waypoint to edit its command.'):setColor('#64748b')
+    r[1011]=widget('ElfBotMultilineTextEdit',routePage,8,256,240,40,'')
+    group(routePage,264,0,296,142,'Add waypoint')
+    label(routePage,272,28,80,'Position:');r[1040]=combo(routePage,356,24,196,{},nil)
+    for i,row in ipairs({{1004,'Stand'},{1007,'Node'},{1001,'Walk'},{1005,'Action'},{1002,'Rope'},{1003,'Ladder'},{1006,'Shovel'},{1008,'Lure'}}) do
+      r[row[1]]=button(routePage,272+(i-1)%4*72,58+math.floor((i-1)/4)*28,64,row[2],function() end)
+    end
+    group(routePage,264,150,296,154,'Saved routes')
+    r[1009]=list(routePage,272,174,280,54);r[1041]=edit(routePage,272,236,280,'')
+    r[1041]:setTooltip('Route name')
+    for i,row in ipairs({{1048,'Edit'},{1050,'Save'},{1075,'Load'}}) do r[row[1]]=button(routePage,272+(i-1)*96,268,88,row[2],function() end) end
+    group(optionsPage,0,0,272,304,'Loot items')
+    r[1035]=list(optionsPage,8,24,256,216)
+    r[1032]=edit(optionsPage,8,248,56,'');r[1031]=edit(optionsPage,72,248,28,'E');r[1029]=edit(optionsPage,108,248,92,'')
+    r[1033]=button(optionsPage,208,248,56,'Del',function() end)
+    label(optionsPage,8,280,256,'ID / destination / name (Enter)'):setColor('#64748b')
+    group(optionsPage,288,0,272,58,'Cavebot hotkeys');r[1047]=button(optionsPage,296,24,256,'Edit scripts',function() end)
+    group(optionsPage,288,66,272,238,'Tools & looting')
+    for i,row in ipairs({{1015,'Use rope'},{1016,'Use shovel'},{1042,'Skip nodes'}}) do
+      label(optionsPage,296,94+(i-1)*28,120,row[2]);r[row[1]]=combo(optionsPage,420,90+(i-1)*28,132,{},nil)
+    end
+    for i,row in ipairs({{1037,'Open next backpack'},{1036,'Loot nearby targets'},{1024,'Loot distant targets'}}) do r[row[1]]=check(optionsPage,296,178+(i-1)*28,256,row[2],false,function() end) end
+    group(alertsPage,0,0,560,304,'Alerts & disconnect handling')
+    for i,text in ipairs({'S','P / R','X'}) do label(alertsPage,340+(i-1)*60,30,46,text) end
+    for i,text in ipairs({'Player nearby','GM / CM detected','Player attacking','Default chat','Private chat','Disconnected'}) do
+      local y=60+(i-1)*32;label(alertsPage,14,y,300,text)
+      for j=1,3 do
+        local id=i<6 and 1100+(i-1)*3+j-1 or 1114+j
+        if id~=1116 then r[id]=check(alertsPage,340+(j-1)*60,y,20,'',false,function() end) end
+      end
+    end
+    label(alertsPage,14,264,530,'S: sound | P: pause / R: reconnect | X: logout'):setColor('#64748b')
     local selected,lootIndex;local refresh,refreshRoutes,refreshLoot
     local visibleRows={}
     local b=e.route();local action=r[1011];action:hide()
@@ -406,6 +470,16 @@ function attachElfBot(c)
       guardCompile(action:getText());b.editAction(node,node.action,action:getText());b.save();refresh()
     end
     action.onFocusChange=function(_,focus) if not focus and selected and b.actionList:getChildByIndex(selected).action=='elfaction' then local ok,err=pcall(action.onEnter);if not ok then e.status=tostring(err) end end end
+    action:setTooltip('ElfBot action script. Double-click for the multiline editor.')
+    action.onDoubleClick=function()
+      local node=selected and b.actionList:getChildByIndex(selected)
+      if not node or node.action~='elfaction' then return end
+      scriptEditor('Waypoint action',node.value,function(source)
+        assert(alive and not win:isDestroyed() and not node:isDestroyed(),'Waypoint is no longer available')
+        guardCompile(source);b.editAction(node,node.action,source);b.save();refresh()
+      end,'Save')
+      return true
+    end
     r[1027].onClick=function() selected=math.max(1,(selected or 1)-1);local node=b.actionList:getChildByIndex(selected);if node then action:setText(node.value);action:setVisible(node.action=='elfaction');b.actionList:focusChild(node);if visibleRows[selected] then selectRow(visibleRows[selected]) end end end
     r[1026].onClick=function() selected=math.min(b.actionList:getChildCount(),(selected or 0)+1);local node=b.actionList:getChildByIndex(selected);if node then action:setText(node.value);action:setVisible(node.action=='elfaction');b.actionList:focusChild(node);if visibleRows[selected] then selectRow(visibleRows[selected]) end end end
     r[1038].onClick=function() assert(selected,'Select a waypoint');b.actionList:getChildByIndex(selected):destroy();selected=math.min(selected,b.actionList:getChildCount());action:hide();b.save();refresh() end
@@ -415,8 +489,8 @@ function attachElfBot(c)
       button(popup,170,49,100,'OK',function() local text=name:getText():match('^%s*(.-)%s*$');assert(text~='','Enter a label');local node=b.addAction('label',text,true);if selected then b.actionList:moveChildToIndex(node,selected) end;b.save();refresh();popup:destroy() end);show(popup)
     end
     r[1020].onCheckChange=function(_,value) data.showLabels=value;refresh() end
-    action:setHeight(dy(52))
-    local recordButton=db(win,132,120,120,13,'Auto Record',function()
+    action:setHeight(40)
+    local recordButton=button(routePage,272,114,280,'Auto Record',function()
       if b.Recorder.isOn() then b.Recorder.disable() else b.Recorder.enable();r[1012]:setChecked(false) end
     end)
     local function recordingState() recordButton:setText(b.Recorder.isOn() and 'Auto Record: ON' or 'Auto Record');recordButton:setOn(b.Recorder.isOn()) end
@@ -481,41 +555,44 @@ function attachElfBot(c)
     end
     data.alerts.disconnected=data.alerts.disconnected or {}
     for id,key in pairs({[1115]='sound',[1117]='logout'}) do local name=key;r[id]:setChecked(data.alerts.disconnected[name]);r[id].onCheckChange=function(_,value) data.alerts.disconnected[name]=value end end
-    local reconnect=dk(win,246,223,9,'',data.extras.reconnect,function(value) data.extras.reconnect=value end);reconnect:setTooltip('Reconnect after disconnect')
+    local reconnect=check(alertsPage,400,220,20,'',data.extras.reconnect,function(value) data.extras.reconnect=value;save() end);reconnect:setTooltip('Reconnect after disconnect')
     refresh();refreshRoutes();refreshLoot();win.onVisibilityChange=function(_,visible) if visible then refresh() end end;return win
   end
   local function targeting()
     local d=data.targeting;d.range=d.range or 2;d.frequency=d.frequency or 2000
-    local win=window('Monster Targeting',dx(380),dy(253));panels.targeting=win
-    dg(win,2,1,234,157,'Monsters definition and behaviours');dg(win,240,1,138,118,'Target selection')
-    dg(win,2,160,132,91,'Stance options');dg(win,138,160,98,91,'Saving & Loading settings');dg(win,240,160,138,91,'Blocked tiles')
-    local monsters=list(win,dx(10),dy(14),dx(88),dy(122));local selected,settingIndex,loading=nil,1,false
-    dl(win,108,18,24,'Name');local name=de(win,134,18,94,'');name:setTooltip('Enter a name and press Enter to add or update. Use * for all monsters.')
-    dl(win,108,29,24,'Count');local count=dc(win,134,29,28,{'Any','1','2','3','4','5','6','7','8','9','10'},'Any')
-    dl(win,170,29,30,'Setting #');local settings=dc(win,200,29,28,{'1','New','Delete'},'1')
-    dl(win,108,40,38,'Categories');local categories=de(win,148,40,80,'')
-    dl(win,108,59,52,'HP% range');local hpMin=de(win,168,59,20,0);dl(win,196,59,12,'to');local hpMax=de(win,208,59,20,100)
-    dl(win,108,70,58,'Monster attacks');local avoid=dc(win,168,70,60,{"Don't avoid",'Avoid beams','Avoid waves','Avoid all'},"Don't avoid")
-    dl(win,108,81,72,'Danger level');local danger=de(win,200,81,28,0)
-    dl(win,108,92,60,'Desired distance');local stance=dc(win,168,92,60,{'No Movement','Approach','Follow','Keep distance','Lure'},'No Movement')
-    dl(win,108,103,60,'Desired action');local action=de(win,168,103,60,'');action:setTooltip('Type your attack spell, for example exori frigo, or an ElfBot command such as sd target. Empty means no spell.')
-    dl(win,108,114,60,'Attack mode');local fight=dc(win,168,114,60,{'No change','Offensive','Balanced','Defensive'},'No change')
-    dl(win,108,125,60,'Wear ring');local ring=de(win,168,125,60,'No change')
-    local alarm=dk(win,110,144,56,'Play alarm',false,function() end);local loot=dk(win,174,144,54,'Loot monster',true,function() end)
-    local reachable=dk(win,248,96,124,'Target must be reachable',d.reachable,function(v) d.reachable=v;save() end)
-    local shootable=dk(win,248,105,124,'Target must be shootable',d.shootable,function(v) d.shootable=v;save() end)
+    local win=window('Monster Targeting',560,350);panels.targeting=win
+    local pages=tabPages(win,{'Monsters','Selection','Profiles'},560,350)
+    local monstersPage,selectionPage,profilesPage=unpack(pages)
+    group(monstersPage,0,0,150,272,'Monsters');group(monstersPage,160,0,400,310,'Monster rules')
+    local monsters=list(monstersPage,8,24,134,200);local selected,settingIndex,loading=nil,1,false
+    label(monstersPage,174,28,80,'Name');local name=edit(monstersPage,256,26,292,'');name:setTooltip('Enter a name and press Enter to add or update. Use * for all monsters.')
+    label(monstersPage,174,56,80,'Count');local count=combo(monstersPage,256,54,92,{'Any','1','2','3','4','5','6','7','8','9','10'},'Any')
+    label(monstersPage,362,56,86,'Setting');local settings=combo(monstersPage,456,54,92,{'1','New','Delete'},'1')
+    label(monstersPage,174,84,80,'Categories');local categories=edit(monstersPage,256,82,292,'')
+    label(monstersPage,174,112,80,'HP% range');local hpMin=edit(monstersPage,256,110,60,0);label(monstersPage,324,112,20,'to');local hpMax=edit(monstersPage,348,110,60,100)
+    label(monstersPage,420,112,60,'Danger');local danger=edit(monstersPage,486,110,62,0)
+    label(monstersPage,174,140,104,'Avoid attacks');local avoid=combo(monstersPage,280,138,268,{"Don't avoid",'Avoid beams','Avoid waves','Avoid all'},"Don't avoid")
+    label(monstersPage,174,168,104,'Movement');local stance=combo(monstersPage,280,166,268,{'No Movement','Approach','Follow','Keep distance','Lure'},'No Movement')
+    label(monstersPage,174,196,104,'Attack script');local action=edit(monstersPage,280,194,268,'');action:setTooltip('Type your attack spell, for example exori frigo, or an ElfBot command such as sd target. Empty means no spell.')
+    label(monstersPage,174,224,80,'Fight mode');local fight=combo(monstersPage,256,222,146,{'No change','Offensive','Balanced','Defensive'},'No change')
+    label(monstersPage,414,224,44,'Ring');local ring=edit(monstersPage,464,222,84,'No change')
+    local alarm=check(monstersPage,174,254,140,'Play alarm',false,function() end);local loot=check(monstersPage,332,254,216,'Loot monster',true,function() end)
+    label(monstersPage,174,282,374,'Press Enter or leave a field to save its rule.'):setColor('#64748b')
+    group(selectionPage,0,0,272,310,'Target selection');group(selectionPage,288,0,272,310,'Movement & combat')
+    local reachable=check(selectionPage,8,212,256,'Require reachable target',d.reachable,function(v) d.reachable=v;save() end)
+    local shootable=check(selectionPage,8,240,256,'Require shootable target',d.shootable,function(v) d.shootable=v;save() end)
     for i,row in ipairs({{'order','List order'},{'health','Health'},{'proximity','Proximity'},{'danger','Danger'},{'random','Random'},{'stick','Stick'}}) do
-      dl(win,248,16+(i-1)*13,38,row[2]);local bar=widget('ElfBotSlider',win,dx(288),dy(18+(i-1)*13),dx(82),dy(8))
+      label(selectionPage,8,30+(i-1)*28,88,row[2]);local bar=widget('ElfBotSlider',selectionPage,104,32+(i-1)*28,156,12)
       bar:setMinimum(0);bar:setMaximum(100);bar:setValue(row[1]=='stick' and (d.stickWeight or (d.stick and 100 or 0)) or (d.weights[row[1]] or 0))
       local key=row[1];bar:setTooltip(row[2]..' priority');bar.onValueChange=function(_,value) if key=='stick' then d.stickWeight=value;d.stick=value>0 else d.weights[key]=value end;save() end
     end
-    dl(win,10,173,73,'Range distance');local range=de(win,86,173,38,d.range)
-    dl(win,10,184,73,'Attack frequency');local frequency=de(win,86,184,38,d.frequency)
-    dl(win,10,195,73,"Ignore other's monsters");local ignore=dc(win,86,195,38,{"Don't",'All','Friends','Enemies'},d.ignoreOthers or "Don't");ignore:setTooltip("Uses server ownership data supplied through ElfBot.setMonsterOwner(id, playerName).")
-    dk(win,10,210,120,'Ignore Anti-bot monsters',d.ignoreAntiBot,function(v) d.ignoreAntiBot=v;save() end):setTooltip('Uses names in the Anti-bot category. The server must supply the name; no hidden server flags are assumed.')
-    dk(win,10,219,120,'Sync spell with attacks',d.syncSpell,function(v) d.syncSpell=v;save() end)
-    dk(win,10,228,120,'Allow diagonal movement',d.diagonal~=false,function(v) d.diagonal=v;save() end)
-    dk(win,10,238,120,'Run Targeting',c.TargetBot.isOn(),function(v) if v then c.TargetBot.setOn() else c.TargetBot.setOff() end end)
+    label(selectionPage,304,30,140,'Range distance');local range=edit(selectionPage,450,28,98,d.range)
+    label(selectionPage,304,60,140,'Attack frequency');local frequency=edit(selectionPage,450,58,98,d.frequency)
+    label(selectionPage,304,90,140,'Ignore owned mobs');local ignore=combo(selectionPage,450,88,98,{"Don't",'All','Friends','Enemies'},d.ignoreOthers or "Don't");ignore:setTooltip("Uses server ownership data supplied through ElfBot.setMonsterOwner(id, playerName).")
+    check(selectionPage,304,132,244,'Ignore Anti-bot monsters',d.ignoreAntiBot,function(v) d.ignoreAntiBot=v;save() end):setTooltip('Uses names in the Anti-bot category. The server must supply the name; no hidden server flags are assumed.')
+    check(selectionPage,304,166,244,'Sync spell with attacks',d.syncSpell,function(v) d.syncSpell=v;save() end)
+    check(selectionPage,304,200,244,'Allow diagonal movement',d.diagonal~=false,function(v) d.diagonal=v;save() end)
+    check(selectionPage,304,234,244,'Run Targeting',c.TargetBot.isOn(),function(v) if v then c.TargetBot.setOn() else c.TargetBot.setOff() end end)
     local function option(v) return v:getCurrentOption().text end
     local refresh,load,store
     load=function()
@@ -551,10 +628,11 @@ function attachElfBot(c)
       else settingIndex=tonumber(text) or 1 end;load();save()
     end
     local function reorder(delta) assert(selected,'Select a monster');local index=math.max(1,math.min(#d.monsters,selected+delta));local row=table.remove(d.monsters,selected);table.insert(d.monsters,index,row);selected=index;refresh();save() end
-    db(win,8,140,14,13,'<',function() reorder(-1) end);db(win,26,140,14,13,'>',function() reorder(1) end)
-    db(win,80,140,20,13,'Del',function() assert(selected,'Select a monster');table.remove(d.monsters,selected);selected=nil;settingIndex=1;refresh();load();save() end)
-    local saved=list(win,dx(148),dy(173),dx(78),dy(44));data.targetProfiles=data.targetProfiles or {}
-    dl(win,148,221,24,'Name');local configName=de(win,172,221,54,data.targetName or 'Default')
+    button(monstersPage,8,232,36,'<',function() reorder(-1) end);button(monstersPage,50,232,36,'>',function() reorder(1) end)
+    button(monstersPage,92,232,50,'Del',function() assert(selected,'Select a monster');table.remove(d.monsters,selected);selected=nil;settingIndex=1;refresh();load();save() end)
+    group(profilesPage,0,0,272,310,'Saved targeting profiles');group(profilesPage,288,0,272,310,'Blocked tiles')
+    local saved=list(profilesPage,8,26,256,190);data.targetProfiles=data.targetProfiles or {}
+    label(profilesPage,8,236,40,'Name');local configName=edit(profilesPage,54,232,210,data.targetName or 'Default')
     local function profiles()
       saved:destroyChildren()
       for key in pairs(data.targetProfiles) do local profileName=key;local row=createRow('ElfBotRow',saved);row:setText(profileName);row.onFocusChange=function(_,v) if v then configName:setText(profileName) end end end
@@ -567,14 +645,14 @@ function attachElfBot(c)
         end end
       end
     end
-    db(win,146,234,30,11,'Edit',apply)
-    db(win,176,234,26,11,'Save',function() if name:getText()~='' then store() end;data.targetName=configName:getText();data.targetProfiles[data.targetName]=json.decode(json.encode(d));profiles();save() end)
-    db(win,202,234,26,11,'Load',function() local source=assert(data.targetProfiles[configName:getText()],'Unknown targeting settings');c.TargetBot.setOff();data.targeting=json.decode(json.encode(source));win:destroy();panels.targeting=nil;show(targeting());save() end)
-    local blocked=list(win,dx(248),dy(173),dx(122),dy(44));dl(win,250,221,46,'Only on label');local onlyLabel=de(win,298,221,72,d.blockedLabel or '')
+    button(profilesPage,8,272,80,'Save rule',apply)
+    button(profilesPage,96,272,80,'Save',function() if name:getText()~='' then store() end;data.targetName=configName:getText();data.targetProfiles[data.targetName]=json.decode(json.encode(d));profiles();save() end)
+    button(profilesPage,184,272,80,'Load',function() local source=assert(data.targetProfiles[configName:getText()],'Unknown targeting settings');c.TargetBot.setOff();data.targeting=json.decode(json.encode(source));win:destroy();panels.targeting=nil;show(targeting());save() end)
+    local blocked=list(profilesPage,296,26,256,190);label(profilesPage,296,236,104,'Only on label');local onlyLabel=edit(profilesPage,408,232,144,d.blockedLabel or '')
     onlyLabel.onEnter=function() d.blockedLabel=onlyLabel:getText();save() end;onlyLabel.onFocusChange=function(_,focus) if not focus then d.blockedLabel=onlyLabel:getText();save() end end
     local chosen;local function blocks() blocked:destroyChildren();for line in (d.blocked or ''):gmatch('[^\r\n]+') do local value=line;local row=createRow('ElfBotRow',blocked);row:setText(value);row.onFocusChange=function(_,v) if v then chosen=value end end end end
-    db(win,310,234,30,11,'Add',function() local p=c.pos();d.blocked=(d.blocked or '')..p.x..','..p.y..','..p.z..'\n';blocks();save() end):setTooltip('Add the tile under your character')
-    db(win,340,234,30,11,'Del',function() assert(chosen,'Select a blocked tile');local rows={};for line in d.blocked:gmatch('[^\r\n]+') do if line~=chosen then rows[#rows+1]=line end end;d.blocked=table.concat(rows,'\n');blocks();save() end)
+    button(profilesPage,380,272,82,'Add',function() local p=c.pos();d.blocked=(d.blocked or '')..p.x..','..p.y..','..p.z..'\n';blocks();save() end):setTooltip('Add the tile under your character')
+    button(profilesPage,470,272,82,'Del',function() assert(chosen,'Select a blocked tile');local rows={};for line in d.blocked:gmatch('[^\r\n]+') do if line~=chosen then rows[#rows+1]=line end end;d.blocked=table.concat(rows,'\n');blocks();save() end)
     e.selectMonsterSetting=load;refresh();load();profiles();blocks();return win
   end
   local function listsPanel()
@@ -940,7 +1018,7 @@ function attachElfBot(c)
     local function clear()
       local previous=loading;loading=true
       selected=nil;name:setText('');left:setText('');right:setText('');on:setChecked(true);bkg:setChecked(true);size:setCurrentOption('Small')
-      commandFields(true);left:setTooltip('ElfBot command, for example: auto 1000 say "exura"');right:setTooltip('Optional ElfBot command for the right mouse button')
+      commandFields(true);left:setTooltip('ElfBot script. Double-click to edit multiple lines.');right:setTooltip('Right-click ElfBot script. Double-click to edit multiple lines.')
       for kind,f in pairs(fields) do f.type:setCurrentOption('Resize');f.bkgType:setCurrentOption('Normal');f.xMode:setCurrentOption('Absolute');f.yMode:setCurrentOption('Absolute');f.x:setText(tostring(20+#data.icons*74));f.y:setText('80');f.text:setText('');for _,v in ipairs(f.ids) do v:setText('0') end;for _,v in ipairs(f.bkgIds) do v:setText('0') end;f.foreground:setText(kind=='onState' and '#55ff88' or '#ff5a61');f.hover:setText('#ffffff') end
       for _,v in ipairs(names:getChildren()) do v:setOn(v==names:getChildByIndex(1)) end
       loading=previous
@@ -958,7 +1036,7 @@ function attachElfBot(c)
           commandFields(not row.builtinController)
           left:setText(row.builtinController and 'Toggle ON/OFF' or row.lclick or '');right:setText(row.builtinController and 'Toggle ON/OFF' or row.rclick or '')
           local hint=row.builtinController and 'Built-in toggle; no command setup is required.'
-          left:setTooltip(hint or (row.errors or {}).lclick or 'Left-click script');right:setTooltip(hint or (row.errors or {}).rclick or 'Right-click script')
+          left:setTooltip(hint or (row.errors or {}).lclick or 'Left-click script. Double-click to edit multiple lines.');right:setTooltip(hint or (row.errors or {}).rclick or 'Right-click script. Double-click to edit multiple lines.')
           for kind,f in pairs(fields) do local state=row[kind] or {};f.type:setCurrentOption(state.type or 'Normal');f.bkgType:setCurrentOption(state.bkgType or 'Normal');f.xMode:setCurrentOption(state.xMode or 'Absolute');f.yMode:setCurrentOption(state.yMode or 'Absolute');f.x:setText(tostring(state.x or 0));f.y:setText(tostring(state.y or 0));f.text:setText(state.text or '');f.foreground:setText(state.foreground or '#000000');f.hover:setText(state.hover or state.foreground or '#000000');for n,v in ipairs(f.ids) do v:setText(tostring((state.ids or {})[n] or 0)) end;for n,v in ipairs(f.bkgIds) do v:setText(tostring((state.bkgIds or {})[n] or 0)) end end
           loading=previous
         end
@@ -1027,6 +1105,18 @@ function attachElfBot(c)
     dl(win,8,166,364,'Enable Icons controls visibility. Changes are saved automatically.')
     clear();refresh()
     for _,v in ipairs({name,left,right}) do v.onTextChange=changed end
+    for _,entry in ipairs({{left,'Left-click script'},{right,'Right-click script'}}) do
+      local field,title=entry[1],entry[2]
+      field.onDoubleClick=function()
+        if not alive or win:isDestroyed() or selectedBuiltin() then return end
+        local selection=selected;local row=selected and data.icons[selected]
+        scriptEditor(title,field:getText(),function(source)
+          assert(alive and not win:isDestroyed() and selected==selection and row==(selected and data.icons[selected]),'Select the same icon before saving its script')
+          guardCompile(source);field:setText(source)
+        end,'Save')
+        return true
+      end
+    end
     size.onOptionChange=changed;on.onCheckChange=changed;bkg.onCheckChange=changed
     for _,f in pairs(fields) do
       for _,key in ipairs({'type','bkgType','xMode','yMode'}) do f[key].onOptionChange=changed end
