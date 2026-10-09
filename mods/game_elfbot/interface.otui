@@ -1,0 +1,217 @@
+ElfBotWindow < UIWindow
+  font: verdana-11px-antialised
+  color: alpha
+  background-color: #f0f0f0
+  border-width: 1
+  border-color: #a0a0a0
+  padding: 29 8 8 8
+  anchors.centerIn: parent
+  draggable: true
+  @onEscape: self:hide()
+
+ElfBotTitle < UILabel
+  font: verdana-11px-antialised
+  color: #111111
+  background-color: #ffffff
+  text-align: left
+  text-offset: 6 0
+  phantom: true
+
+ElfBotButton < UIButton
+  font: verdana-11px-antialised
+  height: 24
+  color: #111111
+  background-color: #e1e1e1
+  border-width: 1
+  border-color: #adadad
+  $hover !disabled:
+    background-color: #e5f1fb
+    border-color: #0078d7
+  $pressed:
+    background-color: #cce4f7
+  $on:
+    background-color: #cce4f7
+  $disabled:
+    color: #888888
+
+ElfBotClose < ElfBotButton
+  color: #ffffff
+  background-color: #c94f55
+  border-width: 0
+  $hover:
+    background-color: #e81123
+
+ElfBotLabel < UILabel
+  font: verdana-11px-antialised
+  color: #111111
+  text-align: left
+  height: 18
+
+ElfBotTextEdit < UITextEdit
+  font: verdana-11px-antialised
+  color: #111111
+  selection-color: #ffffff
+  selection-background-color: #0078d7
+  background-color: #ffffff
+  border-width: 1
+  border-color: #a0a0a0
+  padding: 2
+  height: 22
+
+ElfBotMultilineTextEdit < ElfBotTextEdit
+  multiline: true
+  text-wrap: true
+  padding: 4
+
+ElfBotCheck < UICheckBox
+  font: verdana-11px-antialised
+  color: #111111
+  text-align: left
+  text-offset: 18 0
+  image-source: checkbox
+  image-rect: 0 3 12 12
+  image-clip: 0 0 12 12
+  $checked:
+    image-clip: 0 12 12 12
+  $disabled:
+    color: #888888
+
+ElfBotGroup < UIWidget
+  border-width: 1
+  border-color: #d4d4d4
+  padding: 8
+
+ElfBotList < UIScrollArea
+  background-color: #ffffff
+  border-width: 1
+  border-color: #a0a0a0
+  layout:
+    type: verticalBox
+    fit-children: false
+
+ElfBotRow < UILabel
+  font: verdana-11px-antialised
+  color: #111111
+  height: 20
+  focusable: true
+  text-align: left
+  text-offset: 3 0
+  background-color: #00000000
+  $on:
+    background-color: #0078d7
+    color: #ffffff
+  $!on:
+    background-color: #00000000
+    color: #111111
+
+ElfBotCombo < UIComboBox
+  font: verdana-11px-antialised
+  color: #111111
+  background-color: #ffffff
+  border-width: 1
+  border-color: #a0a0a0
+  height: 22
+
+ElfBotComboPopupMenu < UIPopupMenu
+  background-color: #ffffff
+  border-width: 1
+  border-color: #a0a0a0
+
+ElfBotComboPopupMenuButton < UIButton
+  font: verdana-11px-antialised
+  color: #111111
+  height: 20
+  text-align: left
+  text-offset: 4 0
+  $hover:
+    background-color: #0078d7
+    color: #ffffff
+
+ElfBotIconCaption < UILabel
+  font: verdana-11px-antialised
+  text-align: left
+  text-offset: 0 0
+  phantom: true
+
+ElfBotIcon < UIButton
+  font: verdana-11px-antialised
+  color: #111111
+  background-color: #f0f0f0
+  border-width: 0
+  $pressed:
+    border-width: 1
+    border-color: #ffffff
+    image-color: #b0b0b0
+
+ElfBotScrollBar < UIScrollBar
+  orientation: vertical
+  width: 12
+  height: 39
+  pixels-scroll: true
+  background-color: #f0f0f0
+  ElfBotButton
+    id: decrementButton
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 12 12
+    text: ^
+  ElfBotButton
+    id: incrementButton
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    size: 12 12
+    text: v
+  ElfBotButton
+    id: sliderButton
+    anchors.centerIn: parent
+    size: 12 12
+    minimum: 12
+  UILabel
+    id: valueLabel
+    anchors.fill: parent
+    color: alpha
+    phantom: true
+
+ElfBotSlider < UIScrollBar
+  orientation: horizontal
+  &minSliderSize: 6
+  height: 13
+  background-color: #e1e1e1
+  ElfBotButton
+    id: decrementButton
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    size: 1 1
+    visible: false
+  ElfBotButton
+    id: incrementButton
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    size: 1 1
+    visible: false
+  ElfBotButton
+    id: sliderButton
+    anchors.centerIn: parent
+    size: 6 13
+    minimum: 6
+    background-color: #0078d7
+  UILabel
+    id: valueLabel
+    anchors.fill: parent
+    color: alpha
+    phantom: true
+
+ElfBotSpyText < ElfBotMultilineTextEdit
+  font: terminus-10px
+  color: #000080
+  editable: false
+  text-wrap: false
+  padding: 2
+
+ElfBotOverlay < ElfBotLabel
+  phantom: true
+
+ElfBotChoice < ElfBotCombo
+  background-color: #0078d7
+  color: #ffffff
+  text-offset: 1 0

@@ -70,6 +70,38 @@ MiniWindow
         text: Off
         color: #FF0000
 
+    Panel
+      id: elfbotControls
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 3
+      margin-left: 2
+      margin-right: 2
+      height: 22
+
+      Button
+        id: elfbotOpenButton
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: next.left
+        margin-right: 3
+        text: Open ElfBot
+        @onClick: modules.game_bot.openElfBot()
+
+      Button
+        id: elfbotEnableButton
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: 45
+        @onClick: modules.game_bot.toggleElfBot()
+        $on:
+          text: On
+          color: #00AA00
+        $!on:
+          text: Off
+          color: #FF0000
+
     Label
       id: statusLabel
       anchors.top: prev.bottom

@@ -5,9 +5,6 @@ context.callback = function(callbackType, callback)
   if not context._callbacks[callbackType] then
     return error("Wrong callback type: " .. callbackType)
   end
-  if callbackType == "onAddThing" or callbackType == "onRemoveThing" then
-    g_game.enableTileThingLuaCallback(true)
-  end
 
   local desc = "lua"
   local info = debug.getinfo(2, "Sl")
@@ -18,29 +15,36 @@ context.callback = function(callbackType, callback)
   local callbackData = {}
   local callbacks = context._callbacks[callbackType]
   local wrappedCallback = function(...)
-    if not callbackData.delay or callbackData.delay < context.now then
+    if not context._disposed and not callbackData.removed and (not callbackData.delay or callbackData.delay < context.now) then
       local prevExecution = context._currentExecution
       context._currentExecution = callbackData
       local start = g_clock.realMillis()
-      callback(...)
+      local ok, result = pcall(callback, ...)
+      context._currentExecution = prevExecution
       local executionTime = g_clock.realMillis() - start
       if executionTime > 100 then
         context.warning("Slow " .. callbackType .. " (" .. executionTime .. "ms): " .. desc)
       end
-      context._currentExecution = prevExecution
+      if not ok then
+        if not callbackData.lastError or context.now - callbackData.lastError >= 1000 then
+          callbackData.lastError = context.now
+          context.warning(callbackType .. " callback error: " .. tostring(result))
+        end
+      else
+        return result
+      end
     end
   end
   table.insert(callbacks, wrappedCallback)
+  if callbackType == "onAddThing" or callbackType == "onRemoveThing" then context.updateTileCallbacks() end
 
   return {
     remove = function()
       for i, registeredCallback in ipairs(callbacks) do
         if registeredCallback == wrappedCallback then
+          callbackData.removed = true
           table.remove(callbacks, i)
-          if (callbackType == "onAddThing" or callbackType == "onRemoveThing") and
-              #context._callbacks.onAddThing == 0 and #context._callbacks.onRemoveThing == 0 then
-            g_game.enableTileThingLuaCallback(false)
-          end
+          if callbackType == "onAddThing" or callbackType == "onRemoveThing" then context.updateTileCallbacks() end
           return true
         end
       end
