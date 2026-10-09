@@ -43,12 +43,12 @@ function prepareStandaloneElfBot(c)
     return 'retry'
   end)
   b.registerAction('use','',function(value,retries)
-    local p=position(value);if distance(c.pos(),p)>1 then return b.Actions.goto.callback(value..',1',retries) end
+    local p=position(value);if distance(c.pos(),p)>1 then return b.Actions['goto'].callback(value..',1',retries) end
     local tile=c.g_map.getTile(p);assert(tile and tile:getTopUseThing(),'Waypoint tile unavailable');c.use(tile:getTopUseThing());b.nextRun=c.now+math.max(200,d.useDelay or 500);return true
   end)
   b.registerAction('usewith','',function(value,retries)
     local id,coords=value:match('^(%d+),(.+)$');local p=position(assert(coords,'Expected item,x,y,z'))
-    if distance(c.pos(),p)>1 then return b.Actions.goto.callback(coords..',1',retries) end
+    if distance(c.pos(),p)>1 then return b.Actions['goto'].callback(coords..',1',retries) end
     local tile=c.g_map.getTile(p);assert(tile and tile:getTopUseThing(),'Waypoint tile unavailable');assert(tonumber(id) and tonumber(id)>0 and tonumber(id)<=65535,'Invalid tool item ID');c.useWith(tonumber(id),tile:getTopUseThing());b.nextRun=c.now+math.max(200,d.useDelay or 500);return true
   end)
   function t.isOn() return t.enabled end
@@ -72,7 +72,7 @@ function prepareStandaloneElfBot(c)
       assert(state.attempts<4,'Tool '..kind..' did not change the tile/floor; check item ID and waypoint position')
     else state=nil end
     assert(current.z==p.z,'Tool waypoint is on another floor')
-    if distance(current,p)>1 then return b.Actions.goto.callback(coords..',1',retries) end
+    if distance(current,p)>1 then return b.Actions['goto'].callback(coords..',1',retries) end
     local tile=c.g_map.getTile(p);assert(tile,'Tool waypoint tile unavailable')
     local target=tile.getGround and tile:getGround() or tile:getTopUseThing()
     assert(target and (not target.isItem or target:isItem()),'Tool waypoint has no usable ground item')

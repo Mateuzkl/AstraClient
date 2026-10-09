@@ -4,7 +4,7 @@ ElfBotWindow < UIWindow
   background-color: #f0f0f0
   border-width: 1
   border-color: #a0a0a0
-  padding: 29 8 8 8
+  padding: 0
   anchors.centerIn: parent
   draggable: true
   @onEscape: self:hide()
@@ -45,6 +45,7 @@ ElfBotLabel < UILabel
   font: verdana-11px-antialised
   color: #111111
   text-align: left
+  text-wrap: true
   height: 18
 
 ElfBotTextEdit < UITextEdit
@@ -94,6 +95,7 @@ ElfBotRow < UILabel
   color: #111111
   height: 20
   focusable: true
+  phantom: false
   text-align: left
   text-offset: 3 0
   background-color: #00000000

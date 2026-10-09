@@ -55,14 +55,19 @@ function attachElfBot(c)
       v.elfWidget=true
       if style=='ElfBotOverlay' then v.elfOverlay=true elseif style=='ElfBotIcon' or style=='ElfBotIconCaption' then iconWidgets[#iconWidgets+1]=v else windows[#windows+1]=v end
     end
-    -- Position is relative to the parent's content rectangle, including padding.
+    -- Keep the window's hit-test rectangle unpadded, including its close button.
+    -- Content still uses the same inset below the header; nested groups keep padding.
+    if parent.elfContentOffset then x=x+parent.elfContentOffset.x;y=y+parent.elfContentOffset.y end
     v:setPosition({x=parent:getPaddingRect().x+x,y=parent:getPaddingRect().y+y})
     v:addAnchor(AnchorLeft,'parent',AnchorLeft);v:addAnchor(AnchorTop,'parent',AnchorTop)
     v:setMarginLeft(x);v:setMarginTop(y);v:setSize({width=w,height=h})
     if text then v:setText(text) end
     return v
   end
-  local function label(parent,x,y,w,text) return widget('ElfBotLabel',parent,x,y,w,18,text) end
+  local function label(parent,x,y,w,text)
+    local v=widget('ElfBotLabel',parent,x,y,w,18,text)
+    v:setHeight(math.max(18,v:getTextSize().height));return v
+  end
   local function button(parent,x,y,w,text,callback)
     local v=widget('ElfBotButton',parent,x,y,w,24,text)
     v.onClick=function() local ok,err=pcall(callback);if not ok then e.status=tostring(err);c.warn('ElfBot: '..e.status) end end
@@ -82,8 +87,10 @@ function attachElfBot(c)
   end
   local function window(title,w,h)
     local v=c.UI.createWindow('ElfBotWindow');windows[#windows+1]=v;v:setSize({width=w+16,height=h+37});v:setText(title)
+    v.elfContentOffset={x=8,y=29}
     v.titleBar=widget('ElfBotTitle',v,-7,-27,w+14,23,title)
     local close=widget('ElfBotClose',v,w-15,-26,20,20,'x');close.onClick=function() v:hide() end
+    v.closeButton=close
     v:hide();return v
   end
   local function show(v) v:show();v:raise();v:focus() end
@@ -122,9 +129,10 @@ function attachElfBot(c)
     return v
   end
   -- Coordinates from the original ElfBot resource dialogs, in dialog units.
-  local function dx(n) return math.floor(n*1.5+0.5) end
+  -- Original dialog units need more horizontal room for Astra's bitmap font.
+  local function dx(n) return math.floor(n*2+0.5) end
   local function dy(n) return math.floor(n*1.625+0.5) end
-  local function dl(p,x,y,w,text) local v=label(p,dx(x),dy(y),dx(w),text);v:setHeight(dy(9));return v end
+  local function dl(p,x,y,w,text) local v=label(p,dx(x),dy(y),dx(w),text);v:setHeight(math.max(dy(9),v:getTextSize().height));return v end
   local function de(p,x,y,w,text) local v=edit(p,dx(x),dy(y),dx(w),tostring(text or ''));v:setHeight(dy(9));return v end
   local function dc(p,x,y,w,values,value) local v=combo(p,dx(x),dy(y),dx(w),values,value);v:setHeight(dy(9));return v end
   local function db(p,x,y,w,h,text,fn) local v=button(p,dx(x),dy(y),dx(w),text,fn);v:setHeight(dy(h));return v end
@@ -143,7 +151,7 @@ function attachElfBot(c)
         if subtype==7 then v=dg(win,x,y,w,h,text:gsub('&&','&'))
         elseif subtype==3 or subtype==9 then v=dk(win,x,y,w,text=='IDC_CHK' and '' or text,false,function() end)
         else v=db(win,x,y,w,h,text,function() end) end
-      elseif class=='#130' then v=dl(win,x,y,w,text);v:setHeight(dy(h))
+      elseif class=='#130' then v=dl(win,x,y,w,text);v:setHeight(math.max(dy(h),v:getTextSize().height))
       elseif class=='#129' then
         if style%8>=4 then v=widget('ElfBotMultilineTextEdit',win,dx(x),dy(y),dx(w),dy(h),text)
         else v=de(win,x,y,w,text);v:setHeight(dy(h)) end
@@ -261,14 +269,16 @@ function attachElfBot(c)
         local function commit()
           selectRow(v);local source=sourceField:getText();local binding=keyField:getText():match('^%s*(.-)%s*$')
           if source:match('^%s*$') and not existing then return end
-          if not source:match('%S') and not persistent then
-            table.remove(rows,storedIndex);existing=nil;storedIndex=nil;selected=nil
-            e.reload();save();refresh();return
-          end
           local ok,err=pcall(function()
-            if source:match('%S') then guardCompile(source) end
             if not short and binding~='' then binding=retranslateKeyComboDesc(binding);assert(binding and binding~='','Invalid hotkey') end
-            row.key=binding;row.script=source;row.enabled=enabled:isChecked()
+            local checked=enabled:isChecked()
+            if existing and binding==(row.key or '') and source==(row.script or '') and checked==(row.enabled==true) then return end
+            if not source:match('%S') and not persistent then
+              table.remove(rows,storedIndex);existing=nil;storedIndex=nil;selected=nil
+              e.reload();save();refresh();return
+            end
+            if source:match('%S') then guardCompile(source) end
+            row.key=binding;row.script=source;row.enabled=checked
             if persistent then
               displayed[index]=row;local lines={};for j=1,math.max(index,#displayed) do local entry=displayed[j];if entry and entry.enabled and entry.script:match('%S') then lines[#lines+1]=entry.script end end;data.persistent=table.concat(lines,'\n')
             else
@@ -298,7 +308,7 @@ function attachElfBot(c)
       r[1005]:setText(data.symbol);r[1005].onTextChange=function(_,text) if #text<=4 then data.symbol=text end end
       rowsList:setTooltip('Double-click a shortkey to edit it.')
     else
-      r[1047].onClick=function() assert(persistent or selected,'Select a hotkey first');editEntry(selected) end
+      r[1047].onClick=function() assert(persistent or selected,'Select a hotkey first');editEntry(selected and rows[selected] and selected or nil) end
       r[1048]:setChecked(false)
       r[1048].onCheckChange=function(_,v) persistent=v;refresh() end
     end
@@ -519,7 +529,7 @@ function attachElfBot(c)
     end
     refresh=function()
       monsters:destroyChildren();local new=createRow('ElfBotRow',monsters);new:setText('<New monster>');new.onFocusChange=function(_,v) if v then selected=nil;settingIndex=1;load() end end
-      for i,rule in ipairs(d.monsters) do local index=i;local row=createRow('ElfBotRow',monsters);if row.setTTFFont then row:setTTFFont('/fonts/ttf/arial.ttf',11,0,'#00000000') end;row:setText(rule.name);row.onFocusChange=function(_,v) if v then selected=index;settingIndex=1;load() end end end
+      for i,rule in ipairs(d.monsters) do local index=i;local row=createRow('ElfBotRow',monsters);row:setText(rule.name);row.onFocusChange=function(_,v) if v then selected=index;settingIndex=1;load() end end end
     end
     local function apply() local ok,err=pcall(store);if not ok then e.status=tostring(err);c.warn(e.status) end end
     for _,v in ipairs({name,categories,hpMin,hpMax,danger,action,ring,range,frequency}) do v.onEnter=apply;v.onFocusChange=function(_,focus) if not focus and name:getText()~='' then apply() end end end
@@ -570,35 +580,38 @@ function attachElfBot(c)
     status(win,0,368,630);return win
   end
   local function aimbot()
-    local a=data.aimbot;local win=window('Aimbot',400,320);panels.aimbot=win
-    group(win,0,0,400,158,'Core Aimbot');group(win,0,167,194,149,'Trigger Aimbot')
+    local a=data.aimbot;local win=window('Aimbot',580,460);panels.aimbot=win
+    group(win,0,0,580,224,'Core Aimbot');group(win,0,232,284,228,'Trigger Aimbot')
+    local function option(x,y,text,value,callback)
+      local v=check(win,x,y,266,text,value,callback);v:setTextWrap(true);v:setHeight(28);v:setTooltip(text);return v
+    end
     local function pending(x,y,text)
-      local v=check(win,x,y,190,text,false,function() end)
+      local v=option(x,y,text,false,function() end)
       if v.setEnabled then v:setEnabled(false) end
-      v:setTooltip('This original ElfBot feature is not supported by this client port.')
+      v:setTooltip(text..'\nThis original ElfBot feature is not supported by this client port.')
     end
     for i,text in ipairs({'Prioritize mages with least cur mp','Prioritize mages with most miss. mp','Choose enemies with lowest cur hp',"Lock on leader's target",'Auto-combo paralyze/leader target'}) do
-      if i==3 then check(win,14,28+(i-1)*18,190,text,a.lowestHealth~=false,function(v) a.lowestHealth=v;save() end)
-      else pending(14,28+(i-1)*18,text) end
+      if i==3 then option(14,28+(i-1)*30,text,a.lowestHealth~=false,function(v) a.lowestHealth=v;save() end)
+      else pending(14,28+(i-1)*30,text) end
     end
-    for i,text in ipairs({'Trace shots','Display best target','Discount Protection zones','Lock on paralyzed sub/enemies','Choose subenemy if no enemy'}) do pending(202,28+(i-1)*18,text) end
-    label(win,12,129,70,'Aim leaders:');local leaders=edit(win,80,127,100,data.lists.leaders or '');leaders.onEnter=function() data.lists.leaders=leaders:getText();save() end
-    label(win,202,122,57,'Aim type:');local command=edit(win,260,119,126,a.command or '')
+    for i,text in ipairs({'Trace shots','Display best target','Discount Protection zones','Lock on paralyzed sub/enemies','Choose subenemy if no enemy'}) do pending(300,28+(i-1)*30,text) end
+    label(win,14,200,84,'Aim leaders:');local leaders=edit(win,100,198,180,data.lists.leaders or '');leaders.onEnter=function() data.lists.leaders=leaders:getText();save() end
+    label(win,300,180,80,'Aim type:');local command=edit(win,382,178,184,a.command or '')
     command:setTooltip('client attack command or spell text; the original aim-type modes remain incomplete.')
     command.onEnter=function() assert(not e.compileAttack(command:getText()).interval,'Attack cannot contain auto');a.command=command:getText();save() end
-    label(win,202,143,60,'Combo rate:');local rate=numberField(win,260,140,66,a.frequency or 200)
+    label(win,300,205,80,'Combo rate:');local rate=numberField(win,382,202,82,a.frequency or 200)
     rate.onEnter=function() a.frequency=readNumber(rate,200,60000);save() end
     a.triggerWords=a.triggerWords or {}
     for i,name in ipairs({'Combo','Sync combo','Paralyze','Single'}) do
-      local key=name;label(win,12,191+(i-1)*18,65,name..':');local field=edit(win,80,188+(i-1)*18,99,a.triggerWords[key] or '')
+      local key=name;label(win,14,251+(i-1)*28,94,name..':');local field=edit(win,110,248+(i-1)*28,160,a.triggerWords[key] or '')
       field.onEnter=function() a.triggerWords[key]=field:getText();a.triggers={};for _,word in pairs(a.triggerWords) do if word~='' then a.triggers[#a.triggers+1]={word=word,command=a.command or ''} end end;save() end
     end
-    check(win,12,271,180,'Word triggering enabled',a.wordTriggers,function(v) a.wordTriggers=v end)
-    check(win,12,289,180,'Execute automatically',a.enabled,function(v) a.enabled=v;if v then e.paused=false end end)
-    pending(12,307,"Target others if can't be shot")
-    pending(202,185,'Ignore lower priority leaders')
-    check(win,202,203,185,'Target enemies only if skulled/war',a.skulledOnly,function(v) a.skulledOnly=v end):setTooltip('Current client mode filters all eligible players by skull; war emblems are not implemented.')
-    pending(202,221,'Target subenemies if skulled/war');pending(202,239,'Target others if skulled/war')
+    option(14,374,'Word triggering enabled',a.wordTriggers,function(v) a.wordTriggers=v end)
+    option(14,402,'Execute automatically',a.enabled,function(v) a.enabled=v;if v then e.paused=false end end)
+    pending(14,430,"Target others if can't be shot")
+    pending(300,248,'Ignore lower priority leaders')
+    option(300,280,'Target enemies only if skulled/war',a.skulledOnly,function(v) a.skulledOnly=v end):setTooltip('Current client mode filters all eligible players by skull; war emblems are not implemented.')
+    pending(300,312,'Target subenemies if skulled/war');pending(300,344,'Target others if skulled/war')
     return win
   end
   local hudWidget=widget('ElfBotLabel',g_ui.getRootWidget(),8,130,365,160,'');hudWidget.elfWidget=true;hudWidget:setPhantom(true);hudWidget:setTextWrap(true);hudWidget:setColor('#ffff00');hudWidget:hide()
@@ -778,7 +791,7 @@ function attachElfBot(c)
     end
     local function refresh()
       names:destroyChildren();local new=createRow('ElfBotRow',names);new:setText('<New Icon>');new.onFocusChange=function(_,focus) if focus then clear() end end
-      for i,row in ipairs(data.icons) do local index=i;local v=createRow('ElfBotRow',names);if v.setTTFFont then v:setTTFFont('/fonts/ttf/arial.ttf',11,0,'#00000000') end;v:setText(row.name)
+      for i,row in ipairs(data.icons) do local index=i;local v=createRow('ElfBotRow',names);v:setText(row.name)
         v.onFocusChange=function(_,focus) if not focus then return end;selected=index;name:setText(row.name);left:setText(row.lclick or '');right:setText(row.rclick or '');size:setCurrentOption(row.size or 'Small');on:setChecked(row.enabled~=false);bkg:setChecked(row.background~=false)
           left:setTooltip((row.errors or {}).lclick or 'Left-click script');right:setTooltip((row.errors or {}).rclick or 'Right-click script')
           for kind,f in pairs(fields) do local state=row[kind] or {};f.type:setCurrentOption(state.type or 'Normal');f.bkgType:setCurrentOption(state.bkgType or 'Normal');f.xMode:setCurrentOption(state.xMode or 'Absolute');f.yMode:setCurrentOption(state.yMode or 'Absolute');f.x:setText(tostring(state.x or 0));f.y:setText(tostring(state.y or 0));f.text:setText(state.text or '');f.foreground:setText(state.foreground or '#000000');f.hover:setText(state.hover or state.foreground or '#000000');for n,v in ipairs(f.ids) do v:setText(tostring((state.ids or {})[n] or 0)) end;for n,v in ipairs(f.bkgIds) do v:setText(tostring((state.bkgIds or {})[n] or 0)) end end
@@ -845,7 +858,7 @@ function attachElfBot(c)
     button(win,105,75,135,'Reconnect now',function() c.requestElfReconnect() end)
     label(win,0,117,370,'Uses the selected character and client login session.');return win
   end
-  local menu=window('ElfBot OTC v.1',413,85)
+  local menu=window('ElfBot OTC v.1',550,100)
   local function updateCaption()
     local stats=e.getSessionStats()
     local playerName=stats.name~='' and stats.name or 'Startup'
@@ -866,8 +879,8 @@ function attachElfBot(c)
     {{'Cavebot',function() open('cavebot',cavebot) end},{'Navigation',function() open('navigation',navigation) end},{'Creature Spy',function() open('spy',spy) end}},
     {{'Targeting',function() open('targeting',targeting) end},{'Icons',function() open('icons',icons) end}}
   }
-  for y,row in ipairs(rows) do for x,entry in ipairs(row) do local v=button(menu,(x-1)*70,(y-1)*21,68,entry[1],entry[2]);v:setHeight(19) end end
-  for i=1,5 do local index=i;local v=button(menu,282+(i-1)*26,0,24,tostring(i),function() data.slot=index;e.status='Selected settings slot '..index end);v:setHeight(19) end
+  for y,row in ipairs(rows) do for x,entry in ipairs(row) do button(menu,(x-1)*96,(y-1)*26,94,entry[1],entry[2]) end end
+  for i=1,5 do local index=i;button(menu,388+(i-1)*32,0,30,tostring(i),function() data.slot=index;e.status='Selected settings slot '..index end) end
   local function chooseSettingsFile()
     if g_platform.selectElfBotFile then
       local resources=c.g_resources;resources.makeDir('/elfbot')
@@ -885,9 +898,8 @@ function attachElfBot(c)
     elseif g_platform.selectElfBotFile then c.loadElfSlot(data.slot or 1)
     else open('loadFiles',loadFiles) end
   end},{'Help',commandsView}}
-  for i,entry in ipairs(right) do local v=button(menu,282+(i-1)%2*66,21+math.floor((i-1)/2)*21,64,entry[1],entry[2]);v:setHeight(19) end
-  local enableButton=button(menu,282,63,130,'Automation: OFF',function() c.setElfEnabled(not c.isElfEnabled()) end)
-  enableButton:setHeight(19)
+  for i,entry in ipairs(right) do button(menu,388+(i-1)%2*82,26+math.floor((i-1)/2)*26,80,entry[1],entry[2]) end
+  local enableButton=button(menu,388,78,162,'Automation: OFF',function() c.setElfEnabled(not c.isElfEnabled()) end)
   local function updateEnabled()
     local enabled=c.isElfEnabled()
     enableButton:setText(enabled and 'Automation: ON' or 'Automation: OFF')
@@ -895,7 +907,7 @@ function attachElfBot(c)
   end
   updateEnabled()
   menu.onEscape=hideAll
-  for _,child in ipairs(menu:getChildren()) do if child:getStyleName()=='ElfBotClose' then child.onClick=hideAll end end
+  menu.closeButton.onClick=hideAll
   local nextDisplay=0
   local oldTick=e.tick
   e.tick=function()
@@ -989,8 +1001,8 @@ function attachElfBot(c)
     if hp<=math.max(h.hiHealth or 90,h.loHealth or 50,h.hpHealth or 40) then e.healingBusyUntil=c.now+(h.delay or 1000) end
     if c.now>=(e.nextPotion or 0) then
       if h.uhEnabled and hp<=(h.uhHealth or 40) then c.useWith(data.items.uh,c.player);e.nextPotion=c.now+(h.potionWait or 1000)
-      elseif h.hpEnabled~=false and hp<=h.hpHealth then e.commands[h.hpType]({h.hpHealth,'self'});e.nextPotion=c.now+(h.potionWait or 1000)
-      elseif h.mpEnabled~=false and c.manapercent()<=h.mpMana then e.commands[h.mpType]({'self'});e.nextPotion=c.now+(h.potionWait or 1000) end
+      elseif h.hpEnabled~=false and type(e.commands[h.hpType])=='function' and hp<=h.hpHealth then e.commands[h.hpType]({h.hpHealth,'self'});e.nextPotion=c.now+(h.potionWait or 1000)
+      elseif h.mpEnabled~=false and type(e.commands[h.mpType])=='function' and c.manapercent()<=h.mpMana then e.commands[h.mpType]({'self'});e.nextPotion=c.now+(h.potionWait or 1000) end
     end
     if h.friendEnabled~=false and h.friend and h.friend~='' and mp>=(h.friendMana or 160) then
       local friend=e.getCreature(h.friend);if friend and friend:isPlayer() and friend:getHealthPercent()<=(h.friendHealth or 60) then c.saySpell('exura sio "'..friend:getName(),1000);return end

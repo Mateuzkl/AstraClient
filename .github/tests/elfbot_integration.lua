@@ -14,6 +14,11 @@ local function equal(actual, expected, message)
 end
 local scripts={'language','session','history','icon_import','settings_import','telemetry','legacy','engine','autonomous','original_dialogs','interface','runtime'}
 for _,name in ipairs(scripts) do assert(loadfile('mods/game_elfbot/'..name..'.lua')) end
+local styles='\n'..read('mods/game_elfbot/interface.otui'):gsub('\r\n','\n')
+local function styleProperty(style,property)
+  local block=styles:match('\n'..style..' <[^\n]+\n(.-)\n\n') or ''
+  return block:match('\n  '..property..': ([^\n]+)')
+end
 
 local function fixture()
   local env=setmetatable({}, {__index=_G})
@@ -32,7 +37,12 @@ local function fixture()
   function methods:hide() self.visible=false end
   function methods:show() self.visible=true end
   function methods:isVisible() return self.visible end
-  function methods:raise() end
+  function methods:raise()
+    if self.parent then
+      for i,child in ipairs(self.parent.children) do if child==self then table.remove(self.parent.children,i);break end end
+      self.parent.children[#self.parent.children+1]=self
+    end
+  end
   function methods:focus() if self.parent then self.parent.focused=self end end
   function methods:focusChild(child) self.focused=child end
   function methods:getFocusedChild() return self.focused end
@@ -43,18 +53,46 @@ local function fixture()
   function methods:getChildByIndex(i) return self.children[i] end
   function methods:getStyleName() return self.style end
   function methods:getClassName() return self.style:find('TextEdit') and 'UITextEdit' or 'UIWidget' end
-  function methods:getPaddingRect() return {x=0,y=0,width=1280,height=800} end
-  function methods:getPosition() return self.position or {x=0,y=0} end
+  function methods:getPaddingRect()
+    local p,size,padding=self:getPosition(),self:getSize(),self.padding or 0
+    return {x=p.x+padding,y=p.y+padding,width=size.width-2*padding,height=size.height-2*padding}
+  end
+  function methods:getPosition()
+    if self.parent and self.anchored then
+      local p=self.parent:getPaddingRect();return {x=p.x+(self.marginLeft or 0),y=p.y+(self.marginTop or 0)}
+    elseif self.parent and self.parent.style=='ElfBotList' then
+      local p=self.parent:getPaddingRect();return {x=p.x,y=p.y+(self.parent:getChildIndex(self)-1)*20}
+    end
+    return self.position or {x=0,y=0}
+  end
   function methods:getSize() return self.size or {width=400,height=300} end
   function methods:getText() return self.text or '' end
   function methods:setText(text) self.text=tostring(text) end
-  function methods:setChecked(value) self.checked=value end
+  function methods:setChecked(value)
+    if self.checked==value then return end;self.checked=value
+    if self.onCheckChange then self.onCheckChange(self,value) end
+  end
   function methods:isChecked() return self.checked==true end
   function methods:setOn(value) self.on=value end
   function methods:isOn() return self.on==true end
   function methods:setVisible(value) self.visible=value end
   function methods:setPosition(value) self.position=value end
   function methods:setSize(value) self.size=value end
+  function methods:setHeight(value) local size=self:getSize();self.size={width=size.width,height=value} end
+  function methods:setWidth(value) local size=self:getSize();self.size={width=value,height=size.height} end
+  function methods:addAnchor() self.anchored=true end
+  function methods:setMarginLeft(value) self.marginLeft=value end
+  function methods:setPhantom(value) self.phantom=value end
+  function methods:setEnabled(value) self.enabled=value end
+  function methods:setTextWrap(value) self.textWrap=value end
+  function methods:getTextSize()
+    local width,lines=0,0
+    local limit=math.max(1,math.floor((self:getSize().width-(self.style=='ElfBotCheck' and 18 or 0))/7))
+    for line in (self:getText()..'\n'):gmatch('(.-)\n') do
+      width=math.max(width,#line*7);lines=lines+(self.textWrap and math.max(1,math.ceil(#line/limit)) or 1)
+    end
+    return {width=width,height=lines*14}
+  end
   function methods:getMarginTop() return self.marginTop or 0 end
   function methods:getMarginBottom() return self.marginBottom or 0 end
   function methods:setMarginTop(value) self.marginTop=value end
@@ -66,14 +104,20 @@ local function fixture()
   function methods:clearOptions() self.options={};self.option=nil end
   function methods:setValue(value) self.value=value end
   function methods:getValue() return self.value or 0 end
-  for _,name in ipairs({'addAnchor','setMarginLeft','setHeight','setWidth','setTooltip','setTextWrap','setPhantom','setColor','setBackgroundColor','setVerticalScrollBar','setId','setEnabled','setBorderWidth','setVirtual','setItemId','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
+  for _,name in ipairs({'setTooltip','setColor','setBackgroundColor','setVerticalScrollBar','setId','setBorderWidth','setVirtual','setItemId','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
     methods[name]=function() end
   end
   local function widget(style,parent)
-    local w=setmetatable({style=style,children={},parent=parent,visible=true},{__index=methods})
+    local w=setmetatable({style=style,children={},parent=parent,visible=true,
+      size=style=='ElfBotRow' and {width=parent:getSize().width,height=20} or nil,
+      padding=tonumber(styleProperty(style,'padding')) or (style=='ElfBotGroup' and 8 or 0),
+      phantom=styleProperty(style,'phantom')=='true' or (style:find('Label') or style=='ElfBotTitle' or style=='ElfBotRow') and styleProperty(style,'phantom')~='false',
+      textWrap=styleProperty(style,'text-wrap')=='true'}, {__index=methods})
+    if style=='ElfBotCheck' then w.onClick=function(self) self:setChecked(not self:isChecked()) end end
     widgets[w]=true;if parent then parent.children[#parent.children+1]=w end;return w
   end
   local root, map=widget('Root'),widget('Map')
+  root:setSize({width=1280,height=800})
   local player={}
   function player:getPosition() return {x=100,y=100,z=7} end
   function player:getName() return 'Tester' end
@@ -176,6 +220,29 @@ local function fixture()
   function state.getWidget(text)
     for widget in pairs(widgets) do if widget:getText()==text then return widget end end
   end
+  local function contains(rect,p)
+    return p.x>=rect.x and p.y>=rect.y and p.x<rect.x+rect.width and p.y<rect.y+rect.height
+  end
+  local function hit(widget,p)
+    if not widget.visible or widget.enabled==false then return nil end
+    -- Match UIWidget::propagateOnMouseEvent: only search children inside padding.
+    if contains(widget:getPaddingRect(),p) then
+      for i=#widget.children,1,-1 do
+        local child=widget.children[i];local pos,size=child:getPosition(),child:getSize()
+        if contains({x=pos.x,y=pos.y,width=size.width,height=size.height},p) then
+          local target=hit(child,p);if target then return target end
+        end
+      end
+    end
+    if not widget.phantom then return widget end
+  end
+  function state.click(widget)
+    local p,size=widget:getPosition(),widget:getSize()
+    local target=hit(root,{x=p.x+math.floor(size.width/2),y=p.y+math.floor(size.height/2)})
+    equal(target,widget,'mouse hit must reach the visible control')
+    if target.onMousePress then target.onMousePress(target) end
+    if target.onClick then target.onClick(target) end
+  end
   function state.failWrites()
     env.g_resources.writeFileContents=function() return false end
   end
@@ -211,6 +278,84 @@ do
   env.init();env.toggle();s.failWrites();assert(not env.saveSlot(1),'write failure was ignored')
   assert(not pcall(env.loadElfText,''),'empty input accepted')
   env.terminate()
+end
+
+-- Editing empty slots appends a real row; unchanged focus changes preserve running jobs.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local c=latest.context;local e=c.ElfBot
+  c.storage.elfbot.hotkeys={{key='F2',script='auto 200 say "test"',enabled=true}}
+  e.reload();local reloads,saves=0,0;local reload=e.reload
+  e.reload=function(...) reloads=reloads+1;return reload(...) end
+  c.saveConfig=function() saves=saves+1 end
+  local menu=s.getWidget('ElfBot OTC v.1');local button
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Hotkeys' then button=child end end
+  s.click(assert(button));local panel=s.root:getFocusedChild();local rowsList
+  for _,child in ipairs(panel:getChildren()) do if child:getStyleName()=='ElfBotList' then rowsList=child end end
+  assert(rowsList);local first=rowsList:getChildren()[1]
+  local fields=first:getChildren();local enabled,key,source=fields[1],fields[2],fields[3]
+  local job=e.jobs[1];job.active=true;job.nextRun=c.now+500;job.thread=coroutine.create(function() end)
+  source.onFocusChange(source,false);key:setText(' F2 ');key.onFocusChange(key,false)
+  equal(reloads,0,'unchanged normalized binding must not reload');equal(saves,0,'unchanged row must not save')
+  equal(e.jobs[1],job,'unchanged focus preserves job');assert(job.active and job.thread)
+  equal(job.nextRun,c.now+500,'unchanged focus preserves timer')
+  enabled:setChecked(false);equal(reloads,1);equal(saves,1)
+  source.onFocusChange(source,false);equal(reloads,1,'unchanged disabled row must not reload')
+  source:setText('auto 200 say "changed"');source.onFocusChange(source,false)
+  equal(reloads,2);equal(saves,2);equal(c.storage.elfbot.hotkeys[1].script,'auto 200 say "changed"')
+  source.onFocusChange(source,false);equal(reloads,2,'unchanged edited row must not reload')
+  local empty=rowsList:getChildren()[50];empty.onFocusChange(empty,true)
+  s.click(panel.originalControls[1047]);local editor=s.root:getFocusedChild()
+  equal(editor:getText(),'Edit Hotkey');local command,editorKey,saveButton
+  for _,child in ipairs(editor:getChildren()) do
+    if child:getStyleName()=='ElfBotMultilineTextEdit' then command=child
+    elseif child:getStyleName()=='ElfBotTextEdit' and not editorKey then editorKey=child
+    elseif child:getText()=='Save' then saveButton=child end
+  end
+  assert(command and editorKey and saveButton);editorKey:setText('F3');command:setText('say "new"')
+  s.click(saveButton);equal(#c.storage.elfbot.hotkeys,2,'empty slot must append, not create sparse index')
+  equal(c.storage.elfbot.hotkeys[2].key,'F3');equal(c.storage.elfbot.hotkeys[2].script,'say "new"')
+  c.storage.elfbot.persistent='auto 200 say "persistent"'
+  panel.originalControls[1048]:setChecked(true);source=rowsList:getChildren()[1]:getChildren()[3]
+  local beforeReloads,beforeSaves=reloads,saves
+  source.onFocusChange(source,false);equal(reloads,beforeReloads,'unchanged persistent row must not reload');equal(saves,beforeSaves)
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Position-handling actions still delegate to the registered goto action.
+do
+  local s=fixture();local executor,c=s.context();local calls=0
+  c.autoWalk=function(destination,maxDistance,options)
+    calls=calls+1;equal(destination.x,105);equal(destination.y,100);equal(destination.z,7)
+    equal(maxDistance,100);equal(options.precision,1);return true
+  end
+  equal(c.CaveBot.Actions.use.callback('105,100,7',0),'retry')
+  equal(c.CaveBot.Actions.usewith.callback('3003,105,100,7',0),'retry')
+  equal(c.CaveBot.Actions.tool.callback('rope,3003,105,100,7',0),'retry')
+  equal(calls,3,'all position-handling actions use goto');executor.dispose()
+end
+
+-- Default potion commands are valid; bad/missing imported types cannot break healing.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local c=latest.context;local e=c.ElfBot;local h=c.storage.elfbot.healing
+  equal(h.hpType,'uhealth','valid default health type');equal(h.mpType,'gmana','valid default mana type')
+  assert(type(e.commands[h.hpType])=='function' and type(e.commands[h.mpType])=='function')
+  env.setEnabled(true)
+  h.enabled=true;h.hpEnabled=true;h.mpEnabled=true;h.hpHealth=80;h.mpMana=80;h.potionWait=200;h.delay=200
+  c.hppercent=function() return 20 end;c.manapercent=function() return 20 end
+  local health,mana=0,0
+  e.commands.uhealth=function() health=health+1 end;e.commands.gmana=function() mana=mana+1 end
+  local function tick() c.now=c.now+1000;e.nextHeal=0;e.nextPotion=0;e.healTick() end
+  tick();equal(health,1,'valid health command called');equal(mana,0,'health retains potion priority')
+  h.hpType='';tick();equal(health,1);equal(mana,1,'bad health type does not block valid mana type')
+  h.hpType=nil;h.mpType=nil;tick();equal(health,1);equal(mana,1,'missing types safely skipped')
+  h.hpType='broken';h.mpType='missing';e.commands.broken={};tick()
+  equal(health,1);equal(mana,1,'non-function and unknown commands safely skipped');equal(e.nextPotion,0,'skipped potion does not consume cooldown')
+  assert(not e.paused,'invalid potion types must not stop automation')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 
 -- The collector remains bounded even when the DPS HUD is never opened.
@@ -275,13 +420,21 @@ do
     function creature:isMonster() return true end
     function creature:getId() return i end
     function creature:getName() nameCalls=nameCalls+1;return 'Rat' end
-    function creature:getHealthPercent() return 100 end
-    function creature:getPosition() return {x=100+i%8,y=100,z=7} end
+    function creature:getHealthPercent() return i==100 and 20 or i==99 and 30 or 100 end
+    function creature:getPosition() return {x=100+(i-1)%10,y=100+math.floor((i-1)/10),z=7} end
     monsters[i]=creature
   end
-  s.setSpectators(monsters);c.findPath=function() pathCalls=pathCalls+1;return {} end
+  local checkedTargets={}
+  s.setSpectators(monsters);c.findPath=function(_,destination)
+    pathCalls=pathCalls+1;checkedTargets[pathCalls]=destination
+    if destination.x==109 and destination.y==109 then return nil end
+    return {}
+  end
   c.TargetBot.setOn();c.now=50000;e.targetTick()
-  assert(s.attack(),'target selected');equal(pathCalls,1,'pathfind only winning reachable candidate')
+  equal(s.attack(),monsters[99],'next highest-ranked reachable target selected')
+  equal(pathCalls,2,'stop pathfinding after the first reachable ranked candidate')
+  equal(checkedTargets[1].x,109);equal(checkedTargets[1].y,109,'highest-ranked candidate checked first')
+  equal(checkedTargets[2].x,108);equal(checkedTargets[2].y,109,'next-ranked candidate checked second')
   assert(nameCalls<600,'quadratic same-name target count')
   for i=1,1000 do e.monsterOwners[i]={name='Other',time=c.now-20000};e.ignoredTargets=e.ignoredTargets or {};e.ignoredTargets[i]=c.now-50000 end
   c.now=c.now+1001;e.tick();equal(count(e.monsterOwners),0);equal(count(e.ignoredTargets),0)
@@ -391,6 +544,47 @@ do
     equal(#s.warnings,initialWarnings, name..' panel must construct without errors: '..table.concat(s.warnings,' | '))
   end
   env.terminate();equal(s.connectionCount(),0);equal(count(s.events),0)
+end
+
+-- Header buttons and list rows must receive real mouse hits, not just direct callbacks.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local menu=s.getWidget('ElfBot OTC v.1');assert(menu)
+  assert(not env.isEnabled(),'opening UI must not activate automation')
+  latest.context.storage.elfbot.routes={['First route']={},['Second route']={}}
+  local function open(name)
+    menu:raise()
+    local button
+    for _,child in ipairs(menu:getChildren()) do if child:getText()==name then button=child end end
+    assert(button,'menu button missing: '..name)
+    assert(button:getTextSize().width<=button:getSize().width,'menu caption clipped: '..name)
+    s.click(button)
+    local panel=s.root:getFocusedChild();assert(panel~=menu and panel.closeButton,'panel missing: '..name)
+    return panel
+  end
+  for _,name in ipairs({'Healing','Aimbot','Lists','HUD','Extras','Hotkeys','Shortkeys','Reconnect','Cavebot','Navigation','Creature Spy','Targeting','Icons','Custom'}) do
+    local panel=open(name);assert(panel:isVisible())
+    s.click(panel.closeButton);assert(not panel:isVisible(),'close must hide '..name)
+    equal(open(name),panel,'closing/reopening reuses '..name)
+    s.click(panel.closeButton)
+  end
+  local aim=open('Aimbot')
+  for _,child in ipairs(aim:getChildren()) do if child:getStyleName()=='ElfBotCheck' then
+    assert(child.textWrap,'Aimbot options must wrap')
+    assert(child:getTextSize().height<=child:getSize().height,'wrapped option clipped: '..child:getText())
+    local p,size=child:getPosition(),child:getSize();local bounds=aim:getPaddingRect()
+    assert(p.x+size.width<=bounds.x+bounds.width and p.y+size.height<=bounds.y+bounds.height,'option outside Aimbot')
+  end end
+  s.click(aim.closeButton)
+  local cave=open('Cavebot');local refs=cave.originalControls
+  local rows=refs[1009]:getChildren();equal(#rows,2,'saved routes displayed')
+  s.click(rows[1]);equal(refs[1041]:getText(),'First route','mouse selects first saved route')
+  s.click(rows[2]);equal(refs[1041]:getText(),'Second route','mouse selects second saved route')
+  assert(not env.isEnabled(),'UI interaction must not activate automation')
+  s.click(cave.closeButton);menu:raise();s.click(menu.closeButton)
+  assert(not latest.ui.isVisible(),'main close must hide all ElfBot panels')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 
 print('ElfBot integration, bounded history, callbacks and lifecycle: OK')

@@ -257,7 +257,7 @@ function init()
     aimbot={enabled=false,command='',enemiesOnly=false,skulledOnly=false,triggers={}},
     hud={enabled=false,general=false,active=false},lists={friends='',subfriends='',enemies='',subenemies='',leaders=''},
     extras={nonPvp=false},healing={enabled=false,hiEnabled=false,loEnabled=false,uhEnabled=false,hpEnabled=false,mpEnabled=false,
-      hiSpell='',loSpell='',hiHealth=0,loHealth=0,hiMana=0,loMana=0,uhHealth=0,hpHealth=0,mpMana=0,hpType='',mpType='',delay=0}}}
+      hiSpell='',loSpell='',hiHealth=0,loHealth=0,hiMana=0,loMana=0,uhHealth=0,hpHealth=0,mpMana=0,hpType='uhealth',mpType='gmana',delay=0}}}
   launcher=modules.client_topmenu.addRightGameToggleButton('elfbotButton','ElfBot OTC (Ctrl+Shift+F11)','/game_elfbot/launcher',toggle,false,99998)
   launcher:setOn(false)
   local game={onGameStart=function() if isEnabled() then start() end end,onGameEnd=stop}
