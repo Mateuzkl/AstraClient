@@ -83,6 +83,9 @@ function init()
       tostring(errorMessage) .. ". Repair or reinstall the complete client files.")
     return
   end
+  if not g_resources.directoryExists("/settings/") then
+    g_resources.makeDir("/settings/")
+  end
   Options.settingsReadOnly = false
   Options.actionBar = {}
   local savedExists = g_resources.fileExists(SAVED_FILE)

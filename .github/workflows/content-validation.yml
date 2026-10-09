@@ -10,6 +10,7 @@ on:
       - '.github/tests/indexed_spr*'
       - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/client_options_integrity.lua'
       - '.github/tests/native_splash_config.lua'
       - '.github/tests/web_credentials.lua'
       - '.github/tests/camviewer_files.lua'
@@ -46,6 +47,7 @@ on:
       - '.github/tests/indexed_spr*'
       - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/client_options_integrity.lua'
       - '.github/tests/native_splash_config.lua'
       - '.github/tests/web_credentials.lua'
       - '.github/tests/camviewer_files.lua'
@@ -158,6 +160,9 @@ jobs:
             .github/tests/sprite_decoder.cpp -I. \
             -o /tmp/sprite_decoder_test
           /tmp/sprite_decoder_test
+
+      - name: Test default-options recovery and callback cleanup
+        run: luajit .github/tests/client_options_integrity.lua
 
       - name: Test startup module lifecycle
         run: luajit .github/tests/startup_lifecycle.lua

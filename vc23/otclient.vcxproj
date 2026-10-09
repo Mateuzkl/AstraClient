@@ -849,8 +849,8 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="CopyDefaultClientOptions" AfterTargets="Build">
-    <MakeDir Directories="$(TargetDir)data\\json" />
-    <Copy SourceFiles="$(ProjectDir)..\\data\\json\\default-options.json" DestinationFiles="$(TargetDir)data\\json\\default-options.json" SkipUnchangedFiles="true" />
+    <MakeDir Directories="$(TargetDir)data\json" />
+    <Copy SourceFiles="$(ProjectDir)..\data\json\default-options.json" DestinationFiles="$(TargetDir)data\json\default-options.json" SkipUnchangedFiles="true" />
   </Target>
   <Target Name="CopyNativeSplash" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\data\images\splash.png')">
     <MakeDir Directories="$(TargetDir)data\images" />
