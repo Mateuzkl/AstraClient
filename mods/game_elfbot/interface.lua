@@ -24,6 +24,12 @@ function attachElfBot(c)
   local selectedSettingsPath
   local uiVisible=false
   local iconWidgets,iconJobs={},{}
+  local builtinIcons=ElfBotIconImport.builtinControls(data.controlIconPositions,data.controlIcons)
+  local function rememberControlIcon(row)
+    if type(data.controlIcons)~='table' then data.controlIcons={} end
+    data.controlIcons[row.controlKey]={name=row.name,enabled=row.enabled,size=row.size,background=row.background,
+      offState=row.offState,onState=row.onState}
+  end
   local overlays={}
   local function clearOverlays() for _,v in ipairs(overlays) do if not v:isDestroyed() then v:destroy() end end;overlays={} end
   local chatFilter
@@ -123,7 +129,10 @@ function attachElfBot(c)
   local function colorField(parent,x,y,w,value)
     local v=widget('ElfBotButton',parent,x,y,w,20,'')
     v.getText=function(self) return self.hexValue end
-    v.setText=function(self,text) self.hexValue=text;self:setBackgroundColor(text) end
+    v.setText=function(self,text)
+      local previous=self.hexValue;self.hexValue=text;self:setBackgroundColor(text)
+      if previous~=text and self.onTextChange then self.onTextChange(self,text,previous) end
+    end
     v:setText(value)
     v.onClick=function() scriptEditor('Color (#RRGGBB)',v:getText(),function(text) assert(text:match('^#%x%x%x%x%x%x$'),'Expected #RRGGBB');v:setText(text) end) end
     return v
@@ -659,7 +668,7 @@ function attachElfBot(c)
   local function iconActive(row)
     if data.botEnabled==false or e.paused then return false end
     local job=iconJobs[row]
-    local controller=iconControllers[row] or job and job.iconController
+    local controller=row.builtinController or iconControllers[row] or job and job.iconController
     if controller then return c[controller].isOn() end
     return row.active==true
   end
@@ -677,6 +686,7 @@ function attachElfBot(c)
     else c.info(e.status) end
   end
   local function iconCommand(row,right)
+    if row.builtinController then c.toggleElfController(row.builtinController);return end
     local script=right and row.rclick or row.lclick;if row.enabled==false or not script or script=='' then return end
     if data.botEnabled==false or e.paused then e.status='Automation is OFF. Switch ON before running icon commands.';c.info(e.status);return end
     local errorText=(row.errors or {})[right and 'rclick' or 'lclick'];assert(not errorText,errorText)
@@ -699,12 +709,13 @@ function attachElfBot(c)
   local function renderIcon(v,row)
     local active=iconActive(row);local state=iconState(row) or {};local size=v:getSize().width
     v:setBackgroundColor(row.background~=false and (state.background or (active and '#0a2b25dd' or '#081724cc')) or '#00000000')
+    v:setBorderWidth(row.background~=false and 1 or 0)
     v:setBorderColor(active and '#00d3c8' or '#2a3a46')
     local text=state.text and state.text~='' and state.text or row.name
     if row.extraText then text=text..' '..row.extraText end
     v.caption:setText(text);v.caption:setColor(iconColor(row,state,v.iconHovered))
     v.badge:setText(active and 'ON' or 'OFF');v.badge:setBackgroundColor(active and '#149447' or '#b72f37')
-    v:setTooltip(row.name..'\nLeft / right click: configured command. Drag to move.'..(data.botEnabled==false and '\nAutomation is OFF.' or '')..
+    v:setTooltip(row.name..(row.builtinController and '\nLeft / right click: toggle ON/OFF. Drag to move.' or '\nLeft / right click: configured command. Drag to move.')..(data.botEnabled==false and not row.builtinController and '\nAutomation is OFF.' or '')..
       ((row.errors or {}).lclick and '\nLeft click needs editing' or '')..((row.errors or {}).rclick and '\nRight click needs editing' or ''))
     if v.iconState==state then return end
     local previous=v.iconState
@@ -719,7 +730,10 @@ function attachElfBot(c)
         local ix=many and ((index-1)%2)*side or (content-side)/2;local iy=many and math.floor((index-1)/2)*side or (content-side)/2
         if kind=='Center' or kind=='Center X' then ix=(content-side)/2 elseif kind=='Right' then ix=content-side elseif kind=='Left' then ix=0 end
         if kind=='Center' or kind=='Center Y' then iy=(content-side)/2 elseif kind=='Bottom' then iy=content-side elseif kind=='Top' then iy=0 end
-        local function draw(x,y,w,h) local item=widget('UIItem',v.items,x,y,w,h);item:setBackgroundColor('#00000000');item:setBorderWidth(0);item:setVirtual(true);item:setItemId(id);item:setPhantom(true) end
+        local function draw(x,y,w,h)
+          local item=widget('UIItem',v.items,x,y,w,h);item.drawRarity=false;item.rarityDefaultImageSource=''
+          item:setImageSource('');item:setBackgroundColor('#00000000');item:setBorderWidth(0);item:setVirtual(true);item:setItemId(id);item:setPhantom(true)
+        end
         if kind=='Tile' then for tx=0,content-1,side do for ty=0,content-1,side do draw(tx,ty,math.min(side,content-tx),math.min(side,content-ty)) end end else draw(ix,iy,side,side) end
       end end
     end
@@ -730,13 +744,20 @@ function attachElfBot(c)
   for _,row in ipairs(data.icons) do if row.running==nil then row.running=row.active==true end end
   local function rebuildIcons()
     if iconDragging and uiVisible and data.iconsEnabled then e.iconsDirty=true;return end
+    -- Rebuilt icons must not cover the editor while their position is being changed.
+    local foreground={}
+    for _,v in ipairs(g_ui.getRootWidget():getChildren()) do
+      if v:getStyleName()=='ElfBotWindow' and v:isVisible() then foreground[#foreground+1]=v end
+    end
     e.iconsDirty=false;clearIcons();iconControllers={}
     mapPanel:setMarginTop(originalTop+(uiVisible and data.iconsEnabled and data.iconsSpaceTop and (data.iconsLargeTop and 98 or 70) or 0))
     mapPanel:setMarginBottom(originalBottom+(uiVisible and data.iconsEnabled and data.iconsSpaceBottom and (data.iconsLargeBottom and 98 or 70) or 0))
     if not data.iconsEnabled then for row,job in pairs(iconJobs) do job.active=false;job.thread=nil;row.active=false;row.running=false end;return end
     if not uiVisible then return end
+    local rows={};for _,row in ipairs(builtinIcons) do rows[#rows+1]=row end
+    for _,row in ipairs(data.icons) do rows[#rows+1]=row end
     local previousX,previousY=0,0
-    for _,row in ipairs(data.icons) do
+    for _,row in ipairs(rows) do
       local controller,consistent
       for _,script in ipairs({row.lclick or '',row.rclick or ''}) do if script:match('%S') then
         local ok,program=pcall(e.compile,script);local kind=ok and iconController(program)
@@ -753,7 +774,7 @@ function attachElfBot(c)
       elseif (state.yMode=='From bottom' or state.yMode=='Bottom') then y=heightLimit-y elseif state.yMode=='Center' then y=heightLimit/2+y elseif state.yMode=='Percent' then y=heightLimit*y/100 end
       x=math.floor(math.max(0,math.min(widthLimit,x)));y=math.floor(math.max(0,math.min(heightLimit,y)))
       -- Disabled icons still define anchors for subsequent entries in the script.
-      previousX,previousY=x,y
+      if not row.builtinController then previousX,previousY=x,y end
       if row.enabled~=false then
       local resumeScript=row.runningRight and row.rclick or row.lclick
       if data.botEnabled~=false and not e.paused and row.running and (not iconJobs[row] or not iconJobs[row].active and not iconJobs[row].failed) and resumeScript and resumeScript~='' then local ok,program=pcall(e.compile,resumeScript);if ok and program.interval and not iconController(program) then local job=e.run(resumeScript);iconJobs[row]=job;if job then job.iconRight=row.runningRight==true;job.iconName=row.name;job.row.script=resumeScript end end end
@@ -790,12 +811,18 @@ function attachElfBot(c)
       v.onDragLeave=function(self)
         if alive and not self:isDestroyed() and iconDragging==self and self.dragPosition and uiVisible then
           for _,key in ipairs({'offState','onState'}) do row[key]=row[key] or {};row[key].xMode='Absolute';row[key].yMode='Absolute';row[key].x=self.dragPosition.x;row[key].y=self.dragPosition.y end
+          if row.controlKey then
+            if type(data.controlIconPositions)~='table' then data.controlIconPositions={} end
+            data.controlIconPositions[row.controlKey]={x=self.dragPosition.x,y=self.dragPosition.y}
+            rememberControlIcon(row)
+          end
           save();e.iconsDirty=true
         end
         if iconDragging==self then iconDragging=nil end;return true
       end
       renderIcon(v,row)
     end end
+    for _,v in ipairs(foreground) do v:raise() end
   end
   function e.importIcons(text)
     local imported,warnings=ElfBotIconImport.parse(text,e.compile)
@@ -805,7 +832,7 @@ function attachElfBot(c)
       local key=row.name:lower();occurrences[key]=(occurrences[key] or 0)+1;local index=buckets[key] and buckets[key][occurrences[key]]
       if index then local old=data.icons[index];if iconJobs[old] then iconJobs[old].active=false;iconJobs[old].thread=nil;iconJobs[old]=nil end;data.icons[index]=row else data.icons[#data.icons+1]=row end
     end
-    data.iconsEnabled=true;data.awaitingLoad=nil;e.importWarnings=warnings;save();e.status='Imported '..#imported..' icons; '..#warnings..' click scripts need editing';rebuildIcons()
+    data.awaitingLoad=nil;e.importWarnings=warnings;save();e.status='Imported '..#imported..' icons; '..#warnings..' click scripts need editing';rebuildIcons()
     if panels.icons and not panels.icons:isDestroyed() then panels.icons:destroy();panels.icons=nil end
     return #imported,warnings
   end
@@ -814,19 +841,22 @@ function attachElfBot(c)
     if text:match('%S') and not text:lower():match('^%s*%[icons%]%s*$') then rows,warnings=ElfBotIconImport.parse(text,e.compile) end
     -- Editor Save replaces the displayed document; file import remains a merge.
     for row,job in pairs(iconJobs) do job.active=false;job.thread=nil;row.active=false;row.running=false end
-    iconJobs={};data.icons=rows;data.iconsEnabled=#rows>0;e.importWarnings=warnings
+    iconJobs={};data.icons=rows;e.importWarnings=warnings
     save();rebuildIcons();e.status='Saved '..#rows..' icons; '..#warnings..' click scripts need editing'
     if panels.icons and not panels.icons:isDestroyed() then panels.icons:destroy();panels.icons=nil end
     return #rows,warnings
   end
   local function loadFiles()
-    local win=window('Load ElfBot settings / scripts',650,430);panels.loadFiles=win
-    label(win,0,0,630,'Choose a file below or enter its full Windows path. Preview checks scripts before loading.')
-    local files=list(win,0,28,210,180)
-    local report=widget('ElfBotMultilineTextEdit',win,222,28,428,180,'')
-    local path=edit(win,0,237,650,'')
-    label(win,0,211,640,'File path (original extensionless settings, .txt commands, [Icons], or ElfBot JSON):')
-    label(win,0,271,640,'You can also copy files into elfbot/imports in client\'s AppData folder.')
+    local win=window('Load ElfBot settings / scripts',520,312);panels.loadFiles=win
+    label(win,0,0,520,'Select a file to preview, or enter its full Windows path.')
+    label(win,0,24,160,'Saved files'):setColor('#475569')
+    label(win,172,24,348,'Preview'):setColor('#475569')
+    local files=list(win,0,44,160,110)
+    local report=widget('ElfBotMultilineTextEdit',win,172,44,348,110,'Select a file to view its import summary.')
+    report:setEditable(false)
+    label(win,0,162,65,'File path')
+    local path=edit(win,72,158,448,'')
+    path:setTooltip('Original settings, .txt commands, [Icons] text or ElfBot JSON. You can also copy files into elfbot/imports in the client\'s AppData folder.')
     local function preview()
       local ok,result=pcall(c.previewElfFile,path:getText())
       if not ok then report:setText(tostring(result));return false end
@@ -844,6 +874,7 @@ function attachElfBot(c)
             local full=dir..'/'..name
             if resources.fileExists(full) and name~='before-import.json' then
               local row=createRow('ElfBotRow',files);row:setText((dir~='/elfbot' and dir:sub(9)..'/' or '')..name)
+              row:setTooltip(full)
               row.onFocusChange=function(_,focused) if focused then path:setText(full);preview() end end
               row.onDoubleClick=function() path:setText(full);if preview() then c.loadElfFile(full) end end
             end
@@ -851,31 +882,30 @@ function attachElfBot(c)
         end
       end
     end
-    button(win,0,283,160,'Open saves folder',function()
+    button(win,0,220,160,'Open saves folder',function()
       resources.makeDir('/elfbot');resources.makeDir('/elfbot/imports');resources.makeDir('/elfbot/scripts')
       g_platform.openDir(resources.getWriteDir()..'/elfbot')
-    end)
-    button(win,166,283,100,'Refresh files',refreshFiles)
+    end):setTooltip('Open the ElfBot folder in AppData. Copy external files into elfbot/imports.')
+    button(win,168,220,120,'Refresh files',refreshFiles)
     refreshFiles()
-    button(win,0,310,100,'Preview',preview)
-    button(win,106,310,100,'Load file',function() if preview() then c.loadElfFile(path:getText()) end end)
-    button(win,212,310,140,'Paste script',function()
+    button(win,0,188,88,'Preview',preview)
+    button(win,96,188,104,'Load file',function() if preview() then c.loadElfFile(path:getText()) end end):setOn(true)
+    button(win,208,188,124,'Paste script',function()
       scriptEditor('Load original ElfBot text',g_window.getClipboardText(),function(text) c.loadElfText(text) end)
     end)
-    button(win,358,310,135,'Load selected slot',function() c.loadElfSlot(data.slot or 1) end)
-    button(win,499,310,150,'Last import notices',function() report:setText(table.concat(data.importWarnings or {},'\n\n')) end)
-    label(win,0,349,635,'Imported sections replace the matching sections. Other settings stay as they are.')
-    label(win,0,374,635,'Unsupported scripts stay available to edit; invalid hotkeys are disabled.')
-    status(win,0,397,635);return win
+    button(win,340,188,180,'Load selected slot',function() c.loadElfSlot(data.slot or 1) end)
+    button(win,296,220,224,'Last import notices',function() report:setText(table.concat(data.importWarnings or {},'\n\n')) end)
+    label(win,0,252,520,'Matching sections are replaced; invalid scripts remain editable.')
+    status(win,0,276,520);return win
   end
   local function icons()
-    local win=window('Command Icons',dx(378),dy(164));panels.icons=win
+    local win=window('Command Icons',dx(378),dy(184));panels.icons=win
     dg(win,2,1,374,161,'Icon list');local names=list(win,dx(10),dy(12),dx(88),dy(107))
     dl(win,108,16,26,'Name');local name=de(win,134,16,94,'')
     dl(win,234,16,24,'Lclick');local left=de(win,258,16,108,'')
     dl(win,234,27,24,'Rclick');local right=de(win,258,27,108,'')
     dl(win,108,27,26,'Size');local size=dc(win,134,27,24,{'Small','Medium','Large'},'Small')
-    local on=dk(win,162,27,24,'On',true,function() end);on:setTooltip('Show this icon. Commands run only when Automation is ON.')
+    local on=dk(win,162,27,24,'On',true,function() end);on:setTooltip('Show or hide this icon; this does not start automation.')
     local bkg=dk(win,186,27,47,'Bkg Draw',true,function() end)
     local fields={};local types={'Normal','Resize','Top','Bottom','Left','Right','Tile','Center','Center X','Center Y','Text'}
     for i,kind in ipairs({'offState','onState'}) do
@@ -892,47 +922,110 @@ function attachElfBot(c)
     left:setTooltip('ElfBot command, for example: auto 1000 say "exura"')
     right:setTooltip('Optional ElfBot command for the right mouse button')
     local enableIcons
-    local selected;local function clear()
+    local selected;local loading=true;local rowWidgets={}
+    local function selectedBuiltin()
+      for i,row in ipairs(builtinIcons) do if row.controlKey==selected then return row,i end end
+    end
+    local function commandFields(enabled)
+      left:setEditable(enabled);right:setEditable(enabled);left:setEnabled(enabled);right:setEnabled(enabled)
+    end
+    local function clear()
+      local previous=loading;loading=true
       selected=nil;name:setText('');left:setText('');right:setText('');on:setChecked(true);bkg:setChecked(true);size:setCurrentOption('Small')
+      commandFields(true);left:setTooltip('ElfBot command, for example: auto 1000 say "exura"');right:setTooltip('Optional ElfBot command for the right mouse button')
       for kind,f in pairs(fields) do f.type:setCurrentOption('Resize');f.bkgType:setCurrentOption('Normal');f.xMode:setCurrentOption('Absolute');f.yMode:setCurrentOption('Absolute');f.x:setText(tostring(20+#data.icons*74));f.y:setText('80');f.text:setText('');for _,v in ipairs(f.ids) do v:setText('0') end;for _,v in ipairs(f.bkgIds) do v:setText('0') end;f.foreground:setText(kind=='onState' and '#55ff88' or '#ff5a61');f.hover:setText('#ffffff') end
+      for _,v in ipairs(names:getChildren()) do v:setOn(v==names:getChildByIndex(1)) end
+      loading=previous
     end
     local function refresh()
+      local previous=loading;loading=true;rowWidgets={}
       names:destroyChildren();local new=createRow('ElfBotRow',names);new:setText('<New Icon>');new.onFocusChange=function(_,focus) if focus then clear() end end
-      for i,row in ipairs(data.icons) do local index=i;local v=createRow('ElfBotRow',names);v:setText(row.name)
-        v.onFocusChange=function(_,focus) if not focus then return end;selected=index;name:setText(row.name);left:setText(row.lclick or '');right:setText(row.rclick or '');size:setCurrentOption(row.size or 'Small');on:setChecked(row.enabled~=false);bkg:setChecked(row.background~=false)
-          left:setTooltip((row.errors or {}).lclick or 'Left-click script');right:setTooltip((row.errors or {}).rclick or 'Right-click script')
+      local selectedWidget
+      local function add(row,index)
+        local v=createRow('ElfBotRow',names);v:setText(row.name)
+        rowWidgets[index]=v
+        if row.builtinController then v:setTooltip('Built-in '..row.builtinController..' control. Appearance changes are saved automatically.') end
+        if selected==index then selectedWidget=v end
+        v.onFocusChange=function(_,focus) if not focus then return end;local previous=loading;loading=true;selected=index;name:setText(row.name);size:setCurrentOption(row.size or 'Small');on:setChecked(row.enabled~=false);bkg:setChecked(row.background~=false)
+          commandFields(not row.builtinController)
+          left:setText(row.builtinController and 'Toggle ON/OFF' or row.lclick or '');right:setText(row.builtinController and 'Toggle ON/OFF' or row.rclick or '')
+          local hint=row.builtinController and 'Built-in toggle; no command setup is required.'
+          left:setTooltip(hint or (row.errors or {}).lclick or 'Left-click script');right:setTooltip(hint or (row.errors or {}).rclick or 'Right-click script')
           for kind,f in pairs(fields) do local state=row[kind] or {};f.type:setCurrentOption(state.type or 'Normal');f.bkgType:setCurrentOption(state.bkgType or 'Normal');f.xMode:setCurrentOption(state.xMode or 'Absolute');f.yMode:setCurrentOption(state.yMode or 'Absolute');f.x:setText(tostring(state.x or 0));f.y:setText(tostring(state.y or 0));f.text:setText(state.text or '');f.foreground:setText(state.foreground or '#000000');f.hover:setText(state.hover or state.foreground or '#000000');for n,v in ipairs(f.ids) do v:setText(tostring((state.ids or {})[n] or 0)) end;for n,v in ipairs(f.bkgIds) do v:setText(tostring((state.bkgIds or {})[n] or 0)) end end
+          loading=previous
         end
       end
-      if selected and data.icons[selected] then selectRow(names:getChildByIndex(selected+1)) end
+      for _,row in ipairs(builtinIcons) do add(row,row.controlKey) end
+      for i,row in ipairs(data.icons) do add(row,i) end
+      selectRow(selectedWidget or new)
+      loading=previous
     end
-    local function apply(copy)
+    local function commit(copy)
+      local builtin=selectedBuiltin()
+      assert(not (builtin and copy),'Built-in toggles cannot be copied; use New Icon for custom commands')
       assert(name:getText():match('%S'),'Enter an icon name')
-      local row={name=name:getText(),lclick=left:getText(),rclick=right:getText(),size=size:getCurrentOption().text,enabled=on:isChecked(),active=false,running=false,background=bkg:isChecked(),errors={}}
-      -- Preserve broken imported clicks for editing without rejecting the valid side.
-      for _,side in ipairs({'lclick','rclick'}) do if row[side]~='' then local ok,err=pcall(e.compile,row[side]);if not ok then row.errors[side]=tostring(err) end end end
-      for kind,f in pairs(fields) do local state={type=f.type:getCurrentOption().text,ids={},bkgIds={},bkgType=f.bkgType:getCurrentOption().text,foreground=f.foreground:getText(),hover=f.hover:getText(),xMode=f.xMode:getCurrentOption().text,yMode=f.yMode:getCurrentOption().text,x=readNumber(f.x,-4000,4000),y=readNumber(f.y,-4000,4000),text=f.text:getText()};for n,v in ipairs(f.ids) do state.ids[n]=readNumber(v,0,65535) end;for n,v in ipairs(f.bkgIds) do state.bkgIds[n]=readNumber(v,0,65535) end;row[kind]=state end
-      if selected and not copy then local previous=data.icons[selected];if iconJobs[previous] then iconJobs[previous].active=false;iconJobs[previous].thread=nil;iconJobs[previous]=nil end;data.icons[selected]=row else data.icons[#data.icons+1]=row;selected=#data.icons end
-      if row.enabled then data.iconsEnabled=true;enableIcons:setChecked(true) end
-      save();refresh();rebuildIcons();if next(row.errors) then e.status='Icon saved; invalid click scripts need editing' end
+      local values={name=name:getText(),size=size:getCurrentOption().text,enabled=on:isChecked(),background=bkg:isChecked()}
+      if not builtin then values.lclick=left:getText();values.rclick=right:getText() end
+      local function readId(v) local id=readNumber(v,0,65535);assert(id%1==0,'Item IDs must be whole numbers');return id end
+      for kind,f in pairs(fields) do
+        local state={type=f.type:getCurrentOption().text,ids={},bkgIds={},bkgType=f.bkgType:getCurrentOption().text,foreground=f.foreground:getText(),hover=f.hover:getText(),xMode=f.xMode:getCurrentOption().text,yMode=f.yMode:getCurrentOption().text,x=readNumber(f.x,-4000,4000),y=readNumber(f.y,-4000,4000),text=f.text:getText()}
+        for n,v in ipairs(f.ids) do state.ids[n]=readId(v) end;for n,v in ipairs(f.bkgIds) do state.bkgIds[n]=readId(v) end;values[kind]=state
+      end
+      local row=not copy and (builtin or selected and data.icons[selected]);local created=not row
+      if row then
+        local changed=false;for key,value in pairs(values) do if not table.equal(row[key],value) then changed=true;break end end
+        if not changed then return end
+      else row={active=false,running=false,errors={}} end
+      local commandsChanged=not builtin and (row.lclick~=values.lclick or row.rclick~=values.rclick)
+      -- Visual edits keep running scripts intact. Changing a command stops its old job;
+      -- editing never executes the replacement (it still requires an icon click).
+      if commandsChanged then
+        if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil;iconJobs[row]=nil end
+        row.running=false;row.active=false;row.errors={}
+        for _,side in ipairs({'lclick','rclick'}) do if values[side]~='' then
+          local ok,err=pcall(e.compile,values[side]);if not ok then row.errors[side]=tostring(err) end
+        end end
+      end
+      for key,value in pairs(values) do row[key]=value end
+      if builtin then rememberControlIcon(row)
+      else
+        if created then data.icons[#data.icons+1]=row;selected=#data.icons end
+      end
+      save()
+      if created then refresh() elseif rowWidgets[selected] then rowWidgets[selected]:setText(row.name) end
+      rebuildIcons();if next(row.errors or {}) then e.status='Icon saved; invalid click scripts need editing' end
     end
-    local function move(delta) assert(selected,'Select an icon');local index=math.max(1,math.min(#data.icons,selected+delta));local row=table.remove(data.icons,selected);table.insert(data.icons,index,row);selected=index;refresh();save() end
+    local function changed()
+      if loading or not alive or win:isDestroyed() or not name:getText():match('%S') then return end
+      local ok,err=pcall(commit,false);if not ok then e.status=tostring(err) end
+    end
+    local function move(delta) assert(selected,'Select an icon');assert(type(selected)=='number','Move built-in controls using Xpos / Ypos');local index=math.max(1,math.min(#data.icons,selected+delta));local row=table.remove(data.icons,selected);table.insert(data.icons,index,row);selected=index;refresh();save() end
     db(win,8,123,14,13,'<',function() move(-1) end);db(win,26,123,14,13,'>',function() move(1) end)
     db(win,42,123,18,13,'Edit',function()
+      if selectedBuiltin() then e.status='Appearance changes are saved automatically; the built-in toggle needs no script.';return end
       scriptEditor('Icon Scripts',ElfBotIconImport.serialize(data.icons),function(text)
         e.replaceIcons(text)
       end,'Save')
-    end):setTooltip('Paste or edit a complete [Icons] script')
-    db(win,104,123,34,13,'Apply',function() apply(false) end):setTooltip('Save the icon fields')
+    end):setTooltip('Edit custom [Icons] scripts. Appearance changes are saved automatically.')
     db(win,60,123,20,13,'Clear',clear)
-    db(win,80,123,20,13,'Del',function() assert(selected,'Select an icon');local row=data.icons[selected];if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil;iconJobs[row]=nil end;table.remove(data.icons,selected);clear();refresh();save();rebuildIcons() end)
-    enableIcons=dk(win,8,142,100,'Enable Icons',data.iconsEnabled,function(v) if data.iconsEnabled==v then return end;data.iconsEnabled=v;rebuildIcons();save() end)
-    db(win,202,140,34,13,'Copy >>',function() apply(true) end)
+    db(win,80,123,20,13,'Del',function() assert(selected,'Select an icon');assert(not selectedBuiltin(),'To hide a built-in icon, uncheck On');local row=data.icons[selected];if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil;iconJobs[row]=nil end;table.remove(data.icons,selected);clear();refresh();save();rebuildIcons() end)
+    enableIcons=dk(win,8,142,100,'Enable Icons',data.iconsEnabled,function(v) if loading or not alive or win:isDestroyed() or data.iconsEnabled==v then return end;data.iconsEnabled=v;rebuildIcons();save() end)
+    enableIcons:setTooltip('Show or hide all command icons, including Cavebot and Target. On controls each icon separately.')
+    db(win,202,140,34,13,'Copy >>',function() commit(true) end)
     dk(win,242,140,93,'Make icon space top',data.iconsSpaceTop,function(v) data.iconsSpaceTop=v;rebuildIcons();save() end)
     dk(win,242,149,94,'Make icon space bottom',data.iconsSpaceBottom,function(v) data.iconsSpaceBottom=v;rebuildIcons();save() end)
     dk(win,338,140,34,'Large',data.iconsLargeTop,function(v) data.iconsLargeTop=v;rebuildIcons();save() end)
     dk(win,338,149,34,'Large',data.iconsLargeBottom,function(v) data.iconsLargeBottom=v;rebuildIcons();save() end)
-    clear();refresh();return win
+    dl(win,8,166,364,'Enable Icons controls visibility. Changes are saved automatically.')
+    clear();refresh()
+    for _,v in ipairs({name,left,right}) do v.onTextChange=changed end
+    size.onOptionChange=changed;on.onCheckChange=changed;bkg.onCheckChange=changed
+    for _,f in pairs(fields) do
+      for _,key in ipairs({'type','bkgType','xMode','yMode'}) do f[key].onOptionChange=changed end
+      for _,key in ipairs({'x','y','text','foreground','hover'}) do f[key].onTextChange=changed end
+      for _,v in ipairs(f.ids) do v.onTextChange=changed end;for _,v in ipairs(f.bkgIds) do v.onTextChange=changed end
+    end
+    loading=false;return win
   end
   local function navigation()
     local win=window('Navigation',400,245);panels.navigation=win

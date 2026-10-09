@@ -152,7 +152,6 @@ ElfBotIcon < UIButton
   border-width: 1
   border-color: #2a3a46
   $pressed:
-    border-width: 1
     border-color: #ffffff
     image-color: #b0b0b0
 

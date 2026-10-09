@@ -75,7 +75,10 @@ local function fixture()
     return self.size or {width=400,height=300}
   end
   function methods:getText() return self.text or '' end
-  function methods:setText(text) self.text=tostring(text) end
+  function methods:setText(text)
+    text=tostring(text);local previous=self:getText();if text==previous then return end
+    self.text=text;if self.onTextChange then self.onTextChange(self,text,previous) end
+  end
   function methods:setColoredText(parts)
     self.colored=parts;local values={};for i=1,#parts,2 do values[#values+1]=parts[i] end
     self.text=table.concat(values)
@@ -97,11 +100,14 @@ local function fixture()
   function methods:setMarginLeft(value) self.marginLeft=value end
   function methods:setPhantom(value) self.phantom=value end
   function methods:setEnabled(value) self.enabled=value end
+  function methods:setEditable(value) self.editable=value end
   function methods:setTextWrap(value) self.textWrap=value end
   function methods:setItemId(value) self.itemId=value end
   function methods:setColor(value) self.color=value end
   function methods:setBackgroundColor(value) self.backgroundColor=value end
   function methods:setBorderColor(value) self.borderColor=value end
+  function methods:setBorderWidth(value) self.borderWidth=value end
+  function methods:setImageSource(value) self.imageSource=value end
   function methods:setClipping(value) self.clipping=value end
   function methods:getTextSize()
     local width,lines=0,0
@@ -116,13 +122,16 @@ local function fixture()
   function methods:setMarginTop(value) self.marginTop=value end
   function methods:setMarginBottom(value) self.marginBottom=value end
   function methods:addOption(value) self.options=self.options or {};self.options[#self.options+1]=value;self.option=self.option or value end
-  function methods:setCurrentOption(value) self.option=value end
+  function methods:setCurrentOption(value)
+    if self.option==value then return end;self.option=value
+    if self.onOptionChange then self.onOptionChange(self,value) end
+  end
   function methods:getCurrentOption() return {text=self.option} end
   function methods:setCurrentIndex(index) self.option=(self.options or {})[index] end
   function methods:clearOptions() self.options={};self.option=nil end
   function methods:setValue(value) self.value=value end
   function methods:getValue() return self.value or 0 end
-  for _,name in ipairs({'setTooltip','setVerticalScrollBar','setBorderWidth','setVirtual','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
+  for _,name in ipairs({'setTooltip','setVerticalScrollBar','setVirtual','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
     methods[name]=function() end
   end
   local function widget(style,parent)
@@ -143,6 +152,8 @@ local function fixture()
   function player:getName() return 'Tester' end
   function player:getId() return 1 end
   function player:isLocalPlayer() return true end
+  function player:isMonster() return false end
+  function player:isPlayer() return true end
   function player:isAutoWalking() return false end
   function player:getExperience() return 1000 end
   function player:getLevel() return 10 end
@@ -622,6 +633,61 @@ do
   env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 
+-- Compact Load dialog keeps its controls inside bounds and preserves loading behavior.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  s.files['/elfbot/settings.json']=env.json.encode({elfbot={}})
+  s.files['/elfbot/imports/heal.txt']='auto 1000 say "exura"'
+  s.files['/elfbot/before-import.json']=env.json.encode({elfbot={}})
+  env.g_resources.listDirectoryFiles=function(dir)
+    if dir=='/elfbot' then return {'settings.json','before-import.json'} end
+    if dir=='/elfbot/imports' then return {'heal.txt'} end
+    return {}
+  end
+  env.init();env.toggle();local c=latest.context;local menu=s.getWidget('ElfBot OTC v.1');local load
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Load' then load=child end end
+  s.click(assert(load));local panel=s.root:getFocusedChild();local size=panel:getSize()
+  assert(size.width<=540 and size.height<=360,'Load dialog must stay compact')
+  local files,report,path;local buttons={};local bounds=panel:getPaddingRect()
+  for _,child in ipairs(panel:getChildren()) do
+    local p,dimensions=child:getPosition(),child:getSize()
+    assert(p.x>=bounds.x and p.y>=bounds.y and p.x+dimensions.width<=bounds.x+bounds.width and p.y+dimensions.height<=bounds.y+bounds.height,'Load control outside window: '..child:getText())
+    if child:getStyleName()=='ElfBotButton' then
+      buttons[child:getText()]=child
+      assert(child:getTextSize().width<=dimensions.width,'Load button caption clipped: '..child:getText())
+    elseif child:getStyleName()=='ElfBotLabel' then
+      assert(child:getTextSize().height<=dimensions.height,'Load label must fit wrapped text')
+    end
+    if child:getStyleName()=='ElfBotList' then files=child end
+    if child:getStyleName()=='ElfBotMultilineTextEdit' then report=child end
+    if child:getStyleName()=='ElfBotTextEdit' then path=child end
+  end
+  assert(files and report and path and report.editable==false)
+  equal(#files:getChildren(),2,'list includes saves/imports but excludes recovery backup')
+  s.click(files:getChildren()[2]);equal(path:getText(),'/elfbot/imports/heal.txt')
+  assert(report:getText():find('1 hotkeys',1,true),'selecting a file populates the preview')
+  assert(not env.isEnabled(),'preview cannot start automation')
+  local loaded,slot,opened
+  c.loadElfFile=function(value) loaded=value end;c.loadElfSlot=function(value) slot=value end
+  env.g_resources.getWriteDir=function() return 'C:/fixture/AppData' end
+  env.g_platform.openDir=function(value) opened=value end
+  s.click(assert(buttons['Load file']));equal(loaded,'/elfbot/imports/heal.txt')
+  s.click(assert(buttons['Load selected slot']));equal(slot,1)
+  s.click(assert(buttons['Open saves folder']));equal(opened,'C:/fixture/AppData/elfbot')
+  c.storage.elfbot.importWarnings={'Example import notice'}
+  s.click(assert(buttons['Last import notices']));equal(report:getText(),'Example import notice')
+  path:setText('/elfbot/imports/missing.txt');loaded=nil
+  s.click(buttons['Load file']);assert(not loaded,'failed preview must not call Load')
+  assert(report:getText():find('missing fixture file',1,true))
+  s.click(assert(buttons['Refresh files']));equal(#files:getChildren(),2,'refresh replaces file rows without duplication')
+  s.click(assert(buttons['Paste script']));local paste=s.root:getFocusedChild()
+  assert(paste~=panel and paste.titleBar:getText()=='Load original ElfBot text')
+  s.click(paste.closeButton);panel:raise();s.click(panel.closeButton);assert(not panel:isVisible())
+  menu:raise();s.click(load);equal(s.root:getFocusedChild(),panel,'reopening Load reuses the same dialog')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
 -- Valkor-style icons: visible defaults, click commands, dragging and master OFF.
 do
   local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
@@ -629,18 +695,21 @@ do
   env.init();env.toggle();local c=latest.context;local e=c.ElfBot;local data=c.storage.elfbot
   local menu=s.getWidget('ElfBot OTC v.1');local iconsButton
   for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then iconsButton=child end end
-  s.click(assert(iconsButton));local editor=s.root:getFocusedChild();local edits,apply,on,enable={}
+  s.click(assert(iconsButton));local editor=s.root:getFocusedChild();local edits,on,enable,bkg={}
   for _,child in ipairs(editor:getChildren()) do
     if child:getStyleName()=='ElfBotTextEdit' then edits[#edits+1]=child end
-    if child:getText()=='Apply' then apply=child end
+    assert(child:getText()~='Apply','icon settings must not require Apply')
     if child:getText()=='On' then on=child end
     if child:getText()=='Enable Icons' then enable=child end
+    if child:getText()=='Bkg Draw' then bkg=child end
   end
-  assert(on:isChecked(),'new icons must be visible by default');assert(not enable:isChecked())
+  assert(on:isChecked(),'new icons must be visible by default');assert(not enable:isChecked(),'custom icons stay empty until configured or loaded')
+  local defaults=#data.icons
   edits[1]:setText('Heal');edits[2]:setText('auto 1000 say "exura"');edits[3]:setText('say "right"')
-  apply.onClick();equal(#data.icons,1,'Apply creates one configured icon')
-  assert(data.iconsEnabled and enable:isChecked(),'Apply must enable the icon layer')
-  local row=data.icons[1];assert(row.enabled);editor:hide();menu:setPosition({x=500,y=500})
+  equal(#data.icons,defaults+1,'editing the new icon name creates a single configured icon')
+  assert(not data.iconsEnabled and not enable:isChecked(),'configuration cannot enable the icon layer implicitly')
+  s.click(enable);assert(data.iconsEnabled and enable:isChecked())
+  local row=data.icons[#data.icons];assert(row.enabled);editor:hide();menu:setPosition({x=500,y=500})
   local function icon()
     for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' and v.iconRow==row then return v end end
     error('command icon missing')
@@ -656,6 +725,13 @@ do
   editor:hide();v=icon();local before=count(s.widgets);s.click(v)
   equal(icon(),v,'click updates in place, without destroying the pressed widget');equal(count(s.widgets),before,'caption/badge do not accumulate')
   assert(row.running);equal(v.badge:getText(),'ON');s.advance(50);equal(calls[1],'exura')
+  local runningJob=e.jobs[#e.jobs];local jobsBefore=#e.jobs
+  editor:show();editor:raise();edits[15]:setText('3003');s.click(bkg)
+  assert(row.running and runningJob.active,'live appearance editing cannot cancel a repeating script')
+  equal(e.jobs[#e.jobs],runningJob);equal(#e.jobs,jobsBefore,'appearance edits cannot restart or duplicate scripts')
+  equal(#calls,1,'configuration edits must not execute icon commands');equal(icon().borderWidth,0)
+  equal(icon().items:getChildren()[1].itemId,3003,'active appearance updates without an Apply button')
+  editor:hide();v=icon()
   s.click(v);assert(not row.running);equal(v.badge:getText(),'OFF');s.advance(1500);equal(#calls,1,'second click cancels repeating script')
   v=icon();local p=v:getPosition();assert(v.onMousePress(v,p,2));assert(v.onMouseRelease(v,{x=p.x+5,y=p.y+5},2))
   s.advance(50);equal(calls[2],'right','right click runs its own command')
@@ -679,10 +755,187 @@ do
   assert(#calls>executed,'ON restarts the configured repeating icon')
   s.root:setSize({width=800,height=500});s.advance(500);v=icon();p=v:getPosition()
   assert(p.x+v:getSize().width<=800 and p.y+v:getSize().height<=500,'resized window keeps the icon visible')
-  env.saveSlot(1);assert(env.loadSlot(1));row=latest.context.storage.elfbot.icons[1];v=icon()
+  env.saveSlot(1);assert(env.loadSlot(1));local restored=latest.context.storage.elfbot.icons;row=restored[#restored];v=icon()
   equal(row.offState.x,1100,'drag position persists in saved profile');equal(v.badge:getText(),'OFF','load does not start automation')
   local lateClick=v.onClick;local lateMove=v.onDragMove
   env.terminate();lateClick();assert(not lateMove(v,{x=1,y=1}));equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Enable Icons is the single visibility gate for built-in and custom icons.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  local saved={elfbot={icons={{name='Saved icon',enabled=true,lclick='say "saved"',offState={},onState={}}},iconsEnabled=false,
+    hotkeys={{key='F2',script='say "saved"',enabled=true}},targeting={monsters={{name='Rat',stance='No Movement',loot=false}}},
+    waypoints={{'label','Saved route'}}}}
+  s.files['/elfbot/settings.json']=env.json.encode(saved);s.files['/elfbot/slot1.json']=env.json.encode(saved)
+  env.init();equal(count(s.events),0,'built-in controls must not eagerly start the runtime')
+  env.toggle();local c=latest.context;local data=c.storage.elfbot;local e=c.ElfBot
+  equal(#data.icons,0);equal(#data.hotkeys,0);equal(#data.waypoints,0);equal(#data.targeting.monsters,0)
+  assert(not data.iconsEnabled,'opening ElfBot cannot apply existing personal settings')
+  local function icon(key)
+    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' and v.iconRow.controlKey==key then return v end end
+  end
+  assert(not icon('waypoint') and not icon('target'),'unchecked Enable Icons must hide built-in controls')
+  local menu=s.getWidget('ElfBot OTC v.1');local open
+  for _,child in ipairs(menu:getChildren()) do
+    assert(not child:getText():match('^Cavebot: ') and not child:getText():match('^Target: '),'main menu must not contain redundant controller buttons')
+    if child:getText()=='Icons' then open=child end
+  end
+  s.click(assert(open));local panel=s.root:getFocusedChild();local enable
+  for _,child in ipairs(panel:getChildren()) do
+    assert(not child:getText():match('^Cavebot: ') and not child:getText():match('^Target: '),'icon editor must not contain redundant controller buttons')
+    if child:getText()=='Enable Icons' then enable=child end
+    if child:getStyleName()=='ElfBotList' then
+      local rows=child:getChildren();equal(#rows,3,'built-in controls remain configurable while hidden')
+      equal(rows[1]:getText(),'<New Icon>');equal(rows[2]:getText(),'Cavebot');equal(rows[3]:getText(),'Target')
+    end
+  end
+  assert(enable and not enable:isChecked());s.click(enable)
+  for _,key in ipairs({'waypoint','target'}) do equal(icon(key).badge:getText(),'OFF') end
+  assert(not c.CaveBot.isOn() and not c.TargetBot.isOn() and not env.isEnabled())
+  equal(icon('waypoint').items:getChildren()[1].itemId,3116);equal(icon('target').items:getChildren()[1].itemId,3264)
+  -- Click starts the existing controller directly, without a separate master ON click.
+  c.CaveBot.addAction('label','Ready');data.targeting.monsters={{name='Rat',stance='No Movement',loot=false}}
+  local rat={isMonster=function() return true end,isPlayer=function() return false end,
+    getId=function() return 2 end,getName=function() return 'Rat' end,getHealthPercent=function() return 100 end,
+    getPosition=function() return {x=101,y=100,z=7} end}
+  s.setSpectators({s.player,rat})
+  panel:hide();menu:setPosition({x=500,y=500})
+  s.click(icon('waypoint'));assert(env.isEnabled() and c.CaveBot.isOn());equal(icon('waypoint').badge:getText(),'ON')
+  assert(not c.TargetBot.isOn(),'Cavebot click cannot enable Target')
+  s.click(icon('target'));assert(c.TargetBot.isOn());s.advance(500)
+  equal(s.attack(),rat,'built-in Target uses the real targeting controller')
+  assert(c.CaveBot.isOn() and c.TargetBot.isOn(),'controls must not repeatedly toggle themselves')
+  -- Hide all icons without stopping controllers; stale clicks from hidden icons do nothing.
+  local lateClick=icon('waypoint').onClick;panel:show();panel:raise();s.click(enable)
+  assert(not icon('waypoint') and not icon('target'));lateClick()
+  assert(c.CaveBot.isOn() and c.TargetBot.isOn(),'visibility is not an automation switch')
+  s.advance(500);assert(not icon('waypoint') and not icon('target'),'a pulse cannot recreate unchecked icons')
+  s.click(enable);equal(icon('waypoint').badge:getText(),'ON');equal(icon('target').badge:getText(),'ON');panel:hide()
+  env.setEnabled(false);assert(not c.CaveBot.isOn() and not c.TargetBot.isOn());assert(menu:isVisible())
+  s.click(icon('target'));assert(env.isEnabled() and c.TargetBot.isOn())
+  assert(not c.CaveBot.isOn(),'direct Target click cannot resume the other paused controller')
+  s.click(icon('target'));assert(not c.TargetBot.isOn());equal(s.attack(),nil)
+  equal(#data.icons,0,'using built-ins never creates personal icon records')
+  local lateChange=enable.onCheckChange;lateClick=icon('waypoint').onClick
+  assert(env.loadSlot(1));c=latest.context;data=c.storage.elfbot
+  equal(#data.icons,1);equal(data.icons[1].name,'Saved icon');equal(#data.hotkeys,1);equal(#data.waypoints,1)
+  assert(not data.iconsEnabled and not env.isEnabled(),'only Load applies settings; it cannot enable automation')
+  assert(not icon('waypoint') and not icon('target'),'loading a disabled layer cannot show built-ins')
+  lateChange(enable,true);lateClick();assert(not env.isEnabled() and not data.iconsEnabled,'replaced UI callbacks cannot enable icons or automation')
+  menu=s.getWidget('ElfBot OTC v.1');menu:raise()
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then open=child end end
+  s.click(open);panel=s.root:getFocusedChild()
+  for _,child in ipairs(panel:getChildren()) do if child:getText()=='Enable Icons' then enable=child end end
+  s.click(enable);panel:hide();menu:setPosition({x=500,y=500})
+  equal(icon('waypoint').badge:getText(),'OFF');equal(icon('target').badge:getText(),'OFF')
+  s.click(icon('target'));assert(c.TargetBot.isOn());assert(not c.CaveBot.isOn())
+  equal(#data.icons,1,'using built-ins cannot add or replace custom records')
+  local v=icon('waypoint');local p=v:getPosition();local saves=0;c.saveConfig=function() saves=saves+1 end
+  assert(v.onDragEnter(v,{x=p.x+5,y=p.y+5}));assert(v.onDragMove(v,{x=305,y=455}))
+  s.advance(500);equal(icon('waypoint'),v,'built-in drag survives a pulse')
+  assert(v.onDragLeave(v))
+  equal(saves,1);equal(#data.icons,1);equal(data.controlIconPositions.waypoint.x,300)
+  equal(data.controlIcons.waypoint.offState.x,300);equal(data.controlIcons.waypoint.onState.x,300)
+  env.saveSlot(2);assert(env.loadSlot(2));equal(icon('waypoint'):getPosition().x,300)
+  equal(latest.context.storage.elfbot.icons[1].name,'Saved icon','saving built-in position preserves custom records')
+  env.terminate();lateClick();lateChange(enable,true);equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Built-in appearance is editable without custom scripts, loading or starting automation.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  local saved={elfbot={controlIcons={waypoint={name='Personal Cavebot',size='Large',offState={ids={3003,0,0,0},x=300,y=220}}}}}
+  s.files['/elfbot/settings.json']=env.json.encode(saved)
+  env.init();env.toggle();local c=latest.context;local data=c.storage.elfbot
+  local function icon(key)
+    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' and v.iconRow.controlKey==key then return v end end
+  end
+  assert(not icon('waypoint'),'opening the UI must not show unchecked icons')
+  local menu=s.getWidget('ElfBot OTC v.1');local open
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then open=child end end
+  s.click(assert(open));local panel=s.root:getFocusedChild();local names,on,enable,bkg;local edits,combos,colors={},{},{}
+  for _,child in ipairs(panel:getChildren()) do
+    if child:getStyleName()=='ElfBotList' then names=child end
+    if child:getStyleName()=='ElfBotTextEdit' then edits[#edits+1]=child end
+    if child:getStyleName()=='ElfBotCombo' then combos[#combos+1]=child end
+    assert(child:getText()~='Apply','built-in settings must not require Apply')
+    if child:getText()=='On' then on=child end
+    if child:getText()=='Enable Icons' then enable=child end
+    if child:getText()=='Bkg Draw' then bkg=child end
+    if child.hexValue then colors[#colors+1]=child end
+  end
+  local function select(text)
+    for _,row in ipairs(names:getChildren()) do if row:getText()==text then s.click(row);return end end
+    error('missing editor row '..text)
+  end
+  local function editAppearance(name,offId,onId,x,y)
+    edits[1]:setText(name);combos[1]:setCurrentOption('Medium')
+    edits[4]:setText(offId);edits[15]:setText(onId)
+    combos[4]:setCurrentOption('Absolute');combos[5]:setCurrentOption('Absolute')
+    combos[8]:setCurrentOption('Absolute');combos[9]:setCurrentOption('Absolute')
+    edits[12]:setText(x);edits[13]:setText(y);edits[23]:setText(x);edits[24]:setText(y)
+    edits[14]:setText(name..' OFF');edits[25]:setText(name..' ON')
+  end
+  select('Cavebot');equal(edits[1]:getText(),'Cavebot');equal(edits[4]:getText(),'3116')
+  equal(edits[2]:getText(),'Toggle ON/OFF');assert(not edits[2].editable and not edits[3].enabled,'fixed actions are not editable scripts')
+  editAppearance('Route',3003,3457,240,200)
+  equal(#data.icons,0);assert(not data.iconsEnabled and not enable:isChecked());assert(not env.isEnabled())
+  assert(not icon('waypoint') and not icon('target'),'editing hidden icons cannot implicitly enable them')
+  s.click(enable);assert(data.iconsEnabled and not env.isEnabled())
+  equal(icon('waypoint'):getPosition().x,240);equal(icon('waypoint'):getPosition().y,200)
+  equal(icon('waypoint'):getSize().width,76);equal(icon('waypoint').caption:getText(),'Route OFF')
+  equal(icon('waypoint').items:getChildren()[1].itemId,3003);equal(names:getChildren()[2]:getText(),'Route')
+  -- IDs and color changes take effect synchronously; transient invalid input is not saved.
+  edits[4]:setText('');equal(icon('waypoint').items:getChildren()[1].itemId,3003)
+  edits[4]:setText('3003.5');equal(data.controlIcons.waypoint.offState.ids[1],3003)
+  edits[4]:setText('3004');equal(icon('waypoint').items:getChildren()[1].itemId,3004)
+  edits[4]:setText('3003');colors[1]:setText('#123456');equal(icon('waypoint').caption.color,'#123456')
+  edits[8]:setText('3031');equal(#icon('waypoint').items:getChildren(),2,'configured background layer is visible')
+  bkg:setChecked(false);local bare=icon('waypoint');equal(bare.borderWidth,0);equal(bare.backgroundColor,'#00000000')
+  equal(#bare.items:getChildren(),1,'Bkg Draw OFF removes background layers immediately')
+  for _,item in ipairs(bare.items:getChildren()) do
+    equal(item.imageSource,'');equal(item.borderWidth,0);assert(item.drawRarity==false and item.rarityDefaultImageSource=='','item rarity frames must not reintroduce a border')
+  end
+  bkg:setChecked(true);equal(icon('waypoint').borderWidth,1);equal(#icon('waypoint').items:getChildren(),2)
+  bkg:setChecked(false)
+  equal(icon('target').items:getChildren()[1].itemId,3264,'Cavebot edits cannot change Target')
+  select('Target');editAppearance('Hunt',3031,3035,400,200)
+  equal(#data.icons,0);assert(not c.CaveBot.isOn() and not c.TargetBot.isOn(),'appearance edits cannot toggle controllers')
+  assert(env.saveSlot(1));assert(env.loadSlot(1));c=latest.context;data=c.storage.elfbot
+  equal(icon('waypoint'):getPosition().x,240);equal(icon('waypoint').items:getChildren()[1].itemId,3003)
+  equal(icon('waypoint').borderWidth,0);equal(icon('waypoint').caption.color,'#123456','live appearance changes persist in the saved slot')
+  equal(icon('target'):getPosition().x,400);equal(icon('target').items:getChildren()[1].itemId,3031)
+  assert(data.iconsEnabled and not env.isEnabled());equal(#data.icons,0)
+  local loaded=env.json.decode(s.files['/elfbot/slot1.json']).elfbot.controlIcons
+  assert(not loaded.waypoint.builtinController and not loaded.waypoint.lclick,'profiles save appearance, not executable/controller overrides')
+  c.CaveBot.addAction('label','Ready');local targetBefore=icon('target'):getPosition()
+  menu=s.getWidget('ElfBot OTC v.1');menu:setPosition({x=500,y=500});s.click(icon('waypoint'))
+  assert(c.CaveBot.isOn() and not c.TargetBot.isOn());equal(icon('waypoint').items:getChildren()[1].itemId,3457)
+  equal(icon('waypoint').borderWidth,0,'ON/OFF cannot restore a disabled frame')
+  equal(icon('waypoint').caption:getText(),'Route ON');equal(icon('target'):getPosition().x,targetBefore.x)
+  env.setEnabled(false);menu:raise()
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then open=child end end
+  s.click(open);panel=s.root:getFocusedChild();edits={}
+  for _,child in ipairs(panel:getChildren()) do
+    if child:getStyleName()=='ElfBotList' then names=child end
+    if child:getStyleName()=='ElfBotTextEdit' then edits[#edits+1]=child end
+    if child:getText()=='On' then on=child end
+  end
+  select('Hunt');on:setChecked(false);assert(not icon('target'),'On controls visibility immediately, not automation')
+  equal(#names:getChildren(),3,'hidden built-ins remain editable');assert(not env.isEnabled())
+  on:setChecked(true);assert(icon('target'));equal(icon('target').items:getChildren()[1].itemId,3031)
+  select('<New Icon>');assert(edits[2].editable and edits[3].enabled,'custom command fields become editable again')
+  edits[1]:setText('Custom');edits[2]:setText('say "hello"');equal(#data.icons,1)
+  select('Custom');edits[1]:setText('Custom edited');equal(#data.icons,1);equal(data.icons[1].name,'Custom edited','built-in rows cannot offset custom selection indexes')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+  local builtin=env.ElfBotIconImport.builtinControls(nil,{waypoint={builtinController='TargetBot',lclick='say "bad"',
+    offState={ids={-1,70000,0/0,123},x=math.huge,y='bad',foreground='invalid'}}})[1]
+  equal(builtin.builtinController,'CaveBot');assert(not builtin.lclick);equal(builtin.offState.ids[1],3116)
+  equal(builtin.offState.ids[2],0);equal(builtin.offState.ids[3],0);equal(builtin.offState.ids[4],123)
+  equal(builtin.offState.x,20);equal(builtin.offState.y,20);equal(builtin.offState.foreground,'#ff5a61')
 end
 
 -- Original [Icons] imports keep item layers and controller toggles truthful.
@@ -691,13 +944,17 @@ do
   s.bot.executeBot=function(...) latest=execute(...);return latest end
   env.init();env.toggle();env.setEnabled(true);local c=latest.context;local e=c.ElfBot
   e.caveTick=function() end -- isolate icon toggling from empty-route completion
-  local menu=s.getWidget('ElfBot OTC v.1');menu:setPosition({x=500,y=500})
+  local menu=s.getWidget('ElfBot OTC v.1');local open
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then open=child end end
+  s.click(assert(open));local panel=s.root:getFocusedChild()
+  for _,child in ipairs(panel:getChildren()) do if child:getText()=='Enable Icons' then s.click(child) end end
+  panel:hide();menu:setPosition({x=500,y=500})
   local source='[Icons]\nName: Cavebot\nLeftCommand: auto 50 listas "Cavebot" | setcolor 0 255 0 | setcavebot toggle\n'..
     'State: Inactive\nIconType: Resize\nIconIds: 3003,0,0,0\nText: Cavebot\nPositionX: 20\nPositionY: 250\n'..
     'State: Active\nIconType: Resize\nIconIds: 3457,0,0,0\nText: Cavebot\nPositionX: 20\nPositionY: 250\n'
   local imported,warnings=e.importIcons(source);equal(imported,1);equal(#warnings,0)
-  local function icon()
-    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' then return v end end
+  local function icon(name)
+    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' and not v.iconRow.builtinController and v.iconRow.name==(name or 'Cavebot') then return v end end
     error('imported icon missing')
   end
   local v=icon();equal(v.items:getChildren()[1].itemId,3003);equal(v.badge:getText(),'OFF')
@@ -710,9 +967,9 @@ do
   env.setEnabled(true);equal(icon().badge:getText(),'ON','master ON restores controller and its live badge')
   -- Imported Text icons are still usable without an item.
   e.replaceIcons('[Icons]\nName: Text only\nLeftCommand: say "text"\nState: Inactive\nIconType: Text\nPositionX: 20\nPositionY: 250\n')
-  equal(icon().caption:getText(),'Text only');equal(#icon().items:getChildren(),0)
+  equal(icon('Text only').caption:getText(),'Text only');equal(#icon('Text only').items:getChildren(),0)
   local calls=0;c.saySpell=function(text) equal(text,'text');calls=calls+1 end
-  s.click(icon());s.advance(50);equal(calls,1)
+  s.click(icon('Text only'));s.advance(50);equal(calls,1)
   env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 

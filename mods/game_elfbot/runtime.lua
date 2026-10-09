@@ -184,6 +184,7 @@ function start()
       c.requestElfReconnect=function() reconnectOnce=true;g_game.safeLogout() end
       c.saveElfSlot=saveSlot;c.loadElfSlot=loadSlot;c.currentElfSlot=function() return slot end
       c.setElfEnabled=setEnabled;c.isElfEnabled=isEnabled
+      c.toggleElfController=toggleController
       c.previewElfFile=previewElfFile;c.loadElfFile=loadElfFile;c.loadElfText=loadElfText
       prepareStandaloneElfBot(c)
     end,
@@ -232,6 +233,21 @@ function setEnabled(value)
   if modules.game_bot.updateElfBotControls then modules.game_bot.updateElfBotControls() end
 end
 function hide() if runtime then runtime.ui.hide() end end
+-- Built-in controls require no user command or master-toggle setup.
+function toggleController(name)
+  assert(name=='CaveBot' or name=='TargetBot','Unknown ElfBot controller')
+  if not start() then return false end
+  local c=runtime.context;local controller=c[name]
+  if isEnabled() and not c.ElfBot.paused and controller.isOn() then controller.setOff()
+  else
+    if not isEnabled() then
+      -- A direct click resumes only the chosen controller, not the other paused one.
+      storage.elfbot.masterResume=nil;setEnabled(true)
+    elseif c.ElfBot.paused then c.ElfBot.reload() end
+    controller.setOn()
+  end
+  wake();runtime.ui.automationChanged();return true
+end
 -- Show the read-only Classic HUD without enabling bot automation.
 function showHud()
   if not start() then return false end
@@ -260,7 +276,8 @@ function init()
   g_ui.importStyle('interface.otui')
   if not g_resources.directoryExists('/elfbot') then g_resources.makeDir('/elfbot') end
   if not g_resources.directoryExists('/elfbot/scripts') then g_resources.makeDir('/elfbot/scripts') end
-  -- Each client launch starts empty; saved files remain available through Custom/Load.
+  -- Each client launch starts empty; saved files are applied only through Custom/Load.
+  -- Built-in Cavebot/Target controls are separate from these user settings.
   storage={elfbot={awaitingLoad=true,botEnabled=false,hotkeysEnabled=false,shortkeysEnabled=false,
     symbol='',hotkeys={},shortkeys={},persistent='',icons={},iconsEnabled=false,routes={},waypoints={},loot={},
     targeting={monsters={},weights={danger=0,proximity=0,health=0,order=0},stick=false},

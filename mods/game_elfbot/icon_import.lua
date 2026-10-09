@@ -3,6 +3,55 @@ ElfBotIconImport={}
 local I=ElfBotIconImport
 local function trim(s) return s:match('^%s*(.-)%s*$') end
 local function yes(s) return s:lower()=='yes' or s:lower()=='true' or s=='1' end
+-- Built-in controls save appearance only; their controller identity is fixed.
+local controls={
+  waypoint={name='Cavebot',controller='CaveBot',id=3116,x=20},
+  target={name='Target',controller='TargetBot',id=3264,x=94}
+}
+local iconTypes={Normal=true,Resize=true,Top=true,Bottom=true,Left=true,Right=true,Tile=true,Center=true,['Center X']=true,['Center Y']=true,Text=true}
+local xModes={Absolute=true,Left=true,Right=true,Center=true,['From right']=true,Percent=true,Previous=true}
+local yModes={Absolute=true,Top=true,Bottom=true,Center=true,['From bottom']=true,Percent=true,Previous=true}
+local function numberIn(n,min,max) return type(n)=='number' and n>=min and n<=max end
+local function control(key,positions,appearances)
+  local preset=controls[key];local position=type(positions)=='table' and positions[key]
+  local moved=type(position)=='table' and type(position.x)=='number' and type(position.y)=='number' and
+    position.x==position.x and position.y==position.y and position.x>=0 and position.x<=4000 and position.y>=0 and position.y<=4000
+  local function state(color)
+    return {type='Resize',ids={preset.id,0,0,0},bkgType='Normal',bkgIds={0,0,0,0},
+      text=preset.name,foreground=color,hover='#ffffff',xMode='Absolute',x=moved and position.x or preset.x,
+      yMode=moved and 'Absolute' or 'From bottom',y=moved and position.y or 20}
+  end
+  local row={controlKey=key,builtinController=preset.controller,name=preset.name,enabled=true,size='Small',background=true,
+    errors={},offState=state('#ff5a61'),onState=state('#55ff88')}
+  local saved=type(appearances)=='table' and appearances[key]
+  if type(saved)=='table' then
+    if type(saved.name)=='string' and saved.name:match('%S') then row.name=saved.name end
+    if type(saved.enabled)=='boolean' then row.enabled=saved.enabled end
+    if type(saved.background)=='boolean' then row.background=saved.background end
+    if saved.size=='Small' or saved.size=='Medium' or saved.size=='Large' then row.size=saved.size end
+    for _,kind in ipairs({'offState','onState'}) do
+      local source=saved[kind];local dest=row[kind]
+      if type(source)=='table' then
+        if iconTypes[source.type] then dest.type=source.type end
+        if iconTypes[source.bkgType] then dest.bkgType=source.bkgType end
+        if xModes[source.xMode] then dest.xMode=source.xMode end
+        if yModes[source.yMode] then dest.yMode=source.yMode end
+        for _,field in ipairs({'x','y'}) do if numberIn(source[field],-4000,4000) then dest[field]=source[field] end end
+        if type(source.text)=='string' then dest.text=source.text end
+        for _,field in ipairs({'foreground','hover'}) do
+          if type(source[field])=='string' and source[field]:match('^#%x%x%x%x%x%x$') then dest[field]=source[field] end
+        end
+        for _,field in ipairs({'ids','bkgIds'}) do
+          if type(source[field])=='table' then for i=1,4 do
+            local id=source[field][i];if numberIn(id,0,65535) and id%1==0 then dest[field][i]=id end
+          end end
+        end
+      end
+    end
+  end
+  return row
+end
+function I.builtinControls(positions,appearances) return {control('waypoint',positions,appearances),control('target',positions,appearances)} end
 function I.color(value)
   if value and value:match('^#%x%x%x%x%x%x$') then return value end
   local n=tonumber(value) or 0
