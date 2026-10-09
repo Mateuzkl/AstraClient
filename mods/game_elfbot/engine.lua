@@ -265,13 +265,17 @@ function createElfBotEngine(c, data)
     for index=#e.jobs,1,-1 do local job=e.jobs[index];if job.transient and (job.failed or not job.active) and not job.thread then table.remove(e.jobs,index) end end
   end
   function e.key(key,held)
-    if data.botEnabled==false or e.paused then return false end
+    if data.botEnabled==false or e.paused or type(key)~='string' or key=='' then return false end
     local matched=false
     for _,job in ipairs(e.jobs) do
-      local binding=job.row.toggleKey and job.row.toggleKey~='' and job.row.toggleKey or (job.kind=='hotkey' and job.row.key)
-      if ((job.kind=='hotkey' and data.hotkeysEnabled) or (job.kind=='shortkey' and data.shortkeysEnabled)) and job.row.enabled and not job.failed and binding and binding:lower()==key:lower() then
+      -- An optional toggle is an additional shortcut, not a replacement for the
+      -- primary key displayed (and captured) in the hotkey list.
+      local binding=job.kind=='hotkey' and job.row.key
+      local toggle=job.row.toggleKey
+      local matches=type(binding)=='string' and binding:lower()==key:lower() or type(toggle)=='string' and toggle:lower()==key:lower()
+      if ((job.kind=='hotkey' and data.hotkeysEnabled) or (job.kind=='shortkey' and data.shortkeysEnabled)) and job.row.enabled and not job.failed and matches then
         matched=true
-        if job.program.interval then if not held then job.active=not job.active;job.thread=nil;job.nextRun=0;e.status=(job.row.key or binding)..(job.active and ' enabled' or ' cancelled') end
+        if job.program.interval then if not held then job.active=not job.active;job.thread=nil;job.nextRun=0;e.status=(job.row.key or key)..(job.active and ' enabled' or ' cancelled') end
         elseif not job.thread then job.active=true;job.nextRun=0 end
       end
     end

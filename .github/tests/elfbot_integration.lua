@@ -40,6 +40,7 @@ local function fixture()
     -- Native HiddenState includes hidden ancestors, not just the explicit flag.
     return self.visible and (not self.parent or self.parent:isVisible())
   end
+  function methods:isEnabled() return self.enabled~=false and (not self.parent or self.parent:isEnabled()) end
   function methods:raise()
     if self.parent then
       for i,child in ipairs(self.parent.children) do if child==self then table.remove(self.parent.children,i);break end end
@@ -98,6 +99,7 @@ local function fixture()
   function methods:setHeight(value) local size=self:getSize();self.size={width=size.width,height=value} end
   function methods:setWidth(value) local size=self:getSize();self.size={width=value,height=size.height} end
   function methods:setId(value) self.id=value end
+  function methods:getId() return self.id or '' end
   function methods:addAnchor() self.anchored=true end
   function methods:setMarginLeft(value) self.marginLeft=value end
   function methods:setPhantom(value) self.phantom=value end
@@ -248,6 +250,19 @@ local function fixture()
   end
   function state.emit(object,signal,...)
     for _,handlers in ipairs(connected[object] or {}) do if handlers[signal] then handlers[signal](...) end end
+  end
+  function state.keyEvent(signal,...)
+    local args={...}
+    local function propagate(widget)
+      local child=widget:getFocusedChild()
+      if child and not child:isDestroyed() and child:isVisible() and child:isEnabled() and propagate(child) then return true end
+      if widget[signal] and widget[signal](widget,unpack(args)) then return true end
+      for _,handlers in ipairs(connected[widget] or {}) do
+        if handlers[signal] and handlers[signal](widget,unpack(args)) then return true end
+      end
+      return false
+    end
+    return propagate(root)
   end
   function state.connectionCount()
     local total=0;for _,list in pairs(connected) do total=total+#list end;return total
@@ -586,6 +601,128 @@ do
   env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 
+-- Shortcut cells capture real client key codes, without typing into or running the script.
+do
+  local s=fixture();local env=s.env
+  loadProduction('modules/corelib/const.lua',env);loadProduction('modules/corelib/keyboard.lua',env)
+  local latest;local execute=s.bot.executeBot;s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local c=latest.context;local d=c.storage.elfbot
+  d.hotkeys={{key='F2',script='say "test"',enabled=true}};c.ElfBot.reload()
+  local saves=0;c.saveConfig=function() saves=saves+1 end
+  local menu=s.getWidget('ElfBot OTC v.1')
+  local function open(name)
+    menu:raise();for _,v in ipairs(menu:getChildren()) do if v:getText()==name then s.click(v);return s.root:getFocusedChild() end end
+    error('missing panel '..name)
+  end
+  local panel=open('Hotkeys');local list
+  for _,v in ipairs(panel:getChildren()) do if v:getStyleName()=='ElfBotList' then list=v end end
+  local fields=list:getChildren()[1]:getChildren();local key,script=fields[2],fields[3]
+  assert(key.editable==false,'native key text events must not append to a captured shortcut')
+  assert(key.onKeyDown(key,env.KeyCtrl,env.KeyboardCtrlModifier));equal(key:getText(),'F2');equal(saves,0,'a modifier alone is not a completed shortcut')
+  assert(key.onKeyDown(key,env.KeyF3,env.KeyboardNoModifier));equal(key:getText(),'F3');equal(d.hotkeys[1].key,'F3');equal(saves,1)
+  assert(key.onKeyDown(key,env.KeyF4,env.KeyboardCtrlShiftModifier));equal(key:getText(),'Ctrl+Shift+F4');equal(d.hotkeys[1].key,'Ctrl+Shift+F4')
+  assert(key.onKeyDown(key,env.KeyA,env.KeyboardNoModifier));equal(key:getText(),'A','letter replaces the whole shortcut instead of being appended')
+  local before=saves
+  assert(key.onKeyDown(key,env.KeyA,env.KeyboardNoModifier));assert(key.onKeyPress(key,env.KeyA,env.KeyboardNoModifier,1));assert(key.onKeyUp(key,env.KeyA,env.KeyboardNoModifier))
+  equal(saves,before,'repeat events do not reload/save unchanged bindings');equal(script:getText(),'say "test"')
+  assert(key.onKeyDown(key,env.KeyEnter,env.KeyboardNoModifier));equal(key:getText(),'Enter','Enter is also assignable')
+  assert(key.onKeyPress(key,env.KeyEnter,env.KeyboardNoModifier,0));equal(script:getText(),'say "test"')
+  assert(key.onKeyDown(key,env.KeyLeft,env.KeyboardAltModifier));equal(key:getText(),'Alt+Left')
+  assert(key.onKeyDown(key,env.KeyUnknown,env.KeyboardNoModifier));equal(key:getText(),'Alt+Left')
+  assert(not env.isEnabled(),'capturing a shortcut must not enable automation');assert(not c.ElfBot.jobs[1].active,'captured press must not activate its script')
+  s.click(panel.originalControls[1047]);local editor=s.root:getFocusedChild();local editorKey,save
+  for _,v in ipairs(editor:getChildren()) do if v:getStyleName()=='ElfBotTextEdit' and not editorKey then editorKey=v elseif v:getText()=='Save' then save=v end end
+  assert(editorKey.editable==false);assert(editorKey.onKeyDown(editorKey,env.KeyZ,env.KeyboardAltModifier));equal(editorKey:getText(),'Alt+Z')
+  s.click(save);equal(d.hotkeys[1].key,'Alt+Z')
+  s.click(panel.closeButton)
+  d.shortkeys={{key='heal',script='say "exura"',enabled=true}};panel=open('Shortkeys')
+  for _,v in ipairs(panel:getChildren()) do if v:getStyleName()=='ElfBotList' then list=v end end
+  key=list:getChildren()[1]:getChildren()[2];assert(not key.onKeyDown and key.editable~=false,'shortkey names remain ordinary editable text')
+  key:setText('healme');key.onFocusChange(key,false);equal(d.shortkeys[1].key,'healme')
+  s.click(panel.closeButton);panel=open('Hotkeys');panel.originalControls[1048]:setChecked(true)
+  for _,v in ipairs(panel:getChildren()) do if v:getStyleName()=='ElfBotList' then list=v end end
+  key=list:getChildren()[1]:getChildren()[2];assert(key.enabled==false and key.editable==false,'persistent scripts have no activation-key capture')
+  local deadCapture=editorKey.onKeyDown;before=saves;env.terminate();assert(deadCapture(editorKey,env.KeyF5,env.KeyboardNoModifier));equal(saves,before,'disposed capture must not change saved profiles')
+  equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Native focus propagation through the game console must not swallow Insert/F-keys.
+do
+  local s=fixture();local env=s.env
+  loadProduction('modules/corelib/const.lua',env);loadProduction('modules/corelib/keyboard.lua',env)
+  local said={};env.g_game.talk=function(text) said[#said+1]=text end
+  local chatEnabled=true;env.modules.game_console.isChatEnabled=function() return chatEnabled end
+  local latest;local execute=s.bot.executeBot;s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local c=latest.context;local d=c.storage.elfbot;local e=c.ElfBot
+  d.hotkeysEnabled=true;d.hotkeys={{key='Insert',toggleKey='F2',script="say 'Teste ElfBot Astra funcionando!'",enabled=true},
+    {key='A',script='say "letter"',enabled=true},{key='Ctrl+C',script='say "copy"',enabled=true},
+    {key='Shift+Insert',script='say "paste"',enabled=true}}
+  e.reload()
+  local menu=s.getWidget('ElfBot OTC v.1')
+  for _,v in ipairs(menu:getChildren()) do if v:getText()=='Hotkeys' then s.click(v);break end end
+  local panel=s.root:getFocusedChild();local list,hint
+  for _,v in ipairs(panel:getChildren()) do
+    if v:getStyleName()=='ElfBotList' then list=v
+    elseif v:getText():find('Automation OFF:',1,true) then hint=v end
+  end
+  assert(list and hint,'the editor must explain the OFF master gate')
+  -- The game map is not focusable; its console retains a nested text focus.
+  local game=env.g_ui.createWidget('Game',s.root)
+  local bottom=env.g_ui.createWidget('Bottom',game)
+  local console=env.g_ui.createWidget('Console',bottom)
+  local chat=env.g_ui.createWidget('TextEdit',console);chat:setId('consoleTextEdit');chat:setText('unsent message')
+  local function focusChat()
+    s.root:focusChild(game);game:focusChild(bottom);bottom:focusChild(console);console:focusChild(chat)
+  end
+  local function press(code,mods)
+    mods=mods or env.KeyboardNoModifier
+    local handled=s.keyEvent('onKeyDown',code,mods)
+    s.keyEvent('onKeyPress',code,mods,0);s.keyEvent('onKeyUp',code,mods);s.advance(1100)
+    return handled
+  end
+  focusChat();assert(not press(env.KeyInsert));equal(#said,0,'OFF master blocks hotkeys')
+  env.setEnabled(true);assert(hint:getText():find('Ready:',1,true))
+  focusChat();assert(press(env.KeyInsert),'Insert must reach the bot through the focused game console');equal(#said,1);equal(said[1],'Teste ElfBot Astra funcionando!')
+  assert(press(env.KeyF2));equal(#said,2,'an additional toggle remains supported')
+  equal(chat:getText(),'unsent message','game shortcuts must not change the chat draft')
+  assert(not press(env.KeyA));assert(not press(env.KeyC,env.KeyboardCtrlModifier))
+  assert(not press(env.KeyInsert,env.KeyboardShiftModifier));equal(#said,2,'typing/copy/paste must not fire scripts')
+  -- Capturing a replacement primary key must not run it or leave the old toggle overriding it.
+  local row=list:getChildren()[1];local key,source=row:getChildren()[2],row:getChildren()[3]
+  s.root:focusChild(panel);panel:focusChild(list);list:focusChild(row);row:focusChild(key)
+  assert(press(env.KeyF3));equal(d.hotkeys[1].key,'F3');equal(d.hotkeys[1].toggleKey,'F2');equal(#said,2,'capture never executes')
+  focusChat();assert(not press(env.KeyInsert));assert(press(env.KeyF3));equal(#said,3,'the new displayed primary key executes')
+  assert(press(env.KeyF2));equal(#said,4,'secondary toggle still works after primary replacement')
+  s.root:focusChild(panel);row:focusChild(source)
+  assert(not press(env.KeyF3));equal(#said,4,'script editor blocks even function keys')
+  chatEnabled=false;chat:setEnabled(false);focusChat()
+  assert(press(env.KeyF3));equal(#said,5,'disabled console focus must not block game keys')
+  assert(press(env.KeyA));equal(said[6],'letter','letters work with chat OFF')
+  -- Hidden editors also retain focus pointers but receive no native keyboard input.
+  s.root:focusChild(panel);row:focusChild(source);source:hide()
+  assert(press(env.KeyF3));equal(#said,7,'hidden editor focus must not block shortcuts');source:show()
+  focusChat();panel.originalControls[1001]:setChecked(false)
+  assert(not press(env.KeyF3));equal(#said,7,'category OFF is respected')
+  assert(hint:getText():find('Hotkeys disabled:',1,true));panel.originalControls[1001]:setChecked(true)
+  env.setEnabled(false);focusChat();assert(not press(env.KeyF3));equal(#said,7,'master OFF stops all shortcuts')
+  assert(hint:getText():find('Automation OFF:',1,true));assert(not c.CaveBot.isOn() and not c.TargetBot.isOn())
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Periodic hotkeys can toggle from either shortcut, but held presses never flip twice.
+do
+  local s=fixture();local executor,c=s.context({elfbot={botEnabled=true,hotkeysEnabled=true,shortkeysEnabled=true,
+    hotkeys={{key='Insert',toggleKey='F2',script='auto 200 say "periodic"',enabled=true}},
+    shortkeys={{key='heal',toggleKey='F3',script='say "shortkey"',enabled=true}}}})
+  local e=c.ElfBot;assert(e.key('Insert',false));assert(e.jobs[1].active)
+  assert(e.key('Insert',true));assert(e.jobs[1].active,'held press must not toggle periodic job off')
+  assert(e.key('F2',false));assert(not e.jobs[1].active,'secondary shortcut toggles the same job off')
+  assert(e.key('insert',false));assert(e.jobs[1].active,'primary is case-insensitive')
+  assert(e.key('F3',false));assert(e.jobs[2].active,'shortkeys retain explicit keyboard toggles')
+  assert(not e.key('heal',false),'shortkey names are chat commands, not keyboard bindings')
+  assert(not e.key(nil,false));assert(not e.key('',false));executor.dispose()
+end
+
 -- Position-handling actions still delegate to the registered goto action.
 do
   local s=fixture();local executor,c=s.context();local calls=0
@@ -871,13 +1008,13 @@ do
       if style=='UIWidget' or style=='ElfBotGroup' then inside(child) end
     end
   end
-  inside(cave);assert(cave:getSize().width<=576 and cave:getSize().height<=373)
-  s.click(cave.elfTabs[2]);assert(refs[1035]:isVisible() and not refs[1028]:isVisible(),'Cavebot tabs hide inactive controls')
-  s.click(cave.elfTabs[3]);assert(refs[1100]:isVisible() and not refs[1035]:isVisible());s.click(refs[1100]);assert(latest.context.storage.elfbot.alerts.player.sound)
-  s.click(cave.elfTabs[1]);assert(refs[1028]:isVisible() and not refs[1100]:isVisible())
+  equal(cave.originalDialogId,14000);assert(not cave.elfTabs,'Cavebot must use its pre-tab layout')
+  equal(cave:getSize().width,808);equal(cave:getSize().height,448)
+  assert(refs[1035]:isVisible() and refs[1028]:isVisible() and refs[1100]:isVisible(),'all original Cavebot sections stay on one page')
+  s.click(refs[1100]);assert(latest.context.storage.elfbot.alerts.player.sound)
   s.click(cave.closeButton)
-  local target=open('Targeting');inside(target);assert(target:getSize().width<=576 and target:getSize().height<=387)
-  for _,tab in ipairs(target.elfTabs) do s.click(tab);assert(tab:isOn(),'selected targeting tab highlighted') end
+  local target=open('Targeting');assert(not target.elfTabs,'Targeting must use its pre-tab layout')
+  equal(target:getSize().width,776);equal(target:getSize().height,448)
   s.click(target.closeButton)
   for _,name in ipairs({'Hotkeys','Shortkeys'}) do
     local panel=open(name);inside(panel);assert(panel:getSize().width<=536 and panel:getSize().height<=283)
