@@ -6,6 +6,6 @@ Module
   autoload: true
   autoload-priority: 1001
   dependencies: [game_bot, client_topmenu, game_interface, game_console]
-  scripts: [language, session, history, icon_import, settings_import, telemetry, legacy, engine, autonomous, original_dialogs, interface, runtime]
+  scripts: [language, session, history, icon_import, settings_import, telemetry, legacy, engine, autonomous, original_dialogs, hud, interface, runtime]
   @onLoad: init()
   @onUnload: terminate()

@@ -130,16 +130,27 @@ ElfBotComboPopupMenuButton < UIButton
     color: #ffffff
 
 ElfBotIconCaption < UILabel
-  font: verdana-11px-antialised
-  text-align: left
+  font: verdana-11px-rounded
+  text-align: center
   text-offset: 0 0
+  text-wrap: false
+  focusable: false
   phantom: true
 
+ElfBotIconStatus < ElfBotIconCaption
+  font: terminus-10px
+  color: #ffffff
+  phantom: true
+  focusable: false
+
 ElfBotIcon < UIButton
-  font: verdana-11px-antialised
-  color: #111111
-  background-color: #f0f0f0
-  border-width: 0
+  focusable: false
+  phantom: false
+  draggable: true
+  clipping: true
+  background-color: #081724cc
+  border-width: 1
+  border-color: #2a3a46
   $pressed:
     border-width: 1
     border-color: #ffffff
@@ -212,6 +223,29 @@ ElfBotSpyText < ElfBotMultilineTextEdit
 
 ElfBotOverlay < ElfBotLabel
   phantom: true
+
+ElfBotHudLayer < UIWidget
+  anchors.fill: parent
+  phantom: true
+  focusable: false
+  clipping: true
+
+ElfBotHudPanel < UIWidget
+  phantom: false
+  focusable: false
+  clipping: true
+  draggable: true
+
+ElfBotHudText < UILabel
+  font: verdana-11px-rounded
+  color: #ffffff
+  background-color: #00000044
+  opacity: 0.89
+  text-align: left
+  text-wrap: true
+  phantom: true
+  focusable: false
+  height: 14
 
 ElfBotChoice < ElfBotCombo
   background-color: #0078d7

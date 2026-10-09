@@ -44,7 +44,8 @@ function prepareElfBotTelemetry(e,c,d)
     if botLook then e.currentMessage={content=text,sender='',isprivate=0,isbotlook=1,serial=e.messageSerial};e.pendingLook=nil end
     local damage=text:match('loses (%d+) hitpoints') or text:match('loses (%d+) hit points') or text:match('You deal (%d+) damage')
     if damage and (text:find('your attack',1,true) or text:find('your critical attack',1,true) or text:find('your spell',1,true) or text:find('You deal',1,true) or (MessageModes.DamageDealt and mode==MessageModes.DamageDealt)) then
-      e.damageHistory:add(c.now,tonumber(damage));e.firstDamage=e.firstDamage or c.now;e.lastAttackAt=c.now
+      local amount=tonumber(damage)
+      e.damageHistory:add(c.now,amount);e.highestDamage=math.max(e.highestDamage or 0,amount);e.firstDamage=e.firstDamage or c.now;e.lastAttackAt=c.now
     end
     if text:lower():find('you lose') and text:lower():find('attack by') then e.lastPlayerAttack=c.now end
     if h.navigation then
@@ -95,7 +96,10 @@ function prepareElfBotTelemetry(e,c,d)
     local seen={};local vocs={[1]='S',[2]='D',[3]='P',[4]='K',[5]='MS',[6]='ED',[7]='RP',[8]='EK'}
     for _,creature in ipairs(c.getSpectators()) do if creature~=c.player and creature:isPlayer() and creature.setText and creature.getText then
       local id=creature:getId();seen[id]=true;local info=e.playerInfo(creature);local lines={}
-      if h.vocation then lines[#lines+1]=(info.level and tostring(info.level) or '?')..(vocs[info.vocation] or '')..' | '..info.hp..'%' end
+      if h.vocation then
+        local known=(info.level and tostring(info.level) or '')..(vocs[info.vocation] or '')
+        lines[#lines+1]=(known~='' and known..' | ' or '')..'HP '..info.hp..'%'
+      end
       if h.guild and info.guild and info.guild~='' then lines[#lines+1]=info.guild end
       if h.mana and info.mana then lines[#lines+1]='MP '..(info.estimated and '~' or '')..info.mana..'/'..info.maxMana end
       local text=#lines>0 and '\n'..table.concat(lines,'\n') or ''
@@ -127,7 +131,7 @@ function prepareElfBotTelemetry(e,c,d)
       local remaining=wall.expires-c.now
       local tile=c.g_map.getTile(wall.position)
       if tile and tile.setTimer then
-        if h.wallTimers and remaining>0 then tile:setTimer(remaining,'#ffff00');wall.drawn=true
+        if h.wallTimers and e.hudVisible~=false and remaining>0 then tile:setTimer(remaining,'#ffff00');wall.drawn=true
         elseif wall.drawn then tile:setTimer(0,'#ffffff');wall.drawn=false end
       end
       if remaining<=0 then e.walls[key]=nil end

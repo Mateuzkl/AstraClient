@@ -66,6 +66,7 @@ end
 local function pulse()
   tickEvent=nil
   if not runtime then return end
+  if not isEnabled() and not runtime.ui.isVisible() then return end
   if not worldReady() then tickEvent=scheduleEvent(pulse,100);return end
   local ok,err=pcall(runtime.script)
   if not ok then
@@ -215,19 +216,28 @@ function setEnabled(value)
     if not value then
       if changed then storage.elfbot.masterResume={cave=c.CaveBot.isOn(),target=c.TargetBot.isOn()} end
       c.ElfBot.paused=true;c.CaveBot.setOff();c.TargetBot.setOff()
+      -- Cancel suspended actions without destroying the editor or read-only HUD.
+      for _,job in ipairs(c.ElfBot.jobs) do job.thread=nil;job.active=false end
+      c.ElfBot.jobs={};c.ElfBot.actionJobs={};c._scheduler={}
     else
       c.ElfBot.reload();local resume=storage.elfbot.masterResume or {}
       if resume.cave then c.CaveBot.setOn() end;if resume.target then c.TargetBot.setOn() end
       storage.elfbot.masterResume=nil
     end
-    if value then runtime.ui.show();wake() else runtime.ui.hide() end
+    if value then runtime.ui.show() end
+    runtime.ui.automationChanged();wake()
     settingsNotice(value and 'ElfBot automation enabled' or 'ElfBot automation disabled')
   end
   saveSettings()
-  if not value then stop() end
   if modules.game_bot.updateElfBotControls then modules.game_bot.updateElfBotControls() end
 end
 function hide() if runtime then runtime.ui.hide() end end
+-- Show the read-only Classic HUD without enabling bot automation.
+function showHud()
+  if not start() then return false end
+  storage.elfbot.hud.enabled=true;storage.elfbot.hud.skills=true
+  runtime.ui.show();wake();return true
+end
 function isRunning() return runtime~=nil end
 function isAutomationActive()
   if not runtime then return false end
@@ -255,7 +265,7 @@ function init()
     symbol='',hotkeys={},shortkeys={},persistent='',icons={},iconsEnabled=false,routes={},waypoints={},loot={},
     targeting={monsters={},weights={danger=0,proximity=0,health=0,order=0},stick=false},
     aimbot={enabled=false,command='',enemiesOnly=false,skulledOnly=false,triggers={}},
-    hud={enabled=false,general=false,active=false},lists={friends='',subfriends='',enemies='',subenemies='',leaders=''},
+    hud={enabled=true,skills=true,general=false,active=false},lists={friends='',subfriends='',enemies='',subenemies='',leaders=''},
     extras={nonPvp=false},healing={enabled=false,hiEnabled=false,loEnabled=false,uhEnabled=false,hpEnabled=false,mpEnabled=false,
       hiSpell='',loSpell='',hiHealth=0,loHealth=0,hiMana=0,loMana=0,uhHealth=0,hpHealth=0,mpMana=0,hpType='uhealth',mpType='gmana',delay=0}}}
   launcher=modules.client_topmenu.addRightGameToggleButton('elfbotButton','ElfBot OTC (Ctrl+Shift+F11)','/game_elfbot/launcher',toggle,false,99998)

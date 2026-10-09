@@ -12,12 +12,12 @@ end
 local function equal(actual, expected, message)
   assert(actual==expected, (message or 'value')..': expected '..tostring(expected)..', got '..tostring(actual))
 end
-local scripts={'language','session','history','icon_import','settings_import','telemetry','legacy','engine','autonomous','original_dialogs','interface','runtime'}
+local scripts={'language','session','history','icon_import','settings_import','telemetry','legacy','engine','autonomous','original_dialogs','hud','interface','runtime'}
 for _,name in ipairs(scripts) do assert(loadfile('mods/game_elfbot/'..name..'.lua')) end
 local styles='\n'..read('mods/game_elfbot/interface.otui'):gsub('\r\n','\n')
 local function styleProperty(style,property)
   local block=styles:match('\n'..style..' <[^\n]+\n(.-)\n\n') or ''
-  return block:match('\n  '..property..': ([^\n]+)')
+  return ('\n'..block):match('\n  '..property:gsub('([^%w])','%%%1')..': ([^\n]+)')
 end
 
 local function fixture()
@@ -36,7 +36,10 @@ local function fixture()
   function methods:isDestroyed() return self.destroyed==true end
   function methods:hide() self.visible=false end
   function methods:show() self.visible=true end
-  function methods:isVisible() return self.visible end
+  function methods:isVisible()
+    -- Native HiddenState includes hidden ancestors, not just the explicit flag.
+    return self.visible and (not self.parent or self.parent:isVisible())
+  end
   function methods:raise()
     if self.parent then
       for i,child in ipairs(self.parent.children) do if child==self then table.remove(self.parent.children,i);break end end
@@ -58,16 +61,25 @@ local function fixture()
     return {x=p.x+padding,y=p.y+padding,width=size.width-2*padding,height=size.height-2*padding}
   end
   function methods:getPosition()
-    if self.parent and self.anchored then
+    if self.parent and self.fill then
+      local p=self.parent:getPaddingRect();return {x=p.x,y=p.y}
+    elseif self.parent and self.anchored then
       local p=self.parent:getPaddingRect();return {x=p.x+(self.marginLeft or 0),y=p.y+(self.marginTop or 0)}
     elseif self.parent and self.parent.style=='ElfBotList' then
       local p=self.parent:getPaddingRect();return {x=p.x,y=p.y+(self.parent:getChildIndex(self)-1)*20}
     end
     return self.position or {x=0,y=0}
   end
-  function methods:getSize() return self.size or {width=400,height=300} end
+  function methods:getSize()
+    if self.parent and self.fill then local p=self.parent:getPaddingRect();return {width=p.width,height=p.height} end
+    return self.size or {width=400,height=300}
+  end
   function methods:getText() return self.text or '' end
   function methods:setText(text) self.text=tostring(text) end
+  function methods:setColoredText(parts)
+    self.colored=parts;local values={};for i=1,#parts,2 do values[#values+1]=parts[i] end
+    self.text=table.concat(values)
+  end
   function methods:setChecked(value)
     if self.checked==value then return end;self.checked=value
     if self.onCheckChange then self.onCheckChange(self,value) end
@@ -80,11 +92,17 @@ local function fixture()
   function methods:setSize(value) self.size=value end
   function methods:setHeight(value) local size=self:getSize();self.size={width=size.width,height=value} end
   function methods:setWidth(value) local size=self:getSize();self.size={width=value,height=size.height} end
+  function methods:setId(value) self.id=value end
   function methods:addAnchor() self.anchored=true end
   function methods:setMarginLeft(value) self.marginLeft=value end
   function methods:setPhantom(value) self.phantom=value end
   function methods:setEnabled(value) self.enabled=value end
   function methods:setTextWrap(value) self.textWrap=value end
+  function methods:setItemId(value) self.itemId=value end
+  function methods:setColor(value) self.color=value end
+  function methods:setBackgroundColor(value) self.backgroundColor=value end
+  function methods:setBorderColor(value) self.borderColor=value end
+  function methods:setClipping(value) self.clipping=value end
   function methods:getTextSize()
     local width,lines=0,0
     local limit=math.max(1,math.floor((self:getSize().width-(self.style=='ElfBotCheck' and 18 or 0))/7))
@@ -104,13 +122,15 @@ local function fixture()
   function methods:clearOptions() self.options={};self.option=nil end
   function methods:setValue(value) self.value=value end
   function methods:getValue() return self.value or 0 end
-  for _,name in ipairs({'setTooltip','setColor','setBackgroundColor','setVerticalScrollBar','setId','setBorderWidth','setVirtual','setItemId','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
+  for _,name in ipairs({'setTooltip','setVerticalScrollBar','setBorderWidth','setVirtual','setMinimumAmbientLight','unlockVisibleFloor','setLimitVisibleRange','setup','setMinimum','setMaximum','setStep'}) do
     methods[name]=function() end
   end
   local function widget(style,parent)
     local w=setmetatable({style=style,children={},parent=parent,visible=true,
       size=style=='ElfBotRow' and {width=parent:getSize().width,height=20} or nil,
       padding=tonumber(styleProperty(style,'padding')) or (style=='ElfBotGroup' and 8 or 0),
+      fill=styleProperty(style,'anchors.fill')=='parent',
+      draggable=styleProperty(style,'draggable')=='true',
       phantom=styleProperty(style,'phantom')=='true' or (style:find('Label') or style=='ElfBotTitle' or style=='ElfBotRow') and styleProperty(style,'phantom')~='false',
       textWrap=styleProperty(style,'text-wrap')=='true'}, {__index=methods})
     if style=='ElfBotCheck' then w.onClick=function(self) self:setChecked(not self:isChecked()) end end
@@ -121,10 +141,17 @@ local function fixture()
   local player={}
   function player:getPosition() return {x=100,y=100,z=7} end
   function player:getName() return 'Tester' end
+  function player:getId() return 1 end
   function player:isLocalPlayer() return true end
   function player:isAutoWalking() return false end
   function player:getExperience() return 1000 end
   function player:getLevel() return 10 end
+  function player:getLevelPercent() return 40 end
+  function player:getMagicLevel() return 5 end
+  function player:getMagicLevelPercent() return 60 end
+  function player:getSkillLevel(id) return 11+id end
+  function player:getSkillLevelPercent() return 70 end
+  function player:getStamina() return 2500 end
   function player:getHealthPercent() return 100 end
   function player:getHealth() return 100 end
   function player:getMaxHealth() return 100 end
@@ -196,7 +223,7 @@ local function fixture()
   for _,name in ipairs(scripts) do loadProduction('mods/game_elfbot/'..name..'.lua',env) end
   local console=setmetatable({}, {__index=env})
   loadProduction('modules/game_console/console.lua',console);env.modules.game_console=console
-  local state={env=env,bot=bot,events=events,widgets=widgets,warnings=warnings,root=root,player=player,files=files}
+  local state={env=env,bot=bot,events=events,widgets=widgets,warnings=warnings,root=root,map=map,player=player,files=files}
   function state.advance(milliseconds)
     now=now+milliseconds
     local due={};for event in pairs(events) do if event.due<=now then due[#due+1]=event end end
@@ -243,6 +270,10 @@ local function fixture()
     if target.onMousePress then target.onMousePress(target) end
     if target.onClick then target.onClick(target) end
   end
+  function state.hitHud(mouse)
+    for _,v in ipairs(root:getChildren()) do if v:getStyleName()=='ElfBotHudLayer' then return hit(v,mouse) end end
+  end
+  function state.hitRoot(mouse) return hit(root,mouse) end
   function state.failWrites()
     env.g_resources.writeFileContents=function() return false end
   end
@@ -502,8 +533,12 @@ do
     env.setEnabled(true);assert(env.isEnabled());equal(count(s.events),1,'one enabled tick chain')
     local stopCount=s.communityStops();assert(stopCount>0,'community bot not disabled')
     s.advance(50);equal(count(s.events),1,'one tick successor')
-    env.setEnabled(false);assert(not env.isRunning());assert(not s.tileEnabled());equal(count(s.events),0)
-    env.terminate();equal(s.connectionCount(),0);equal(count(s.widgets),initialWidgets,'all ElfBot widgets released')
+    local executor=latest;local widgetCount=count(s.widgets)
+    env.setEnabled(false);assert(not env.isEnabled());assert(env.isRunning());assert(latest.ui.isVisible())
+    equal(latest,executor,'OFF must retain the runtime');equal(count(s.widgets),widgetCount,'OFF must not destroy the open UI')
+    equal(count(s.events),1,'visible OFF keeps only the read-only pulse')
+    latest.ui.hide();s.advance(500);equal(count(s.events),0,'hidden OFF must not poll')
+    env.terminate();assert(not s.tileEnabled());equal(s.connectionCount(),0);equal(count(s.widgets),initialWidgets,'all ElfBot widgets released')
   end
   env.init();env.toggle()
   local c=latest.context;local executed=0;c.saySpell=function() executed=executed+1 end
@@ -519,11 +554,11 @@ end
 
 -- Reload/termination cancels reconnect work instead of logging in after the module is gone.
 do
-  local s=fixture();local env=s.env;env.init();env.setEnabled(true)
+  local s=fixture();local env=s.env
   local executor
   local execute=s.bot.executeBot
   s.bot.executeBot=function(...) executor=execute(...);return executor end
-  env.setEnabled(false);env.setEnabled(true)
+  env.init();env.setEnabled(true)
   executor.context.storage.elfbot.extras.reconnect=true
   s.setOnline(false);s.emit(env.g_game,'onGameEnd')
   equal(count(s.events),1,'one pending reconnect')
@@ -587,4 +622,295 @@ do
   env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
 end
 
-print('ElfBot integration, bounded history, callbacks and lifecycle: OK')
+-- Valkor-style icons: visible defaults, click commands, dragging and master OFF.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();local c=latest.context;local e=c.ElfBot;local data=c.storage.elfbot
+  local menu=s.getWidget('ElfBot OTC v.1');local iconsButton
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Icons' then iconsButton=child end end
+  s.click(assert(iconsButton));local editor=s.root:getFocusedChild();local edits,apply,on,enable={}
+  for _,child in ipairs(editor:getChildren()) do
+    if child:getStyleName()=='ElfBotTextEdit' then edits[#edits+1]=child end
+    if child:getText()=='Apply' then apply=child end
+    if child:getText()=='On' then on=child end
+    if child:getText()=='Enable Icons' then enable=child end
+  end
+  assert(on:isChecked(),'new icons must be visible by default');assert(not enable:isChecked())
+  edits[1]:setText('Heal');edits[2]:setText('auto 1000 say "exura"');edits[3]:setText('say "right"')
+  apply.onClick();equal(#data.icons,1,'Apply creates one configured icon')
+  assert(data.iconsEnabled and enable:isChecked(),'Apply must enable the icon layer')
+  local row=data.icons[1];assert(row.enabled);editor:hide();menu:setPosition({x=500,y=500})
+  local function icon()
+    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' and v.iconRow==row then return v end end
+    error('command icon missing')
+  end
+  local v=icon();assert(v.draggable and not v.phantom);equal(v.caption:getParent(),v,'caption belongs inside the clickable button')
+  equal(v.caption:getText(),'Heal','empty sprite/text still has a visible name');equal(v.badge:getText(),'OFF')
+  local calls={};c.saySpell=function(text) calls[#calls+1]=text end
+  s.click(v);equal(#e.jobs,0,'OFF click must not queue a command for later')
+  assert(e.status:find('Automation is OFF',1,true));assert(not row.running)
+  local automation
+  for _,child in ipairs(menu:getChildren()) do if child:getText()=='Automation: OFF' then automation=child end end
+  editor:show();menu:raise();s.click(assert(automation));assert(editor:isVisible() and menu:isVisible())
+  editor:hide();v=icon();local before=count(s.widgets);s.click(v)
+  equal(icon(),v,'click updates in place, without destroying the pressed widget');equal(count(s.widgets),before,'caption/badge do not accumulate')
+  assert(row.running);equal(v.badge:getText(),'ON');s.advance(50);equal(calls[1],'exura')
+  s.click(v);assert(not row.running);equal(v.badge:getText(),'OFF');s.advance(1500);equal(#calls,1,'second click cancels repeating script')
+  v=icon();local p=v:getPosition();assert(v.onMousePress(v,p,2));assert(v.onMouseRelease(v,{x=p.x+5,y=p.y+5},2))
+  s.advance(50);equal(calls[2],'right','right click runs its own command')
+  -- Drag beyond the map, save both visual states once, and do not execute a click.
+  v=icon();local saves=0;c.saveConfig=function() saves=saves+1 end;p=v:getPosition()
+  assert(v.onDragEnter(v,{x=p.x+5,y=p.y+5}));assert(v.onDragMove(v,{x=1105,y=355}))
+  s.advance(500);equal(icon(),v,'pulse cannot replace a dragging widget');equal(saves,0)
+  assert(v.onDragLeave(v));equal(saves,1);equal(row.offState.x,1100);equal(row.onState.x,1100)
+  equal(row.offState.y,350);equal(row.onState.y,350);equal(#calls,2,'drag does not execute the icon')
+  s.advance(500);v=icon();equal(v:getPosition().x,1100);equal(v:getPosition().y,350)
+  s.click(v);s.advance(50);assert(row.running);local executed=#calls
+  local suspended=e.jobs[#e.jobs];suspended.thread=coroutine.create(function() error('OFF coroutine resumed') end)
+  c._scheduler={{execution=s.now()+1,callback=function() error('OFF scheduled action ran') end}}
+  editor:show();menu:raise();s.click(automation)
+  assert(not env.isEnabled());assert(menu:isVisible() and editor:isVisible(),'OFF must not close any open editor')
+  equal(latest.context,c,'OFF retains context');equal(#e.jobs,0,'OFF cancels suspended jobs');equal(#c._scheduler,0)
+  assert(not suspended.thread and not suspended.active,'OFF releases suspended coroutine references')
+  equal(automation:getText(),'Automation: OFF');equal(icon().badge:getText(),'OFF')
+  s.advance(2000);equal(#calls,executed,'OFF cannot send icon actions')
+  s.click(automation);assert(env.isEnabled());editor:hide();s.advance(50)
+  assert(#calls>executed,'ON restarts the configured repeating icon')
+  s.root:setSize({width=800,height=500});s.advance(500);v=icon();p=v:getPosition()
+  assert(p.x+v:getSize().width<=800 and p.y+v:getSize().height<=500,'resized window keeps the icon visible')
+  env.saveSlot(1);assert(env.loadSlot(1));row=latest.context.storage.elfbot.icons[1];v=icon()
+  equal(row.offState.x,1100,'drag position persists in saved profile');equal(v.badge:getText(),'OFF','load does not start automation')
+  local lateClick=v.onClick;local lateMove=v.onDragMove
+  env.terminate();lateClick();assert(not lateMove(v,{x=1,y=1}));equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Original [Icons] imports keep item layers and controller toggles truthful.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  env.init();env.toggle();env.setEnabled(true);local c=latest.context;local e=c.ElfBot
+  e.caveTick=function() end -- isolate icon toggling from empty-route completion
+  local menu=s.getWidget('ElfBot OTC v.1');menu:setPosition({x=500,y=500})
+  local source='[Icons]\nName: Cavebot\nLeftCommand: auto 50 listas "Cavebot" | setcolor 0 255 0 | setcavebot toggle\n'..
+    'State: Inactive\nIconType: Resize\nIconIds: 3003,0,0,0\nText: Cavebot\nPositionX: 20\nPositionY: 250\n'..
+    'State: Active\nIconType: Resize\nIconIds: 3457,0,0,0\nText: Cavebot\nPositionX: 20\nPositionY: 250\n'
+  local imported,warnings=e.importIcons(source);equal(imported,1);equal(#warnings,0)
+  local function icon()
+    for v in pairs(s.widgets) do if v:getStyleName()=='ElfBotIcon' then return v end end
+    error('imported icon missing')
+  end
+  local v=icon();equal(v.items:getChildren()[1].itemId,3003);equal(v.badge:getText(),'OFF')
+  s.click(v);assert(c.CaveBot.isOn());equal(v.badge:getText(),'ON');equal(v.caption.color,'#00ff00')
+  equal(v.items:getChildren()[1].itemId,3457,'active state swaps item without replacing the button')
+  s.advance(500);assert(c.CaveBot.isOn(),'auto prefix must not repeatedly toggle the controller')
+  v=icon();s.click(v);assert(not c.CaveBot.isOn());equal(v.badge:getText(),'OFF')
+  c.CaveBot.setOn();s.advance(500);equal(icon().badge:getText(),'ON','external Follow switch updates icon')
+  env.setEnabled(false);equal(icon().badge:getText(),'OFF');assert(latest.ui.isVisible())
+  env.setEnabled(true);equal(icon().badge:getText(),'ON','master ON restores controller and its live badge')
+  -- Imported Text icons are still usable without an item.
+  e.replaceIcons('[Icons]\nName: Text only\nLeftCommand: say "text"\nState: Inactive\nIconType: Text\nPositionX: 20\nPositionY: 250\n')
+  equal(icon().caption:getText(),'Text only');equal(#icon().items:getChildren(),0)
+  local calls=0;c.saySpell=function(text) equal(text,'text');calls=calls+1 end
+  s.click(icon());s.advance(50);equal(calls,1)
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+-- Classic HUD: map-aligned defaults, window-wide dragging, real stats and cleanup.
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  s.map:setPosition({x=240,y=80});s.map:setSize({width=500,height=400})
+  local sidebar=env.g_ui.createWidget('Sidebar',s.root)
+  sidebar:setPosition({x=1040,y=80});sidebar:setSize({width=240,height=500})
+  env.init();assert(env.showHud());local c=latest.context;local saves=0
+  c.saveConfig=function() saves=saves+1 end
+  local function panel(id)
+    for v in pairs(s.widgets) do if v.id==id then return v end end
+    error('missing HUD panel '..id)
+  end
+  local skills=panel('elfbotHudSkills')
+  local function startDrag(v)
+    local p=v:getPosition();local mouse={x=p.x+6,y=p.y+6}
+    equal(s.hitHud(mouse),v,'clicking HUD text must hit its draggable block, not the game map')
+    assert(v.draggable and not v.phantom,'HUD blocks must receive drag gestures')
+    assert(v.onMousePress(v,mouse,1),'press consumed before map input')
+    assert(v.onDragEnter(v,mouse),'plain left-button drag must not require Ctrl')
+  end
+  startDrag(skills)
+  assert(skills.onDragMove(skills,{x=306,y=236}))
+  equal(skills:getPosition().x,300);equal(skills:getPosition().y,230)
+  s.advance(500);equal(skills:getPosition().x,300);equal(skills:getPosition().y,230,'HUD pulse must not snap the dragged block back')
+  equal(saves,0,'do not schedule settings writes on each mouse move')
+  assert(skills.onDragLeave(skills,nil,{x=306,y=236}),'drop consumed before map release')
+  assert(skills.onMouseRelease(skills,{x=306,y=236},1))
+  equal(saves,1,'save position once on drop');assert(not env.isEnabled(),'moving HUD must not start automation')
+  local saved=c.storage.elfbot.hud.dragPositions.elfbotHudSkills
+  assert(saved.x>=0 and saved.x<=1 and saved.y>=0 and saved.y<=1,'save window-relative positions')
+  equal(saved.space,'window')
+  -- The other block can be positioned independently.
+  c.storage.elfbot.hud.general=true;s.advance(500)
+  local stats=panel('elfbotHudStats');startDrag(stats)
+  assert(stats.onDragMove(stats,{x=336,y=346}));assert(stats.onDragLeave(stats))
+  equal(stats:getPosition().x,330);equal(stats:getPosition().y,340);equal(saves,2)
+  equal(skills:getPosition().x,300);equal(skills:getPosition().y,230,'moving stats must not move skills')
+  -- Move beyond the old map boundary, over the right-side inventory area.
+  startDrag(skills);assert(skills.onDragMove(skills,{x=1206,y=166}))
+  assert(skills:getPosition().x>s.map:getPaddingRect().x+s.map:getPaddingRect().width,'right-side dragging must not stop at the map edge')
+  assert(skills:getSize().width<230,'moved skills block fits its text, not a wide empty margin')
+  assert(skills.onDragLeave(skills));equal(saves,3)
+  local right=skills:getPosition();s.advance(500)
+  equal(skills:getPosition().x,right.x);equal(skills:getPosition().y,right.y,'pulse preserves placement outside the map')
+  equal(s.hitRoot({x=right.x+6,y=right.y+6}),skills,'HUD remains clickable above the sidebar')
+  equal(s.hitRoot({x=1046,y=400}),sidebar,'phantom overlay must not block other sidebar controls')
+  s.map:setSize({width=700,height=200});s.advance(500)
+  equal(skills:getPosition().x,right.x);equal(skills:getPosition().y,right.y,'map resize must not move window-positioned HUDs')
+  local function inside(v)
+    local rect,p,size=s.root:getPaddingRect(),v:getPosition(),v:getSize()
+    assert(p.x>=rect.x and p.y>=rect.y and p.x+size.width<=rect.x+rect.width and p.y+size.height<=rect.y+rect.height,'drag/resize must keep the whole block visible')
+  end
+  inside(skills);inside(stats)
+  s.root:setSize({width=900,height=600});s.advance(500);inside(skills);inside(stats)
+  local before=skills:getPosition();env.saveSlot(1)
+  assert(env.loadSlot(1),'saved HUD profile must load')
+  local restored=panel('elfbotHudSkills');assert(restored~=skills,'load replaces owned HUD widgets')
+  equal(restored:getPosition().x,before.x);equal(restored:getPosition().y,before.y,'saved drag position must be restored')
+  local current=latest.context;current.saveConfig=function() saves=saves+1 end
+  local previous=current.storage.elfbot.hud.dragPositions.elfbotHudSkills
+  -- Cancellation and teardown cannot save a half-finished drag or recreate polling.
+  startDrag(restored);restored.onDragMove(restored,{x=-1000,y=-1000});inside(restored)
+  restored.onDragMove(restored,{x=100000,y=100000});inside(restored)
+  latest.ui.hide();assert(restored.onDragLeave(restored));equal(saves,3)
+  equal(current.storage.elfbot.hud.dragPositions.elfbotHudSkills,previous,'cancelled drag does not change saved position')
+  local lateMove,lateLeave=restored.onDragMove,restored.onDragLeave
+  env.terminate();assert(not lateMove(restored,{x=100,y=100}));assert(lateLeave(restored))
+  equal(saves,3);equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+do
+  local s=fixture();local env=s.env
+  s.map:setPosition({x=240,y=80});s.map:setSize({width=500,height=400})
+  env.init();assert(not env.isRunning());equal(count(s.events),0,'HUD must not eagerly start an OFF bot')
+  assert(env.showHud());assert(not env.isEnabled(),'showing the HUD must not enable automation')
+  local layer,skills
+  for v in pairs(s.widgets) do
+    if v:getStyleName()=='ElfBotHudLayer' then layer=v end
+    if v.id=='elfbotHudSkills' then skills=v end
+  end
+  assert(layer and layer:isVisible(),'Classic HUD must appear immediately, without extra checkboxes or a delayed tick')
+  equal(skills:getPosition().x,410,'skills-only HUD remains top-right even on a smaller map')
+  equal(skills:getPosition().y,85);equal(#skills:getChildren(),8)
+  local values=skills:getChildren()
+  equal(values[1].colored[2],'#ffff00','Level label is yellow')
+  equal(values[1].colored[4],'#ffff00','Level value is yellow')
+  equal(values[2].colored[2],'#4fc3f7','Magic Level label is blue')
+  equal(values[2].colored[4],'#00ff00','Magic Level value is green')
+  equal(values[3].colored[2],'#ffffff','skill labels are white')
+  equal(values[3].colored[4],'#00ff00','skill values are green')
+  equal(values[8].colored[4],'#00ff00','Stamina value is green')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+end
+
+do
+  local s=fixture();local env=s.env;local latest;local execute=s.bot.executeBot
+  s.bot.executeBot=function(...) latest=execute(...);return latest end
+  s.map:setPosition({x=250,y=100});s.map:setSize({width=950,height=500})
+  env.init();env.toggle();local c=latest.context;local e=c.ElfBot;local h=c.storage.elfbot.hud
+  h.enabled=true;h.general=true;h.damage=true;h.active=true;h.healing=true
+  h.playerInfo=true;h.guild=true;h.vocation=true;h.mana=true
+  local other={text='Previous label'}
+  function other:getName() return 'Unknown player' end
+  function other:getId() return 2 end
+  function other:getPosition() return {x=101,y=100,z=7} end
+  function other:getHealthPercent() return 85 end
+  function other:getVocation() return 0 end
+  function other:getManaPercent() return -1 end
+  function other:isPlayer() return true end
+  function other:getText() return self.text end
+  function other:setText(text) self.text=text end
+  s.setSpectators({s.player,other})
+  e.status='ElfBot settings saved';c.exp=function() return 2000 end
+  latest.callbacks.onTextMessage(env.MessageModes.DamageDealt,'You deal 350 damage')
+  s.advance(2000)
+  local layer,stats,skills
+  for v in pairs(s.widgets) do
+    if v:getStyleName()=='ElfBotHudLayer' then layer=v end
+    if v.id=='elfbotHudStats' then stats=v elseif v.id=='elfbotHudSkills' then skills=v end
+  end
+  assert(layer and stats and skills,'HUD blocks missing')
+  equal(layer:getParent(),s.root,'HUD must be able to cross the map edge and side panels')
+  assert(layer.phantom,'HUD must not consume map clicks');assert(layer:isVisible())
+  local function text(panel)
+    local lines={};for _,row in ipairs(panel:getChildren()) do if row:isVisible() then lines[#lines+1]=row:getText() end end
+    return table.concat(lines,'\n')
+  end
+  local function includes(panel,value) assert(text(panel):find(value,1,true),'missing HUD value: '..value..'\n'..text(panel)) end
+  includes(stats,'Tester | Level 10');includes(stats,'HP 100/100 (100%) | MP 100/100 (100%)')
+  includes(stats,'Session: 00:00:02');includes(stats,'XP gained: 1,000');includes(stats,'XP/hour: 1,800,000')
+  includes(stats,'Best hit: 350');includes(stats,'Healing: OFF')
+  assert(not text(stats):find('settings saved',1,true),'status notices are not running scripts')
+  assert(not text(stats):find('Unknown player',1,true),'player labels must not be duplicated in the statistics block')
+  equal(other.text,'\nHP 85%','unknown look data must not fabricate level, vocation, guild or mana')
+  includes(skills,'~ Level: 10 (40%)');includes(skills,'~ Magic Level: 5 (60%)')
+  includes(skills,'~ Fist: 11 (70%)');includes(skills,'~ Club: 12 (70%)')
+  includes(skills,'~ Distance: 15 (70%)');includes(skills,'~ Shielding: 16 (70%)');includes(skills,'~ Fishing: 17 (70%)')
+  includes(skills,'~ Stamina: 41:40 (99%)');equal(#skills:getChildren(),8,'only Classic 8.60 skills are rendered')
+  equal(stats:getPosition().x,258);equal(stats:getPosition().y,108)
+  equal(skills:getPosition().x,870,'Classic skills use the map top-right inset');equal(skills:getPosition().y,105)
+  local function checkBounds()
+    local bounds=s.map:getPaddingRect()
+    for _,panel in ipairs({stats,skills}) do if panel:isVisible() then
+      local p,size=panel:getPosition(),panel:getSize()
+      assert(p.x>=bounds.x and p.y>=bounds.y and p.x+size.width<=bounds.x+bounds.width and p.y+size.height<=bounds.y+bounds.height,'HUD outside the map')
+      for _,row in ipairs(panel:getChildren()) do if row:isVisible() then
+        assert(row.phantom,'HUD text must not consume map clicks')
+        assert(row.textWrap and row:getTextSize().height<=row:getSize().height,'HUD wrapping clipped: '..row:getText()..' / '..row:getTextSize().height..' > '..row:getSize().height)
+        local rp,rs=row:getPosition(),row:getSize()
+        assert(rp.y>=p.y and rp.y+rs.height<=p.y+size.height,'row outside its HUD block')
+      end end
+    end end
+  end
+  checkBounds()
+  -- Repeated updates reuse widgets and the existing single pulse.
+  local allocated=count(s.widgets)
+  for _=1,120 do s.advance(500) end
+  equal(count(s.widgets),allocated,'HUD refresh must not accumulate widgets');equal(count(s.events),1,'HUD must not create another timer chain')
+  s.map:setPosition({x=300,y=80});s.advance(500);equal(stats:getPosition().x,308,'default HUD placement follows the map')
+  s.map:setSize({width=500,height=400});s.advance(500)
+  assert(skills:getPosition().y>=stats:getPosition().y+stats:getSize().height,'small maps stack without overlapping')
+  checkBounds()
+  h.x=9999;h.y=9999;h.skillRight=9999;h.skillTop=9999;s.advance(500);checkBounds()
+  equal(stats:getPosition().x,308,'saved offsets must not change the standard placement')
+  equal(stats:getPosition().y,88)
+  h.x=nil;h.y=nil;h.general=false;h.damage=false;h.healing=false;h.skills=false;s.advance(500)
+  assert(not layer:isVisible(),'empty HUD must be hidden')
+  h.general=true;h.skills=true;h.enabled=false;s.advance(500);assert(not layer:isVisible(),'disabled HUD stays hidden')
+  h.enabled=true;h.general=true;h.active=true
+  c.storage.elfbot.hotkeys={{key='F2',script='auto 200 say "test"',enabled=true}}
+  c.storage.elfbot.hotkeysEnabled=true;c.saySpell=function() end;e.reload();e.jobs[1].active=true
+  c.storage.elfbot.botEnabled=true;e.paused=false;s.advance(500);includes(stats,'Active scripts');includes(stats,'F2')
+  c.storage.elfbot.hotkeysEnabled=false;s.advance(500);assert(not text(stats):find('Active scripts',1,true),'disabled hotkey category must not be shown as active')
+  c.storage.elfbot.healing.enabled=true;c.storage.elfbot.healing.hiEnabled=true;c.storage.elfbot.healing.hiHealth=90
+  h.healing=true;s.advance(500);includes(stats,'Healing: ON');includes(stats,'Hi 90%')
+  c.exp=function() return 1e30 end;s.advance(500);includes(stats,'XP: waiting for valid character statistics')
+  -- A large timer list and long names still fit, with a bounded reusable row pool.
+  h.spellTimers=true
+  for i=1,100 do e.spellTimers[string.rep('Long spell name ',8)..i]=c.now+100000 end
+  s.advance(500);checkBounds();assert(#stats:getChildren()<=32,'HUD row pool is bounded');includes(stats,'more')
+  local menu=s.getWidget('ElfBot OTC v.1');local hudButton
+  for _,v in ipairs(menu:getChildren()) do if v:getText()=='HUD' then hudButton=v end end
+  hudButton.onClick();local config=s.root:getFocusedChild()
+  for _,v in ipairs(config:getChildren()) do if v:getStyleName()=='ElfBotCheck' then
+    assert(v.textWrap and v:getTextSize().height<=v:getSize().height,'HUD option clipped: '..v:getText())
+  end end
+  assert(not s.getWidget('HUD map offset X / Y:'),'Classic HUD must not require offset settings')
+  assert(not s.getWidget('Reset positions'),'Classic positioning is automatic')
+  h.skills=false;h.spellTimers=false;s.advance(500);assert(not skills:isVisible(),'skills option hides the block')
+  latest.ui.hide();assert(not layer:isVisible());equal(other.text,'Previous label','hide restores owned creature text')
+  s.advance(500);assert(not layer:isVisible(),'late tick cannot reopen a hidden HUD')
+  latest.ui.show();assert(layer:isVisible(),'HUD must reopen after its hidden parent is shown again')
+  env.terminate();equal(count(s.events),0);equal(s.connectionCount(),0)
+  for v in pairs(s.widgets) do assert(not v.elfWidget and not v:getStyleName():find('ElfBotHud'),'HUD ownership cleaned up') end
+end
+
+print('ElfBot integration, bounded history, callbacks, Classic HUD and lifecycle: OK')

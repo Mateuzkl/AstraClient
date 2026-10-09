@@ -31,7 +31,7 @@ function attachElfBot(c)
   local originalTop,originalBottom=mapPanel:getMarginTop(),mapPanel:getMarginBottom()
   -- Register cleanup before constructing windows, so failed startup is reversible.
   e.disposeInterface=function()
-    if not alive then return end;alive=false;if e.clearPlayerLabels then e.clearPlayerLabels() end;if e.clearWallTimers then e.clearWallTimers() end;clearOverlays();e.jobs={};e.actionJobs={}
+    if not alive then return end;alive=false;e.hudVisible=false;if e.clearPlayerLabels then e.clearPlayerLabels() end;if e.clearWallTimers then e.clearWallTimers() end;clearOverlays();e.jobs={};e.actionJobs={}
     for _,v in ipairs(iconWidgets) do if not v:isDestroyed() then v:destroy() end end;iconWidgets={}
     if e.spyFloor then mapPanel:unlockVisibleFloor() end;if e.scrollView and mapPanel.setLimitVisibleRange then mapPanel:setLimitVisibleRange(e.originalVisibleRange~=false) end
     mapPanel:setMarginTop(originalTop);mapPanel:setMarginBottom(originalBottom)
@@ -614,13 +614,24 @@ function attachElfBot(c)
     pending(300,312,'Target subenemies if skulled/war');pending(300,344,'Target others if skulled/war')
     return win
   end
-  local hudWidget=widget('ElfBotLabel',g_ui.getRootWidget(),8,130,365,160,'');hudWidget.elfWidget=true;hudWidget:setPhantom(true);hudWidget:setTextWrap(true);hudWidget:setColor('#ffff00');hudWidget:hide()
+  local hudLayer=g_ui.createWidget('ElfBotHudLayer',g_ui.getRootWidget())
+  hudLayer.elfWidget=true;windows[#windows+1]=hudLayer;hudLayer:hide()
+  local hudDisplay=createElfBotHud(e,c,data,hudLayer,mapPanel)
   local function hud()
-    local h=data.hud;local win=window('HUD Display',dx(268),dy(139));panels.hud=win
-    dg(win,2,0,264,61,'Player Info:');dg(win,2,64,264,72,'Display options:')
-    local fields={{'playerInfo','Player Info Enabled',14,12},{'guild','Show guild name',14,24},{'vocation','Show vocation, level, hp',14,35},{'mana','Show estimated mana',14,46},{'autoLook','Look at players automatically',138,12},{'cachePlayers','Cache player information',138,24},{'updateCache','Look and update cached entries',138,35},
-      {'enabled','On-screen Info Enabled',14,77},{'general','General information',14,88},{'deathTimers','Death timers',14,99},{'wallTimers','Magic wall timers',14,110},{'active','Activated hotkeys/shortkeys',14,121},{'healing','Healing percentages',138,77},{'damage','Damage per second',138,88},{'spellTimers','Spell timers',138,99},{'navigation','Navigation & exiva players',138,110}}
-    for _,row in ipairs(fields) do local key=row[1];dk(win,row[3],row[4],124,row[2],h[key],function(v) h[key]=v;if key=='cachePlayers' then data.playerCache=v and e.playerCache or nil end;save() end) end
+    local h=data.hud;local win=window('HUD Display',700,326);panels.hud=win
+    group(win,0,0,700,142,'Player Info (above creatures)')
+    group(win,0,150,700,176,'On-screen information')
+    local fields={{'playerInfo','Player Info Enabled',14,28},{'guild','Show guild name',14,56},{'vocation','Show vocation, level and HP',14,84},{'mana','Show estimated mana when known',14,112},
+      {'autoLook','Look at players automatically',360,28},{'cachePlayers','Cache player information',360,56},{'updateCache','Look and update cached entries',360,84},
+      {'enabled','On-screen Info Enabled',14,178},{'general','General information and session XP',14,206},{'deathTimers','Recent death timers',14,234},{'wallTimers','Magic wall timers',14,262},{'active','Activated hotkeys/shortkeys',14,290},
+      {'healing','Healing status and percentages',360,178},{'damage','Damage per second and best hit',360,206},{'spellTimers','Spell timers',360,234},{'navigation','Navigation & exiva players',360,262},{'skills','Skills, magic level and stamina',360,290}}
+    for _,row in ipairs(fields) do
+      local key=row[1];local value=h[key];if key=='skills' then value=h.skills~=false end
+      local option=check(win,row[3],row[4],320,row[2],value,function(v)
+        h[key]=v;if key=='cachePlayers' then data.playerCache=v and e.playerCache or nil end;save()
+      end)
+      option:setTextWrap(true);option:setHeight(26)
+    end
     return win
   end
   local function extras()
@@ -632,8 +643,33 @@ function attachElfBot(c)
     button(win,160,233,130,'Restart scripts',function() data.hotkeysEnabled=true;data.shortkeysEnabled=true;e.reload() end)
     status(win,0,276,425);return win
   end
-  local function clearIcons() for _,v in ipairs(iconWidgets) do if not v:isDestroyed() then v:destroy() end end;iconWidgets={} end
-  local function iconState(row) return row.active and row.onState or row.offState end
+  local iconDragging
+  local iconControllers={}
+  local function clearIcons() iconDragging=nil;for _,v in ipairs(iconWidgets) do if not v:isDestroyed() then v:destroy() end end;iconWidgets={} end
+  local function iconController(program)
+    local controller
+    for _,node in ipairs(program.body) do
+      if node.kind~='command' then return end
+      local kind=({setcavebot='CaveBot',setfollowwaypoints='CaveBot',settargeting='TargetBot'})[node.name]
+      if kind then if controller and controller~=kind then return end;controller=kind
+      elseif node.name~='listas' and node.name~='dontlist' and node.name~='setcolor' then return end
+    end
+    return controller
+  end
+  local function iconActive(row)
+    if data.botEnabled==false or e.paused then return false end
+    local job=iconJobs[row]
+    local controller=iconControllers[row] or job and job.iconController
+    if controller then return c[controller].isOn() end
+    return row.active==true
+  end
+  local function iconColor(row,state,hover)
+    if hover and state.hover then return state.hover end
+    local job=iconJobs[row];local color=iconActive(row) and job and job.env and job.env.color
+    if color then return string.format('#%02x%02x%02x',color[1],color[2],color[3]) end
+    return state.foreground or (iconActive(row) and '#55ff88' or '#ff5a61')
+  end
+  local function iconState(row) return iconActive(row) and row.onState or row.offState end
   local function iconNotice(row,script,state)
     e.status=row.name..' '..state..': '..script
     if modules.game_textmessage and modules.game_textmessage.displayStatusMessage then
@@ -642,55 +678,123 @@ function attachElfBot(c)
   end
   local function iconCommand(row,right)
     local script=right and row.rclick or row.lclick;if row.enabled==false or not script or script=='' then return end
+    if data.botEnabled==false or e.paused then e.status='Automation is OFF. Switch ON before running icon commands.';c.info(e.status);return end
     local errorText=(row.errors or {})[right and 'rclick' or 'lclick'];assert(not errorText,errorText)
     local ok,program=pcall(guardCompile,script);assert(ok,'Icon '..row.name..' / '..(right and 'Right' or 'Left')..': '..tostring(program)..' | Script: '..script)
-    if program.interval then
-      if iconJobs[row] and iconJobs[row].active and iconJobs[row].iconRight==right then iconJobs[row].active=false;iconJobs[row].thread=nil;row.active=false;row.running=false;iconNotice(row,script,'cancelled')
-      else if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil end;local job,err=e.run(script);assert(job,err);job.iconRight=right;job.iconName=row.name;job.row.script=script;iconJobs[row]=job;row.active=true;row.running=true;iconNotice(row,script,'enabled') end
-    else local job,err=e.run(script);assert(job,err);job.iconName=row.name;job.row.script=script;iconNotice(row,script,'executed') end
+    local controller=iconController(program)
+    if controller then
+      -- Module toggles act once per click, even in old "auto ... setcavebot toggle" scripts.
+      -- Match the badge to the live controller rather than repeatedly flipping it.
+      if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil end
+      local job,err=e.runProgram({body=program.body});assert(job,err);job.iconController=controller;job.iconName=row.name;job.row.script=script;iconJobs[row]=job
+      local done=e.advance(job);assert(done~=nil,job.error);if done then job.active=false end
+      row.running=false;row.active=c[controller].isOn();iconNotice(row,script,row.active and 'enabled' or 'cancelled')
+    elseif program.interval then
+      if iconJobs[row] and iconJobs[row].active and (iconJobs[row].iconRight==right or row.rclick==row.lclick) then iconJobs[row].active=false;iconJobs[row].thread=nil;row.active=false;row.running=false;iconNotice(row,script,'cancelled')
+      else if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil end;local job,err=e.run(script);assert(job,err);job.iconRight=right;job.iconName=row.name;job.row.script=script;iconJobs[row]=job;row.active=true;row.running=true;row.runningRight=right;iconNotice(row,script,'enabled') end
+    else local job,err=e.run(script);assert(job,err);job.iconName=row.name;job.row.script=script;row.active=not row.active;iconNotice(row,script,'executed') end
+  end
+  -- Valkor-style frame, caption and ON/OFF badge stay clickable even without an item.
+  -- Reuse the button on clicks: do not destroy the native pressed widget mid-event.
+  local function renderIcon(v,row)
+    local active=iconActive(row);local state=iconState(row) or {};local size=v:getSize().width
+    v:setBackgroundColor(row.background~=false and (state.background or (active and '#0a2b25dd' or '#081724cc')) or '#00000000')
+    v:setBorderColor(active and '#00d3c8' or '#2a3a46')
+    local text=state.text and state.text~='' and state.text or row.name
+    if row.extraText then text=text..' '..row.extraText end
+    v.caption:setText(text);v.caption:setColor(iconColor(row,state,v.iconHovered))
+    v.badge:setText(active and 'ON' or 'OFF');v.badge:setBackgroundColor(active and '#149447' or '#b72f37')
+    v:setTooltip(row.name..'\nLeft / right click: configured command. Drag to move.'..(data.botEnabled==false and '\nAutomation is OFF.' or '')..
+      ((row.errors or {}).lclick and '\nLeft click needs editing' or '')..((row.errors or {}).rclick and '\nRight click needs editing' or ''))
+    if v.iconState==state then return end
+    local previous=v.iconState
+    if previous and (previous.x~=state.x or previous.y~=state.y or previous.xMode~=state.xMode or previous.yMode~=state.yMode) then e.iconsDirty=true end
+    v.iconState=state;v.items:destroyChildren()
+    local content=size-26
+    local function layer(ids,kind)
+      if not ids or kind=='Text' then return end
+      local many=(ids[2] or 0)>0 or (ids[3] or 0)>0 or (ids[4] or 0)>0
+      for index,id in ipairs(ids) do if id>0 then
+        local side=kind=='Resize' and (many and math.floor(content/2) or content) or 32
+        local ix=many and ((index-1)%2)*side or (content-side)/2;local iy=many and math.floor((index-1)/2)*side or (content-side)/2
+        if kind=='Center' or kind=='Center X' then ix=(content-side)/2 elseif kind=='Right' then ix=content-side elseif kind=='Left' then ix=0 end
+        if kind=='Center' or kind=='Center Y' then iy=(content-side)/2 elseif kind=='Bottom' then iy=content-side elseif kind=='Top' then iy=0 end
+        local function draw(x,y,w,h) local item=widget('UIItem',v.items,x,y,w,h);item:setBackgroundColor('#00000000');item:setBorderWidth(0);item:setVirtual(true);item:setItemId(id);item:setPhantom(true) end
+        if kind=='Tile' then for tx=0,content-1,side do for ty=0,content-1,side do draw(tx,ty,math.min(side,content-tx),math.min(side,content-ty)) end end else draw(ix,iy,side,side) end
+      end end
+    end
+    if row.background~=false then layer(state.bkgIds,state.bkgType) end
+    layer(state.ids,state.type)
   end
   -- Migrate saved icons once; later visual updates must not start click scripts.
   for _,row in ipairs(data.icons) do if row.running==nil then row.running=row.active==true end end
   local function rebuildIcons()
-    e.iconsDirty=false;clearIcons()
-    mapPanel:setMarginTop(originalTop+(uiVisible and data.iconsEnabled and data.iconsSpaceTop and (data.iconsLargeTop and 48 or 24) or 0))
-    mapPanel:setMarginBottom(originalBottom+(uiVisible and data.iconsEnabled and data.iconsSpaceBottom and (data.iconsLargeBottom and 48 or 24) or 0))
+    if iconDragging and uiVisible and data.iconsEnabled then e.iconsDirty=true;return end
+    e.iconsDirty=false;clearIcons();iconControllers={}
+    mapPanel:setMarginTop(originalTop+(uiVisible and data.iconsEnabled and data.iconsSpaceTop and (data.iconsLargeTop and 98 or 70) or 0))
+    mapPanel:setMarginBottom(originalBottom+(uiVisible and data.iconsEnabled and data.iconsSpaceBottom and (data.iconsLargeBottom and 98 or 70) or 0))
     if not data.iconsEnabled then for row,job in pairs(iconJobs) do job.active=false;job.thread=nil;row.active=false;row.running=false end;return end
     if not uiVisible then return end
     local previousX,previousY=0,0
     for _,row in ipairs(data.icons) do
-      local state=iconState(row) or {};local size=row.size=='Large' and 48 or row.size=='Medium' and 32 or 24
-      local rect=g_ui.getRootWidget():getPaddingRect();local x,y=state.x or 0,state.y or 0
+      local controller,consistent
+      for _,script in ipairs({row.lclick or '',row.rclick or ''}) do if script:match('%S') then
+        local ok,program=pcall(e.compile,script);local kind=ok and iconController(program)
+        if not kind or controller and controller~=kind then consistent=false;break end
+        controller=kind;consistent=true
+      end end
+      if consistent then iconControllers[row]=controller end
+      local state=iconState(row) or {};local size=row.size=='Large' and 92 or row.size=='Medium' and 76 or 64;local height=size+6
+      local rect=g_ui.getRootWidget():getPaddingRect();local x,y=state.x or 20,state.y or 80
+      local widthLimit,heightLimit=math.max(0,rect.width-size),math.max(0,rect.height-height)
       if state.xMode=='Previous' then x=previousX+x
-      elseif (state.xMode=='From right' or state.xMode=='Right') then x=rect.width-x-size elseif state.xMode=='Center' then x=(rect.width-size)/2+x elseif state.xMode=='Percent' then x=rect.width*x/100 end
+      elseif (state.xMode=='From right' or state.xMode=='Right') then x=widthLimit-x elseif state.xMode=='Center' then x=widthLimit/2+x elseif state.xMode=='Percent' then x=widthLimit*x/100 end
       if state.yMode=='Previous' then y=previousY+y
-      elseif (state.yMode=='From bottom' or state.yMode=='Bottom') then y=rect.height-y-size elseif state.yMode=='Center' then y=(rect.height-size)/2+y elseif state.yMode=='Percent' then y=rect.height*y/100 end
+      elseif (state.yMode=='From bottom' or state.yMode=='Bottom') then y=heightLimit-y elseif state.yMode=='Center' then y=heightLimit/2+y elseif state.yMode=='Percent' then y=heightLimit*y/100 end
+      x=math.floor(math.max(0,math.min(widthLimit,x)));y=math.floor(math.max(0,math.min(heightLimit,y)))
       -- Disabled icons still define anchors for subsequent entries in the script.
       previousX,previousY=x,y
       if row.enabled~=false then
-      if row.running and (not iconJobs[row] or not iconJobs[row].active and not iconJobs[row].failed) and row.lclick and row.lclick~='' then local ok,program=pcall(e.compile,row.lclick);if ok and program.interval then local job=e.run(row.lclick);iconJobs[row]=job;if job then job.iconName=row.name;job.row.script=row.lclick end end end
-      local v=widget('ElfBotIcon',g_ui.getRootWidget(),x,y,size,size,'');v.elfWidget=true
-      v.onClick=function() local ok,err=pcall(iconCommand,row,false);if not ok then e.status=tostring(err) end;rebuildIcons() end
-      v.onMousePress=function(_,pos,button) if button==MouseRightButton then local ok,err=pcall(iconCommand,row,true);if not ok then e.status=tostring(err) end;rebuildIcons();return true end;return false end
-      v:setBackgroundColor(row.background~=false and (state.background or '#00000000') or '#00000000')
-      local function layer(ids,kind)
-        if not ids then return end
-        local many=(ids[2] or 0)>0 or (ids[3] or 0)>0 or (ids[4] or 0)>0
-        for index,id in ipairs(ids) do if id>0 then
-          local side=kind=='Resize' and (many and math.floor(size/2) or size) or 32
-          local ix=many and ((index-1)%2)*side or 0;local iy=many and math.floor((index-1)/2)*side or 0
-          if kind=='Center' or kind=='Center X' then ix=(size-side)/2 elseif kind=='Right' then ix=size-side end
-          if kind=='Center' or kind=='Center Y' then iy=(size-side)/2 elseif kind=='Bottom' then iy=size-side end
-          local function draw(x,y,w,h) local item=widget('UIItem',v,x,y,w,h);item:setBackgroundColor('#00000000');if item.setBorderWidth then item:setBorderWidth(0) end;item:setVirtual(true);item:setItemId(id);item:setPhantom(true) end
-          if kind=='Tile' then for tx=0,size-1,side do for ty=0,size-1,side do draw(tx,ty,math.min(side,size-tx),math.min(side,size-ty)) end end else draw(ix,iy,side,side) end
-        end end
+      local resumeScript=row.runningRight and row.rclick or row.lclick
+      if data.botEnabled~=false and not e.paused and row.running and (not iconJobs[row] or not iconJobs[row].active and not iconJobs[row].failed) and resumeScript and resumeScript~='' then local ok,program=pcall(e.compile,resumeScript);if ok and program.interval and not iconController(program) then local job=e.run(resumeScript);iconJobs[row]=job;if job then job.iconRight=row.runningRight==true;job.iconName=row.name;job.row.script=resumeScript end end end
+      local v=widget('ElfBotIcon',g_ui.getRootWidget(),x,y,size,height,'');v.iconRow=row
+      v.items=widget('UIWidget',v,13,18,size-26,size-26);v.items:setPhantom(true);v.items:setClipping(true)
+      v.caption=widget('ElfBotIconCaption',v,3,3,size-6,14,'')
+      v.badge=widget('ElfBotIconStatus',v,size-24,height-13,22,11,'')
+      local function click(right)
+        if not alive or v:isDestroyed() or not v:isVisible() or iconDragging then return end
+        c.now=g_clock.millis();c.time=c.now
+        local ok,err=pcall(iconCommand,row,right);if not ok then e.status=tostring(err);c.warn(e.status) end
+        if alive and not v:isDestroyed() then renderIcon(v,row) end
       end
-      if row.background~=false then layer(state.bkgIds,state.bkgType) end
-      if state.type~='Text' then layer(state.ids,state.type) end
-      local text=state.text or row.name;if row.extraText then text=text..' '..row.extraText end;local caption=widget('ElfBotIconCaption',g_ui.getRootWidget(),x,y+size-3,math.max(size,#text*7+4),15,text);caption:setColor(state.foreground or '#111111');caption:setPhantom(true)
-      -- Caption is a phantom root sibling: only the sprite's square accepts clicks.
-      local resting=state.foreground or '#111111';caption:setColor(resting)
-      v:setTooltip(row.name..((row.errors or {}).lclick and '\nLeft click needs editing' or '')..((row.errors or {}).rclick and '\nRight click needs editing' or ''))
+      v.onClick=function() click(false) end
+      v.onMousePress=function() return true end
+      v.onMouseRelease=function(self,pos,button)
+        if not alive or self:isDestroyed() or not pos then return true end
+        local p,s=self:getPosition(),self:getSize()
+        if button==MouseRightButton and pos.x>=p.x and pos.y>=p.y and pos.x<p.x+s.width and pos.y<p.y+s.height then click(true) end
+        return true
+      end
+      v.onHoverChange=function(_,hover) if not alive or v:isDestroyed() then return end;v.iconHovered=hover;v.caption:setColor(iconColor(row,iconState(row) or {},hover)) end
+      v.onDragEnter=function(self,mouse)
+        if not alive or self:isDestroyed() or not self:isVisible() then return false end
+        local p=self:getPosition();iconDragging=self;self.dragReference={x=mouse.x-p.x,y=mouse.y-p.y};self.dragPosition=nil;self:raise();return true
+      end
+      v.onDragMove=function(self,mouse)
+        if not alive or self:isDestroyed() or iconDragging~=self then return false end
+        local bounds,s=self:getParent():getPaddingRect(),self:getSize()
+        local nx=math.floor(math.max(0,math.min(math.max(0,bounds.width-s.width),mouse.x-self.dragReference.x-bounds.x)))
+        local ny=math.floor(math.max(0,math.min(math.max(0,bounds.height-s.height),mouse.y-self.dragReference.y-bounds.y)))
+        self:setMarginLeft(nx);self:setMarginTop(ny);self.dragPosition={x=nx,y=ny};return true
+      end
+      v.onDragLeave=function(self)
+        if alive and not self:isDestroyed() and iconDragging==self and self.dragPosition and uiVisible then
+          for _,key in ipairs({'offState','onState'}) do row[key]=row[key] or {};row[key].xMode='Absolute';row[key].yMode='Absolute';row[key].x=self.dragPosition.x;row[key].y=self.dragPosition.y end
+          save();e.iconsDirty=true
+        end
+        if iconDragging==self then iconDragging=nil end;return true
+      end
+      renderIcon(v,row)
     end end
   end
   function e.importIcons(text)
@@ -771,7 +875,7 @@ function attachElfBot(c)
     dl(win,234,16,24,'Lclick');local left=de(win,258,16,108,'')
     dl(win,234,27,24,'Rclick');local right=de(win,258,27,108,'')
     dl(win,108,27,26,'Size');local size=dc(win,134,27,24,{'Small','Medium','Large'},'Small')
-    local on=dk(win,162,27,24,'On',false,function() end);on:setTooltip('Show this icon. Repeating scripts start when you click the icon.')
+    local on=dk(win,162,27,24,'On',true,function() end);on:setTooltip('Show this icon. Commands run only when Automation is ON.')
     local bkg=dk(win,186,27,47,'Bkg Draw',true,function() end)
     local fields={};local types={'Normal','Resize','Top','Bottom','Left','Right','Tile','Center','Center X','Center Y','Text'}
     for i,kind in ipairs({'offState','onState'}) do
@@ -785,9 +889,12 @@ function attachElfBot(c)
       dl(win,x+6,121,32,'Text');f.text=de(win,x+40,121,42,'');f.foreground=colorField(win,dx(x+84),dy(121),dx(20),'#000000');f.hover=colorField(win,dx(x+106),dy(121),dx(20),'#000000');f.foreground:setHeight(dy(9));f.hover:setHeight(dy(9))
       f.foreground:setTooltip('Text color');f.hover:setTooltip('Hover text color')
     end
+    left:setTooltip('ElfBot command, for example: auto 1000 say "exura"')
+    right:setTooltip('Optional ElfBot command for the right mouse button')
+    local enableIcons
     local selected;local function clear()
-      selected=nil;name:setText('');left:setText('');right:setText('');on:setChecked(false);bkg:setChecked(true);size:setCurrentOption('Small')
-      for _,f in pairs(fields) do f.type:setCurrentOption('Normal');f.bkgType:setCurrentOption('Normal');f.xMode:setCurrentOption('Absolute');f.yMode:setCurrentOption('Absolute');f.x:setText('0');f.y:setText('0');f.text:setText('');for _,v in ipairs(f.ids) do v:setText('0') end;for _,v in ipairs(f.bkgIds) do v:setText('0') end;f.foreground:setText('#000000');f.hover:setText('#000000') end
+      selected=nil;name:setText('');left:setText('');right:setText('');on:setChecked(true);bkg:setChecked(true);size:setCurrentOption('Small')
+      for kind,f in pairs(fields) do f.type:setCurrentOption('Resize');f.bkgType:setCurrentOption('Normal');f.xMode:setCurrentOption('Absolute');f.yMode:setCurrentOption('Absolute');f.x:setText(tostring(20+#data.icons*74));f.y:setText('80');f.text:setText('');for _,v in ipairs(f.ids) do v:setText('0') end;for _,v in ipairs(f.bkgIds) do v:setText('0') end;f.foreground:setText(kind=='onState' and '#55ff88' or '#ff5a61');f.hover:setText('#ffffff') end
     end
     local function refresh()
       names:destroyChildren();local new=createRow('ElfBotRow',names);new:setText('<New Icon>');new.onFocusChange=function(_,focus) if focus then clear() end end
@@ -797,14 +904,16 @@ function attachElfBot(c)
           for kind,f in pairs(fields) do local state=row[kind] or {};f.type:setCurrentOption(state.type or 'Normal');f.bkgType:setCurrentOption(state.bkgType or 'Normal');f.xMode:setCurrentOption(state.xMode or 'Absolute');f.yMode:setCurrentOption(state.yMode or 'Absolute');f.x:setText(tostring(state.x or 0));f.y:setText(tostring(state.y or 0));f.text:setText(state.text or '');f.foreground:setText(state.foreground or '#000000');f.hover:setText(state.hover or state.foreground or '#000000');for n,v in ipairs(f.ids) do v:setText(tostring((state.ids or {})[n] or 0)) end;for n,v in ipairs(f.bkgIds) do v:setText(tostring((state.bkgIds or {})[n] or 0)) end end
         end
       end
+      if selected and data.icons[selected] then selectRow(names:getChildByIndex(selected+1)) end
     end
     local function apply(copy)
-      assert(name:getText()~='','Enter an icon name')
+      assert(name:getText():match('%S'),'Enter an icon name')
       local row={name=name:getText(),lclick=left:getText(),rclick=right:getText(),size=size:getCurrentOption().text,enabled=on:isChecked(),active=false,running=false,background=bkg:isChecked(),errors={}}
       -- Preserve broken imported clicks for editing without rejecting the valid side.
       for _,side in ipairs({'lclick','rclick'}) do if row[side]~='' then local ok,err=pcall(e.compile,row[side]);if not ok then row.errors[side]=tostring(err) end end end
       for kind,f in pairs(fields) do local state={type=f.type:getCurrentOption().text,ids={},bkgIds={},bkgType=f.bkgType:getCurrentOption().text,foreground=f.foreground:getText(),hover=f.hover:getText(),xMode=f.xMode:getCurrentOption().text,yMode=f.yMode:getCurrentOption().text,x=readNumber(f.x,-4000,4000),y=readNumber(f.y,-4000,4000),text=f.text:getText()};for n,v in ipairs(f.ids) do state.ids[n]=readNumber(v,0,65535) end;for n,v in ipairs(f.bkgIds) do state.bkgIds[n]=readNumber(v,0,65535) end;row[kind]=state end
       if selected and not copy then local previous=data.icons[selected];if iconJobs[previous] then iconJobs[previous].active=false;iconJobs[previous].thread=nil;iconJobs[previous]=nil end;data.icons[selected]=row else data.icons[#data.icons+1]=row;selected=#data.icons end
+      if row.enabled then data.iconsEnabled=true;enableIcons:setChecked(true) end
       save();refresh();rebuildIcons();if next(row.errors) then e.status='Icon saved; invalid click scripts need editing' end
     end
     local function move(delta) assert(selected,'Select an icon');local index=math.max(1,math.min(#data.icons,selected+delta));local row=table.remove(data.icons,selected);table.insert(data.icons,index,row);selected=index;refresh();save() end
@@ -817,13 +926,13 @@ function attachElfBot(c)
     db(win,104,123,34,13,'Apply',function() apply(false) end):setTooltip('Save the icon fields')
     db(win,60,123,20,13,'Clear',clear)
     db(win,80,123,20,13,'Del',function() assert(selected,'Select an icon');local row=data.icons[selected];if iconJobs[row] then iconJobs[row].active=false;iconJobs[row].thread=nil;iconJobs[row]=nil end;table.remove(data.icons,selected);clear();refresh();save();rebuildIcons() end)
-    dk(win,8,142,100,'Enable Icons',data.iconsEnabled,function(v) data.iconsEnabled=v;rebuildIcons();save() end)
+    enableIcons=dk(win,8,142,100,'Enable Icons',data.iconsEnabled,function(v) if data.iconsEnabled==v then return end;data.iconsEnabled=v;rebuildIcons();save() end)
     db(win,202,140,34,13,'Copy >>',function() apply(true) end)
     dk(win,242,140,93,'Make icon space top',data.iconsSpaceTop,function(v) data.iconsSpaceTop=v;rebuildIcons();save() end)
     dk(win,242,149,94,'Make icon space bottom',data.iconsSpaceBottom,function(v) data.iconsSpaceBottom=v;rebuildIcons();save() end)
     dk(win,338,140,34,'Large',data.iconsLargeTop,function(v) data.iconsLargeTop=v;rebuildIcons();save() end)
     dk(win,338,149,34,'Large',data.iconsLargeBottom,function(v) data.iconsLargeBottom=v;rebuildIcons();save() end)
-    refresh();return win
+    clear();refresh();return win
   end
   local function navigation()
     local win=window('Navigation',400,245);panels.navigation=win
@@ -869,8 +978,8 @@ function attachElfBot(c)
     return stats
   end
   updateCaption()
-  local function hideAll() uiVisible=false;if e.clearPlayerLabels then e.clearPlayerLabels() end;rebuildIcons();clearOverlays();hudWidget:hide();for _,v in ipairs(windows) do if not v:isDestroyed() and v~=hudWidget then v:hide() end end end
-  local function showMenu() uiVisible=true;updateCaption();show(menu);rebuildIcons();c.playSound('/game_elfbot/sounds/elfng.ogg') end
+  local function hideAll() uiVisible=false;e.hudVisible=false;if e.clearPlayerLabels then e.clearPlayerLabels() end;if e.clearWallTimers then e.clearWallTimers() end;rebuildIcons();clearOverlays();hudDisplay.hide();for _,v in ipairs(windows) do if not v:isDestroyed() then v:hide() end end end
+  local function showMenu() uiVisible=true;e.hudVisible=true;local stats=updateCaption();show(menu);rebuildIcons();hudDisplay.update(true,stats);c.playSound('/game_elfbot/sounds/elfng.ogg') end
   local function open(key,create) show(panels[key] or create()) end
   local commandsView=function() local names={};for name in pairs(e.commands) do names[#names+1]=name end;table.sort(names);scriptEditor('Supported ElfBot commands',table.concat(names,'\n'),function() end) end
   local rows={
@@ -916,9 +1025,11 @@ function attachElfBot(c)
     for i=#windows,1,-1 do if windows[i]:isDestroyed() then table.remove(windows,i) end end
     for i=#statusLabels,1,-1 do if statusLabels[i]:isDestroyed() then table.remove(statusLabels,i) end end
     updateEnabled()
-    local iconSignature=tostring(data.iconsEnabled)..tostring(data.iconsSpaceTop)..tostring(data.iconsSpaceBottom)
+    local rect=g_ui.getRootWidget():getPaddingRect()
+    local iconSignature=tostring(data.iconsEnabled)..tostring(data.iconsSpaceTop)..tostring(data.iconsSpaceBottom)..':'..rect.width..':'..rect.height
     if e.iconsDirty or iconSignature~=e.iconSignature then e.iconSignature=iconSignature;rebuildIcons() end
     local changed=false;for row,job in pairs(iconJobs) do if job.failed and row.running then row.active=false;row.running=false;changed=true end end;if changed then rebuildIcons() end
+    for _,v in ipairs(iconWidgets) do if not v:isDestroyed() and v.iconRow then renderIcon(v,v.iconRow) end end
     local session=updateCaption()
     e.updatePlayerLabels(uiVisible)
     if e.spyWidget and not e.spyWidget:isDestroyed() and panels.spy:isVisible() then e.spyWidget:setText(e.spyText()) end
@@ -927,35 +1038,7 @@ function attachElfBot(c)
     local function rgb(color) return color and string.format('#%02x%02x%02x',color[1],color[2],color[3]) or '#ffffff' end
     for key,display in pairs(e.displays or {}) do if c.now>display.expires then e.displays[key]=nil else overlay(display.text,display.x,display.y,rgb(display.color)) end end
     for _,box in pairs(e.listboxes) do for i,line in ipairs(box.lines) do local offset=box.direction=='up' and -(#box.lines-i+1)*15 or (i-1)*15;overlay(line.text,box.x,box.y+offset,rgb(line.color)) end end
-    if data.hud.enabled and uiVisible then
-      local lines={}
-      if data.hud.general then lines[#lines+1]=c.name()..' | Level '..c.level()..' | HP '..c.hppercent()..'% | MP '..c.manapercent()..'%' end
-      if data.hud.general then lines[#lines+1]='Session '..session.timeText..' | Gained '..ElfBotSession.formatNumber(session.gained)..' XP | '..ElfBotSession.formatNumber(session.perHour)..' XP/hour' end
-      if data.hud.target then local target=c.g_game.getAttackingCreature();lines[#lines+1]='Target: '..(target and target:getName()..' '..target:getHealthPercent()..'%' or 'none') end
-      if data.hud.active then for _,job in ipairs(e.jobs) do if job.active and job.row.enabled and not job.failed and (not job.env or not job.env.hidden) then lines[#lines+1]=job.iconName and ((job.env and job.env.label) or job.iconName)..': '..job.row.script or (job.env and job.env.label) or (job.row.key and job.row.key~='' and job.row.key) or job.row.script end end;lines[#lines+1]=e.status or '' end
-      if data.hud.healing and data.healing then lines[#lines+1]='Healing Hi '..data.healing.hiHealth..'% / Lo '..data.healing.loHealth..'%' end
-      if data.hud.playerInfo then
-        for _,spec in ipairs(c.getSpectators()) do if spec:isPlayer() and spec~=c.player then local info=e.playerInfo(spec);local text=info.name
-          if data.hud.vocation then local vocs={[1]='Sorcerer',[2]='Druid',[3]='Paladin',[4]='Knight',[5]='Master Sorcerer',[6]='Elder Druid',[7]='Royal Paladin',[8]='Elite Knight'};text=text..' | '..(vocs[info.vocation] or 'Vocation ?')..' | Level '..(info.level or '?')..' | HP '..info.hp..'%' end
-          if data.hud.guild then text=text..' | Guild '..(info.guild or '?') end
-          if data.hud.mana then text=text..' | Mana '..(info.mana and ((info.estimated and '~' or '')..info.mana..'/'..info.maxMana) or '?') end
-          lines[#lines+1]=text
-        end end
-      end
-      if data.hud.damage then lines[#lines+1]='Damage / sec (10 s): '..e.damagePerSecond() end
-      if data.hud.deathTimers then for _,death in ipairs(e.deaths) do lines[#lines+1]=death.name..' dead '..math.floor((c.now-death.time)/1000)..' s' end end
-      if data.hud.wallTimers then for _,wall in pairs(e.walls) do local p=wall.position;lines[#lines+1]=(wall.id~=2130 and 'Magic wall ' or 'Wild growth ')..p.x..','..p.y..','..p.z..' | '..math.ceil((wall.expires-c.now)/1000)..' s' end end
-      if data.hud.spellTimers then for key,expires in pairs(e.spellTimers) do lines[#lines+1]=key..' | '..string.format('%.1f',(expires-c.now)/1000)..' s' end end
-      if data.hud.navigation then
-        for _,spec in ipairs(c.getSpectators()) do if spec:isPlayer() and spec~=c.player and (e.listContains('friends',spec:getName()) or e.listContains('enemies',spec:getName()) or e.listContains('subfriends',spec:getName()) or e.listContains('subenemies',spec:getName())) then
-          local p,origin=spec:getPosition(),c.pos();local rx,ry=p.x-origin.x,p.y-origin.y;local relation=(e.listContains('friends',spec:getName()) or e.listContains('subfriends',spec:getName())) and 'Friend' or 'Enemy'
-          if data.hud.altNavigation then lines[#lines+1]=string.format('%s %s: (%+d,%+d), floor %+d',relation,spec:getName(),rx,ry,origin.z-p.z)
-          else local direction=(ry<0 and 'north' or ry>0 and 'south' or '')..(rx<0 and 'west' or rx>0 and 'east' or '');lines[#lines+1]=relation..' '..spec:getName()..': '..direction..' '..c.getDistanceBetween(origin,p)..' sq.' end
-        end end
-      end
-      if data.hud.navigation and e.exivaInfo then lines[#lines+1]=e.exivaInfo.name..': '..e.exivaInfo.direction end
-      hudWidget:setPosition({x=data.hud.x or 8,y=data.hud.y or 130});hudWidget:setHeight(math.max(16,#lines*16));hudWidget:setText(table.concat(lines,'\n'));hudWidget:show()
-    else hudWidget:hide() end
+    hudDisplay.update(uiVisible,session)
     if data.lists.colors then for _,spec in ipairs(c.getSpectators()) do if spec:isPlayer() and spec~=c.player then local color=e.listContains('enemies',spec:getName()) and '#ff4040' or e.listContains('friends',spec:getName()) and '#40ff40' or nil;if color then spec:setMarked(color) end end end end
   end
   e.onReload=function() iconJobs={};e.displays={};clearOverlays();rebuildIcons() end
@@ -1030,6 +1113,7 @@ function attachElfBot(c)
   api.tick=e.tick
   api.disconnected=function() alert('disconnected') end
   api.show=showMenu
+  api.automationChanged=function() updateEnabled();rebuildIcons() end
   api.isVisible=function() return menu:isVisible() end
   api.hide=hideAll
   api.toggle=function() if menu:isVisible() then hideAll() else showMenu() end end
