@@ -28,6 +28,10 @@ on:
       - .github/tests/standalone_util.cpp
       - data/images/splash.png
       - data/cursors/**
+      - data/json/default-options.json
+      - modules/client_options/options.lua
+      - browser/tests/default-options.test.cjs
+      - tools/check_default_options.cjs
       - vc23/otclient.vcxproj
 
   pull_request:
@@ -43,6 +47,10 @@ on:
       - .github/tests/standalone_util.cpp
       - data/images/splash.png
       - data/cursors/**
+      - data/json/default-options.json
+      - modules/client_options/options.lua
+      - browser/tests/default-options.test.cjs
+      - tools/check_default_options.cjs
       - vc23/otclient.vcxproj
 
 jobs:
@@ -141,6 +149,21 @@ jobs:
           [xml]$project = Get-Content -LiteralPath vc23/otclient.vcxproj -Raw
           if (-not $project.SelectSingleNode("//*[local-name()='Target' and @Name='CopyNativeSplash']")) {
             throw 'The direct Visual Studio build must also package native splash artwork.'
+          }
+
+      - name: Validate default settings and Windows packaging
+        shell: pwsh
+        run: |
+          node --test browser/tests/default-options.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Default-options test failed.' }
+          node tools/check_default_options.cjs data/json/default-options.json
+          if ($LASTEXITCODE -ne 0) { throw 'Default-options validation failed.' }
+          $source = Get-FileHash -LiteralPath data/json/default-options.json
+          $packaged = Get-FileHash -LiteralPath build/data/json/default-options.json
+          if ($source.Hash -ne $packaged.Hash) { throw 'Default options differ in Windows build output.' }
+          [xml]$proj = Get-Content -LiteralPath vc23/otclient.vcxproj -Raw
+          if (-not $proj.SelectSingleNode("//*[local-name()='Target' and @Name='CopyDefaultClientOptions']")) {
+            throw 'Direct MSBuild packaging target is missing.'
           }
 
       # Salva mesmo em falha: as 90 deps compilam antes do erro de compile do codigo,

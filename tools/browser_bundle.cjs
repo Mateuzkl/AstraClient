@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
+const { validateDefaultOptions } = require('./check_default_options.cjs');
 const forbidden = /(?:^|\/)(?:\.git|\.env(?:\.[^/]*)?|config\.otml|test-secret\.invalid|.*\.(?:pem|key|pfx|p12|sql|dump|bak|backup|log|tmp|old|psd|pdb|exe|dll|obj))$/i;
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 function writeIfChanged(file, contents) {
@@ -84,6 +85,8 @@ function canonicalOutput(target) {
 }
 function stage(root, policy, target, things) {
   const names = inventory(root, policy);
+  if (names.includes('data/json/default-options.json'))
+    validateDefaultOptions(fs.readFileSync(path.join(root, 'data/json/default-options.json')));
   const realRoot = fs.realpathSync(root) + path.sep;
   const output = canonicalOutput(target);
   const relative = path.relative(realRoot, output);

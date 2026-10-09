@@ -63,6 +63,15 @@ if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/data/images/splash.png")
         VERBATIM)
 endif()
 
+if(WIN32)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/json"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/data/json/default-options.json"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/json/default-options.json"
+        VERBATIM)
+endif()
+
 if(WASM)
     configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
     configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)

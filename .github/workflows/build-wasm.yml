@@ -15,6 +15,7 @@ on:
       - tools/normalize_browser_text_assets.py
       - tools/browser_manifest.py
       - tools/browser_bundle.cjs
+      - tools/check_default_options.cjs
       - init.lua
       - CMakeLists.txt
       - vcpkg.json
@@ -35,6 +36,7 @@ on:
       - tools/normalize_browser_text_assets.py
       - tools/browser_manifest.py
       - tools/browser_bundle.cjs
+      - tools/check_default_options.cjs
       - init.lua
       - CMakeLists.txt
       - vcpkg.json
