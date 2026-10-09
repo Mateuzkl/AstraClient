@@ -1,6 +1,13 @@
 -- Regression for locally damaged default-options.json and player options.
 -- Runs with LuaJIT only; no client binary, graphics, or network required.
 assert(loadfile('modules/corelib/json.lua'))()
+-- Corelib supplies table.find at runtime; mirror it in the isolated test VM.
+table.find = table.find or function(array, needle)
+  for index, value in ipairs(array) do
+    if value == needle then return index end
+  end
+  return nil
+end
 local stream = assert(io.open('data/json/default-options.json', 'rb'))
 local shipped = stream:read('*a')
 stream:close()
