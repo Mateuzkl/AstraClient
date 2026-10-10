@@ -18,11 +18,12 @@ on:
       - init.lua
       - CMakeLists.txt
       - vcpkg.json
+      - cmake/**
   push:
     branches:
       - main
-      - 'feat/**'
-      - 'fix/**'
+      - feat/**
+      - fix/**
     paths:
       - .github/workflows/build-wasm.yml
       - browser/**
@@ -38,6 +39,7 @@ on:
       - init.lua
       - CMakeLists.txt
       - vcpkg.json
+      - cmake/**
 
 permissions:
   contents: read
@@ -51,20 +53,44 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
+
       - name: Check out source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           lfs: true
 
+      - name: Initialize diagnostics
+        run: |
+          mkdir -p build-wasm-release/diagnostics
+          printf "### WebAssembly build stages\n| Stage | Exit code | Seconds |\n| --- | --- | --- |\n" >> "$GITHUB_STEP_SUMMARY"
+          git rev-parse HEAD > build-wasm-release/diagnostics/commit.txt
+
       - name: Extract bundled 8.60 assets
         run: |
           sudo apt-get update
-          sudo apt-get install -y 7zip-rar
+          sudo apt-get install -y 7zip-rar ccache
           7z x data/things/860.rar -odata/things
 
+      - name: Identify compiler cache namespace
+        id: compiler
+        run: |
+          echo "version=$(g++ -dumpfullversion)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiler objects
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-wasm-emsdk-6.0.8-${{ steps.compiler.outputs.version }}-${{ hashFiles('src/**', 'browser/**', 'cmake/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ccache-wasm-emsdk-6.0.8-${{ steps.compiler.outputs.version }}-
+            ccache-wasm-emsdk-6.0.8-
+
+      - name: Reset compiler cache statistics
+        run: ccache --zero-stats
+
       - name: Cache Emscripten SDK and CMake downloads
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ${{ runner.tool_cache }}/emsdk
@@ -87,36 +113,46 @@ jobs:
 
       - name: Build Release
         shell: bash
-        run: bash browser/build-wasm.sh Release
+        run: |
+          bash cmake/ci/run-stage.sh build bash browser/build-wasm.sh Release
 
       - name: Validate browser endpoint, cursor and persistence behavior
         run: |
+          bash cmake/ci/run-stage.sh validate-browser-endpoint-cursor-and-persistence-behavior bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           node --test browser/tests/*.test.cjs
           python3 browser/tests/text_assets.py
           python3 browser/tests/manifest.py
+          CI_DIAGNOSTIC_STAGE
 
       - name: Audit source secrets and actual production bundle
         run: |
+          bash cmake/ci/run-stage.sh audit-source-secrets-and-actual-production-bundle bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           node tools/browser_bundle.cjs scan .
           node tools/browser_bundle.cjs audit . browser/production-assets.json build-wasm-release/dist data/things/860
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate production Nginx TLS and binary WebSocket routes
         run: |
+          bash cmake/ci/run-stage.sh validate-production-nginx-tls-and-binary-websocket-routes bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           sudo apt-get install -y --no-install-recommends nginx openssl
           ASTRA_NGINX=nginx ASTRA_WEB_DIST="$PWD/build-wasm-release/dist" node --test browser/tests/nginx.test.cjs
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate WebSocket teardown with the pinned SDK
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-websocket-teardown-with-the-pinned-sdk bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
             -lwebsocket.js --pre-js browser/tests/mock-websocket.js \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-websocket-test.js"
           node "${RUNNER_TEMP}/astra-websocket-test.js"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate browser RSA login encryption and settings compatibility
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-browser-rsa-login-encryption-and-settings-compatibility bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-rsa-test.js"
@@ -129,36 +165,44 @@ jobs:
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-credentials-test.js"
           node "${RUNNER_TEMP}/astra-credentials-test.js"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate independent logic timer on the application pthread
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-independent-logic-timer-on-the-application-pthread bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -pthread browser/tests/logic_timer.cpp \
             -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 -sEXIT_RUNTIME=1 \
             -sENVIRONMENT=node -sASSERTIONS=1 -o "${RUNNER_TEMP}/astra-logic-timer.js"
           timeout 15 node "${RUNNER_TEMP}/astra-logic-timer.js"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate Fetch callback lifetimes with the pinned SDK
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-fetch-callback-lifetimes-with-the-pinned-sdk bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
             --pre-js browser/tests/mock-fetch.js -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \
             -o "${RUNNER_TEMP}/astra-fetch-test.js"
           node "${RUNNER_TEMP}/astra-fetch-test.js"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate synchronous keyboard cancellation on the browser thread
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-synchronous-keyboard-cancellation-on-the-browser-thread bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
             --pre-js browser/tests/mock-keyboard.js --pre-js browser/runtime.js \
             -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 -sEXIT_RUNTIME=1 \
             -sENVIRONMENT=node -sASSERTIONS=1 -o "${RUNNER_TEMP}/astra-keyboard-test.js"
           timeout 15 node "${RUNNER_TEMP}/astra-keyboard-test.js"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate queue and Lua parser ownership with sanitizers
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-queue-and-lua-parser-ownership-with-sanitizers bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           g++ -std=c++17 -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
             -fno-omit-frame-pointer browser/tests/message_budget.cpp \
             -o "${RUNNER_TEMP}/astra-message-budget-test"
@@ -169,21 +213,50 @@ jobs:
             -DLUA_ANSI -I "${LUA_SRC}" -I browser/lua51 browser/tests/lua_parser.c \
             "${LUA_SOURCES[@]}" -lm -o "${RUNNER_TEMP}/astra-lua-parser-test"
           "${RUNNER_TEMP}/astra-lua-parser-test"
+          CI_DIAGNOSTIC_STAGE
 
       - name: Validate shipped static and animated cursor images
         shell: bash
         run: |
+          bash cmake/ci/run-stage.sh validate-shipped-static-and-animated-cursor-images bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
           em++ -std=c++17 -DNDEBUG -I src browser/tests/cursor_images.cpp \
             src/framework/graphics/apngloader.cpp -sUSE_ZLIB=1 \
             --embed-file data/cursors@/data/cursors \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \
             -o "${RUNNER_TEMP}/astra-cursor-images-test.js"
           node "${RUNNER_TEMP}/astra-cursor-images-test.js" /data/cursors
+          CI_DIAGNOSTIC_STAGE
 
       - name: Upload browser bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: astraclient-browser-${{ github.sha }}
           path: build-wasm-release/dist/
           if-no-files-found: error
           compression-level: 6
+
+      - name: Record compiler cache statistics
+        if: always()
+        run: |
+          bash cmake/ci/run-stage.sh compiler-cache ccache --show-stats
+        continue-on-error: true
+
+      - name: Upload build diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: wasm-diagnostics-${{ github.sha }}
+          path: |
+            build-wasm-release/diagnostics/
+            build-wasm-release/CMakeCache.txt
+            build-wasm-release/CMakeFiles/CMakeConfigureLog.yaml
+            build-wasm-release/Testing/Temporary/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache-wasm
+      CCACHE_MAXSIZE: 1G
+      CCACHE_COMPILERCHECK: content
+      EM_COMPILER_WRAPPER: ccache
+      DIAGNOSTICS_DIR: build-wasm-release/diagnostics
