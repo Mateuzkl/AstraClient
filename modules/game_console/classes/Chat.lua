@@ -865,6 +865,7 @@ function Chat:sendPrivateMessage(tab, chatCommandPrivateReady, chatCommandPrivat
 end
 
 function Chat:sendMessage(message, tab)
+    if filterMessage(message) then return end
     local tab = tab or self:getCurrentTab()
     if not tab then
         return
