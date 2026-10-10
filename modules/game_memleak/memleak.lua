@@ -23,7 +23,7 @@ local function readPerformance()
   local ping = online and g_game.getPing and validMetric(g_game.getPing(), 0) or nil
   local proxyPing = online and g_proxy and g_proxy.getPing and validMetric(g_proxy.getPing(), 1) or nil
   return {
-    timestamp = g_clock.millis(),
+    timestamp = g_clock.realMillis(),
     fps = g_app and g_app.getFps and validMetric(g_app.getFps(), 0) or nil,
     ping = ping,
     proxyPing = proxyPing
@@ -47,17 +47,20 @@ local function metricSummary(key)
   return string.format('avg %.0f / min %.0f / max %.0f', total / count, low, high)
 end
 
-local function updatePerformance()
+local function updatePerformance(delay)
   local sample = readPerformance()
-  local previous = performanceSamples[#performanceSamples]
-  sample.delay = previous and math.max(0, sample.timestamp - previous.timestamp - sampleInterval) or 0
+  sample.delay = delay -- The initial sample has no preceding scheduled deadline.
   performanceSamples[#performanceSamples + 1] = sample
   if #performanceSamples > maxSamples then table.remove(performanceSamples, 1) end
-  local span = (sample.timestamp - performanceSamples[1].timestamp) / 1000
   setPerformanceText('perfCurrent', 'FPS: ' .. metricText(sample.fps, '') .. ' | Game ping: ' .. metricText(sample.ping, ' ms') ..
     ' | Proxy ping: ' .. metricText(sample.proxyPing, ' ms'))
-  setPerformanceText('perfHistory', string.format('Sampled over %.1fs (%d/%d; every 2s):\nFPS: %s\nGame ping (ms): %s\nMonitor timer delay (ms): %s',
-    span, #performanceSamples, maxSamples, metricSummary('fps'), metricSummary('ping'), metricSummary('delay')))
+  return sample
+end
+
+local function updatePerformanceHistory()
+  local span = (performanceSamples[#performanceSamples].timestamp - performanceSamples[1].timestamp) / 1000
+  setPerformanceText('perfHistory', string.format('Sampled over %.1fs (%d/%d; every 2s):\nFPS: %s\nGame ping (ms): %s\nMonitor timer delay (ms): %s\nMonitor collection work (ms): %s',
+    span, #performanceSamples, maxSamples, metricSummary('fps'), metricSummary('ping'), metricSummary('delay'), metricSummary('work')))
 end
 
 local function stopMonitoring()
@@ -72,13 +75,22 @@ local function startMonitoring()
   performanceSnapshot = nil
   setPerformanceText('perfDiff', 'Snapshot/Diff also compares FPS and ping. Unavailable readings are not zero.')
   local expected = generation
+  local sampleDeadline
   local function memoryTick()
     if expected ~= generation or not initialized then return end
     monitorEvent = nil
     if not g_memLeak.isWindowVisible() then return end
-    updatePerformance()
+    local started = g_clock.realMillis()
+    local delay = sampleDeadline and math.max(0, started - sampleDeadline) or nil
+    local sample = updatePerformance(delay)
     g_memLeak.updateMemoryDisplay()
+    if expected ~= generation or not initialized or not g_memLeak.isWindowVisible() then return end
+    sample.work = math.max(0, g_clock.realMillis() - started)
+    updatePerformanceHistory()
+    -- Use the native event's deadline: its clock may be cached within a frame.
+    -- Real time above measures callback work without mistaking it for lateness.
     monitorEvent = scheduleEvent(memoryTick, sampleInterval)
+    sampleDeadline = monitorEvent:ticks()
   end
   local function detailTick()
     if expected ~= generation or not initialized then return end

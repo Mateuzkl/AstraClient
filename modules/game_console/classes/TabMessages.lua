@@ -25,7 +25,7 @@ function TabMessages.new(name, content)
         activeLabels = 0,
 
         messagesPerSecond = 0,
-        messageWindowStart = nil,
+        recentMessageTimes = {},
         lastMessageTime = 0,
         event = nil,
         ownerPrivateChannel = false,
@@ -133,7 +133,7 @@ function TabMessages:clearMessages()
     end
     self.activeLabels = 0
     self.messagesPerSecond = 0
-    self.messageWindowStart = nil
+    self.recentMessageTimes = {}
     self.lastMessageTime = 0
     self:updateLabels()
 end
@@ -179,19 +179,22 @@ function TabMessages:isNpcChat()
     return self.name == NPC_NAME_CHAT
 end
 
-function TabMessages:getMessagesPerSecond()
-    if not self.messageWindowStart or g_clock.millis() - self.messageWindowStart >= 1000 then return 0 end
+-- Threshold-capped rolling count: only the newest batching-threshold timestamps
+-- are needed to decide whether traffic is above the limit. Never retain a burst.
+function TabMessages:getMessagesPerSecond(now)
+    now = now or g_clock.millis()
+    local times = self.recentMessageTimes
+    while times[1] and now - times[1] >= 1000 do table.remove(times, 1) end
+    self.messagesPerSecond = #times
     return self.messagesPerSecond
 end
 
 function TabMessages:recordMessage()
     local now = g_clock.millis()
-    if not self.messageWindowStart or now - self.messageWindowStart >= 1000 then
-        self.messageWindowStart = now
-        self.messagesPerSecond = 1
-    else
-        self.messagesPerSecond = self.messagesPerSecond + 1
-    end
+    self:getMessagesPerSecond(now)
+    if #self.recentMessageTimes >= MAX_MESSAGE_PER_SECOND then table.remove(self.recentMessageTimes, 1) end
+    table.insert(self.recentMessageTimes, now)
+    self.messagesPerSecond = #self.recentMessageTimes
     self.lastMessageTime = now
 end
 

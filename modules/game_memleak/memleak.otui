@@ -68,7 +68,7 @@ MainWindow
       text: 'Sampled history: -'
 
     MemLeakLabel
-      text: 'High ping can indicate network delay; low FPS or late timer samples can indicate client stalls. Timer delay is not network latency. Samples are not per-frame timings.'
+      text: 'High ping can indicate network delay; low FPS or late timers can indicate client stalls. Timer delay measures lateness against the scheduled deadline; the initial sample is unavailable. Collection work measures sampling and memory-display work before updating history. Neither is network latency or per-frame timing.'
 
     MemLeakSection
       !text: tr('Process and Lua Memory')

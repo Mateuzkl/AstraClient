@@ -22,7 +22,7 @@ local function drainCanceled()
   end
 end
 local measured = 0
-local now, fps, ping, proxyPing, online = 0, 61, 51, 0, true
+local now, realNow, fps, ping, proxyPing, online = 0, 0, 61, 51, 0, true
 local window
 local function newWidget(collection)
   local widget = {visible = false}
@@ -40,7 +40,7 @@ local function newWidget(collection)
   return widget
 end
 local env = {
-  g_clock = {millis = function() return now end},
+  g_clock = {millis = function() return now end, realMillis = function() return realNow end},
   g_app = {getFps = function() return fps end},
   g_game = {isOnline = function() return online end, getPing = function() return ping end},
   g_proxy = {getPing = function() return proxyPing end},
@@ -50,7 +50,12 @@ local env = {
   },
   g_ui = {displayUI = function() return newWidget(windows) end},
   modules = {client_topmenu = {addLeftButton = function() return newWidget(buttons) end}},
-  scheduleEvent = function(fn, delay) local event = {}; events[event] = {callback = fn, canceled = false, delay = delay}; return event end,
+  scheduleEvent = function(fn, delay)
+    local deadline = now + delay
+    local event = {ticks = function() return deadline end}
+    events[event] = {callback = fn, canceled = false, delay = delay}
+    return event
+  end,
   removeEvent = function(event)
     -- Like the real dispatcher: release the callback, retain the queue entry until poll().
     local entry = assert(events[event]); entry.canceled = true; entry.callback = nil
@@ -114,7 +119,8 @@ fps, ping, proxyPing = 60, 50, 55
 env.takeSnapshot()
 assert(snapshots == 1 and window.labels.perfDiff.text:find('FPS 60', 1, true))
 local function sample(elapsed)
-  now = now + elapsed
+  realNow = realNow + elapsed
+  now = realNow -- The frame clock advances before dispatching, not during work.
   for event, entry in pairs(events) do
     if not entry.canceled and entry.delay == 2000 then
       local fn = entry.callback; events[event] = nil; fn(); return
@@ -143,8 +149,28 @@ env.onClose(); env.takeSnapshot(); env.showDiff()
 assert(snapshots == 1 and diffs == 1 and activeEvents() == 0, 'closed diagnostics must not sample or snapshot')
 env.toggle()
 assert(window.labels.perfHistory.text:find('(1/120;', 1, true), 'reopening must reset performance history')
+assert(window.labels.perfHistory.text:find('Monitor timer delay (ms): unavailable', 1, true),
+  'the initial sample has no measured interval and must not introduce a zero')
 env.showDiff()
 assert(window.labels.perfDiff.text:find('Take a Snapshot first', 1, true), 'old performance baselines must not survive reopening')
+
+sample(2100); sample(2250)
+assert(window.labels.perfHistory.text:find('Monitor timer delay (ms): avg 175 / min 100 / max 250', 1, true),
+  'all-late intervals must not have a fabricated zero minimum or understated average')
+
+-- Native millis() is cached during callbacks; realMillis() advances. A long
+-- collection must be reported as work, not as lateness of an on-time event.
+env.onClose()
+env.g_memLeak.updateMemoryDisplay = function() realNow = realNow + 125 end
+env.toggle()
+assert(window.labels.perfHistory.text:find('Monitor timer delay (ms): unavailable', 1, true))
+assert(window.labels.perfHistory.text:find('Monitor collection work (ms): avg 125 / min 125 / max 125', 1, true))
+sample(1875) -- The native deadline is 2000 ms after the cached frame timestamp.
+assert(window.labels.perfHistory.text:find('Monitor timer delay (ms): avg 0 / min 0 / max 0', 1, true),
+  'callback runtime must not count as delay, even with a frozen frame clock')
+sample(2175) -- 125 ms of prior work + 2175 ms elapsed = 300 ms past deadline.
+assert(window.labels.perfHistory.text:find('Monitor timer delay (ms): avg 150 / min 0 / max 300', 1, true))
+assert(window.labels.perfHistory.text:find('Monitor collection work (ms): avg 125 / min 125 / max 125', 1, true))
 env.terminate(); drainCanceled()
 
 env.g_memLeak = nil

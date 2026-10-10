@@ -95,6 +95,7 @@ do -- Public/private bursts must stop batching after silence; buffers stay bound
   chat.currentTab = 'Local'; tab:setCurrent(true)
   for i = 1, 10000 do tab:addMessage('', 0, 1, 'message ' .. i) end
   assert(#tab.messages == 200 and tab.activeLabels == 200 and count(events) == 1)
+  assert(#tab.recentMessageTimes == 20, 'rolling rate bookkeeping must stay bounded under a 10000-message burst')
   assert(tab.messages[200]:getText() == 'message 10000')
   now = 1100; fire(tab.event, true)
   assert(count(events) == 0 and not tab:isInSlowMode() and tab:getMessagesPerSecond() == 0,
@@ -113,9 +114,32 @@ do -- Public/private bursts must stop batching after silence; buffers stay bound
   end
   assert(labels[200].message:getText() == 'after burst')
 
+  -- A burst split across the old fixed-window boundary must still be batched.
+  for _, private in ipairs({false, true}) do
+    tab:stopSlowMode(); tab:clearMessages()
+    local start = now + 2000
+    now = start
+    local function add(text)
+      if private then tab:addPrivateMessage(text, 1, '') else tab:addMessage('', 0, 1, text) end
+    end
+    add('seed')
+    now = start + 990
+    for i = 1, 9 do add('before boundary ' .. i) end
+    now = start + 1010
+    for i = 1, 11 do add('after boundary ' .. i) end
+    assert(tab:getMessagesPerSecond() == 20 and tab:isInSlowMode() and count(events) == 1,
+      'public/private rolling-second bursts must not bypass batching at a fixed boundary')
+    now = start + 1990
+    assert(tab:getMessagesPerSecond() == 11, 'timestamps exactly one second old must expire')
+    fire(tab.event, true)
+    assert(not tab:isInSlowMode() and count(events) == 0, 'traffic below the rolling threshold must leave batching')
+    now = start + 2010
+    assert(tab:getMessagesPerSecond() == 0 and #tab.recentMessageTimes == 0)
+  end
+
   -- Shared labels must not be cleared by records from an inactive tab.
   local other = env.Message.new()
-  local label = labels[1]; label.children = 1; label.keywords = {'owned'}
+  local label = labels[200]; label.children = 1; label.keywords = {'owned'}
   other.label = label; other:clear()
   assert(label.children == 1 and #label.keywords == 1 and label.message ~= nil)
   label.message:clear()
@@ -203,10 +227,14 @@ do -- Native portrait references and unchanged UI updates.
   assert(children.creature.creature == nil and weak[1] == nil, 'hidden pool rows must release the native portrait owner too')
 end
 
-do -- A crowded map must not filter all spectators after filling the 30-row pool.
+do -- Global top-K selection must include late spectators with better priorities.
   local online, spectators, positionCalls, filterCalls, targetCalls, rowUpdates = true, {}, 0, 0, 0, 0
   local player = {getPosition = function() positionCalls = positionCalls + 1; return {x = 0, y = 0, z = 7} end}
   local env = {g_clock = {millis = function() return 1000 end},
+    table = setmetatable({sort = function(values, compare)
+      assert(#values <= 30, 'only the retained row-capacity candidates may be sorted')
+      return table.sort(values, compare)
+    end}, {__index = table}),
     KeyBind = {getKeyBind = function() return {} end},
     g_game = {isOnline = function() return online end, getLocalPlayer = function() return player end,
       getAttackingCreature = function() targetCalls = targetCalls + 1 end,
@@ -225,20 +253,47 @@ do -- A crowded map must not filter all spectators after filling the 30-row pool
   local battle = {panel = {getLayout = noop}, buttons = buttons, sortType = {'byDistanceAscending'},
     window = {isVisible = function() return false end}, secondary = false}
   env.battleClasses = {battle}
-  for i = 1, 500 do
-    local id = i
-    spectators[i] = {isLocalPlayer = function() filterCalls = filterCalls + 1; return false end,
+  local function spectator(id)
+    return {isLocalPlayer = function() filterCalls = filterCalls + 1; return false end,
       getHealthPercent = function() return 80 end, getPosition = function() return {x = 31 - id, y = 0, z = 7} end,
       canBeSeen = function() return true end, isPlayer = function() return false end,
       isNpc = function() return false end, isMonster = function() return false end,
       getId = function() return id end, getName = function() return string.format('Name%03d', 31 - id) end}
   end
+  for i = 1, 500 do spectators[i] = spectator(i) end
   env.checkCreatures()
-  assert(filterCalls == 30 and positionCalls == 1, 'cap filters and share the player position across filtering/sorting')
+  assert(filterCalls == 500 and positionCalls == 1, 'scan all candidates while sharing one player position')
   assert(targetCalls == 2 and rowUpdates == 30, 'one target snapshot and one row update per battle tick')
-  for i = 1, 30 do assert(buttons[i].creature == spectators[31 - i]) end
+  local expected = {}
+  for i = 1, 500 do expected[i] = spectators[i] end
+  local function assertSelection(mode)
+    battle.sortType[1] = mode
+    local descending = mode:find('Descending') ~= nil
+    local function value(creature)
+      if mode:find('Distance') then return math.abs(31 - creature:getId()) end
+      if mode:find('Hitpoints') then return creature:getHealthPercent() end
+      if mode:find('Name') then return creature:getName():lower() end
+      return creature:getId()
+    end
+    table.sort(expected, function(a, b)
+      local va, vb = value(a), value(b)
+      if va == vb then va, vb = a:getId(), b:getId() end
+      if descending then return va > vb end
+      return va < vb
+    end)
+    env.checkCreatures()
+    for i = 1, 30 do assert(buttons[i].creature == expected[i], 'bounded heap must match global sort for ' .. mode) end
+  end
+  for _, field in ipairs({'Distance', 'Hitpoints', 'Name', 'Age'}) do
+    assertSelection('by' .. field .. 'Ascending')
+    assertSelection('by' .. field .. 'Descending')
+  end
+  -- A low-health candidate at the very end must displace an early full row.
+  spectators[500].getHealthPercent = function() return 1 end
+  assertSelection('byHitpointsAscending')
+  assert(buttons[1].creature == spectators[500])
+  spectators[500].getHealthPercent = function() return 80 end
   battle.sortType[1] = 'byNameDescending'; env.checkCreatures()
-  for i = 1, 30 do assert(buttons[i].creature == spectators[i]) end
   battle.sortType[1] = 'byHitpointsAscending'; env.checkCreatures()
   for i = 1, 30 do assert(buttons[i].creature == spectators[i], 'ties preserve age ordering') end
   local checks, filters = 0, {showPlayers = false}
@@ -254,6 +309,19 @@ do -- A crowded map must not filter all spectators after filling the 30-row pool
   local before = targetCalls
   env.onTargetStateChange()
   assert(targetCalls == before + 2, 'immediate target events share their native getters across all rows')
+  for i = 501, 1600 do spectators[i] = spectator(i) end
+  battle.sortType[1] = 'byAgeDescending'; env.checkCreatures()
+  for i = 1, 30 do assert(buttons[i].creature == spectators[1601 - i], 'newest global ages must not wrap at 1000') end
+  local ages = upvalue(env.checkCreatures, 'battleAges')
+  assert(count(ages) == 1600 and ages[1] == 1 and ages[1600] == 1600)
+  local weak = setmetatable({spectators[1599]}, {__mode = 'v'})
+  spectators, expected = {spectators[1], spectators[1600]}, {}
+  battle.sortType[1] = 'byAgeAscending'; env.checkCreatures()
+  assert(buttons[1].creature == spectators[1] and buttons[2].creature == spectators[2] and count(ages) == 2,
+    'removed spectator IDs must be pruned without changing the ages of remaining creatures')
+  for i = 3, 30 do assert(buttons[i].creature == nil, 'unfilled row slots must release their creature') end
+  collectgarbage('collect'); collectgarbage('collect')
+  assert(weak[1] == nil, 'top-K selection must not retain discarded/removed spectator objects')
   online = false; env.checkCreatures()
   for _, button in ipairs(buttons) do assert(button.creature == nil) end
 end
@@ -394,4 +462,4 @@ do -- Terminal spam must not grow the copy buffer or allocate rows indefinitely.
   assert(count(events) == 0 and #upvalue(env.addLine, 'cachedLines') == 0)
 end
 
-print('Memory hotpaths: chat, terminal spam, creature owners, battle cap/sort and Helper sessions passed')
+print('Memory hotpaths: rolling chat bursts, terminal spam, creature owners, global battle top-K and Helper sessions passed')
