@@ -120,6 +120,10 @@ function terminate()
   g_chat:terminate()
 
   Communication:saveSettings()
+  if consolePanel then consolePanel:destroy(); consolePanel = nil end
+  consoleToggleChat = nil
+  g_chat = nil
+  g_channel = nil
 end
 
 function save()

@@ -57,6 +57,20 @@ MainWindow
       color: #9fc6e0
 
     MemLeakSection
+      !text: tr('FPS, Ping and Client Responsiveness')
+
+    MemLeakLabel
+      id: perfCurrent
+      text: 'FPS / Ping: -'
+
+    MemLeakLabel
+      id: perfHistory
+      text: 'Sampled history: -'
+
+    MemLeakLabel
+      text: 'High ping can indicate network delay; low FPS or late timer samples can indicate client stalls. Timer delay is not network latency. Samples are not per-frame timings.'
+
+    MemLeakSection
       !text: tr('Process and Lua Memory')
 
     MemLeakLabel
@@ -112,12 +126,19 @@ MainWindow
       id: widgetLeak
       text: 'Take a snapshot before repeating a workload.'
 
+    MemLeakLabel
+      id: perfDiff
+      text: 'Snapshot/Diff also compares FPS and ping.'
+
     MemLeakSection
       !text: tr('Dispatcher and Slow Callbacks')
 
     MemLeakLabel
       id: eventInfo
       text: '-'
+
+    MemLeakLabel
+      text: 'Timings are cumulative since the last profiler reset. Time (%) = share of measured callbacks; Cpu (%) = callback time / elapsed time, not OS process CPU. Detached widgets and canceled queue entries alone do not prove a leak. Compare the same workload before and after.'
 
     MemLeakSection
       !text: tr('Growth Alerts')

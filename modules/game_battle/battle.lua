@@ -381,25 +381,31 @@ end
 local function sortCreaturesForBattle(battle, creatures, player)
   local sortType = (battle.sortType and battle.sortType[1]) or (battle.panel and battle.panel.sortType) or 'byAgeAscending'
   local descending = sortType:find('Descending') ~= nil
-
-  local function compareValue(a, b)
-    if sortType:find('Distance') then
-      local playerPos = player:getPosition()
-      return getDistanceBetween(playerPos, a:getPosition()), getDistanceBetween(playerPos, b:getPosition())
-    elseif sortType:find('Hitpoints') then
-      return a:getHealthPercent(), b:getHealthPercent()
-    elseif sortType:find('Name') then
-      return a:getName():lower(), b:getName():lower()
+  local byDistance = sortType:find('Distance') ~= nil
+  local byHitpoints = sortType:find('Hitpoints') ~= nil
+  local byName = sortType:find('Name') ~= nil
+  local playerPos = byDistance and player:getPosition()
+  local values, ages = {}, {}
+  -- Native getters (especially position tables) need only run once per row,
+  -- not on every comparison made by table.sort.
+  for _, creature in ipairs(creatures) do
+    local age = battleAges[creature:getId()] or 0
+    ages[creature] = age
+    if byDistance then
+      values[creature] = getDistanceBetween(playerPos, creature:getPosition())
+    elseif byHitpoints then
+      values[creature] = creature:getHealthPercent()
+    elseif byName then
+      values[creature] = creature:getName():lower()
+    else
+      values[creature] = age
     end
-
-    return battleAges[a:getId()] or 0, battleAges[b:getId()] or 0
   end
 
   table.sort(creatures, function(a, b)
-    local valueA, valueB = compareValue(a, b)
+    local valueA, valueB = values[a], values[b]
     if valueA == valueB then
-      valueA = battleAges[a:getId()] or 0
-      valueB = battleAges[b:getId()] or 0
+      valueA, valueB = ages[a], ages[b]
     end
 
     if descending then
@@ -428,7 +434,8 @@ local function updateBattleCreatures(battle, spectators, player)
   local now = g_clock.millis()
   local resetAgePoint = now - 250
   for _, creature in ipairs(spectators) do
-    if doCreatureFitFilters(battle, creature, player) and #creatures < maxCreatures then
+    if #creatures >= maxCreatures then break end
+    if doCreatureFitFilters(battle, creature, player) then
       if not creature.lastSeen or creature.lastSeen < resetAgePoint then
         creature.screenAge = now
       end

@@ -3,6 +3,62 @@ local window, button, monitorEvent, updateEvent
 local initialized = false
 local generation = 0
 local hotkey = 'Ctrl+Alt+M'
+local performanceLabels = {}
+local performanceSamples = {}
+local performanceSnapshot
+local sampleInterval = 2000
+local maxSamples = 120
+
+local function setPerformanceText(id, value)
+  local label = performanceLabels[id]
+  if label and not label:isDestroyed() and label:getText() ~= value then label:setText(value) end
+end
+
+local function validMetric(value, minimum)
+  return type(value) == 'number' and value == value and value < math.huge and value >= minimum and value or nil
+end
+
+local function readPerformance()
+  local online = g_game and g_game.isOnline and g_game.isOnline()
+  local ping = online and g_game.getPing and validMetric(g_game.getPing(), 0) or nil
+  local proxyPing = online and g_proxy and g_proxy.getPing and validMetric(g_proxy.getPing(), 1) or nil
+  return {
+    timestamp = g_clock.millis(),
+    fps = g_app and g_app.getFps and validMetric(g_app.getFps(), 0) or nil,
+    ping = ping,
+    proxyPing = proxyPing
+  }
+end
+
+local function metricText(value, unit)
+  return value and string.format('%.0f%s', value, unit) or 'unavailable'
+end
+
+local function metricSummary(key)
+  local total, count, low, high = 0, 0, math.huge, 0
+  for _, sample in ipairs(performanceSamples) do
+    local value = sample[key]
+    if value then
+      total, count = total + value, count + 1
+      low, high = math.min(low, value), math.max(high, value)
+    end
+  end
+  if count == 0 then return 'unavailable' end
+  return string.format('avg %.0f / min %.0f / max %.0f', total / count, low, high)
+end
+
+local function updatePerformance()
+  local sample = readPerformance()
+  local previous = performanceSamples[#performanceSamples]
+  sample.delay = previous and math.max(0, sample.timestamp - previous.timestamp - sampleInterval) or 0
+  performanceSamples[#performanceSamples + 1] = sample
+  if #performanceSamples > maxSamples then table.remove(performanceSamples, 1) end
+  local span = (sample.timestamp - performanceSamples[1].timestamp) / 1000
+  setPerformanceText('perfCurrent', 'FPS: ' .. metricText(sample.fps, '') .. ' | Game ping: ' .. metricText(sample.ping, ' ms') ..
+    ' | Proxy ping: ' .. metricText(sample.proxyPing, ' ms'))
+  setPerformanceText('perfHistory', string.format('Sampled over %.1fs (%d/%d; every 2s):\nFPS: %s\nGame ping (ms): %s\nMonitor timer delay (ms): %s',
+    span, #performanceSamples, maxSamples, metricSummary('fps'), metricSummary('ping'), metricSummary('delay')))
+end
 
 local function stopMonitoring()
   generation = generation + 1
@@ -12,13 +68,17 @@ end
 
 local function startMonitoring()
   stopMonitoring()
+  performanceSamples = {}
+  performanceSnapshot = nil
+  setPerformanceText('perfDiff', 'Snapshot/Diff also compares FPS and ping. Unavailable readings are not zero.')
   local expected = generation
   local function memoryTick()
     if expected ~= generation or not initialized then return end
     monitorEvent = nil
     if not g_memLeak.isWindowVisible() then return end
+    updatePerformance()
     g_memLeak.updateMemoryDisplay()
-    monitorEvent = scheduleEvent(memoryTick, 2000)
+    monitorEvent = scheduleEvent(memoryTick, sampleInterval)
   end
   local function detailTick()
     if expected ~= generation or not initialized then return end
@@ -51,6 +111,9 @@ function terminate()
   initialized = false
   if g_memLeak then g_memLeak.uiTerminate() end
   window = nil -- C++ destroys the owned window and drops all child references.
+  performanceLabels = {}
+  performanceSamples = {}
+  performanceSnapshot = nil
   if button then button:destroy(); button = nil end
 end
 
@@ -59,6 +122,9 @@ function toggle()
   if not window then
     window = g_ui.displayUI('memleak')
     if not window then return end
+    for _, id in ipairs({'perfCurrent', 'perfHistory', 'perfDiff'}) do
+      performanceLabels[id] = window:recursiveGetChildById(id)
+    end
     g_memLeak.uiInit(window)
   end
   g_memLeak.toggle()
@@ -73,7 +139,29 @@ function onClose()
   if button then button:setOn(false) end
 end
 
-function takeSnapshot() g_memLeak.takeSnapshot() end
-function showDiff() g_memLeak.computeDiff() end
+function takeSnapshot()
+  if not initialized or not g_memLeak.isWindowVisible() then return end
+  performanceSnapshot = readPerformance()
+  g_memLeak.takeSnapshot()
+  setPerformanceText('perfDiff', 'Snapshot: FPS ' .. metricText(performanceSnapshot.fps, '') ..
+    ' | Game ping ' .. metricText(performanceSnapshot.ping, ' ms'))
+end
+
+function showDiff()
+  if not initialized or not g_memLeak.isWindowVisible() then return end
+  g_memLeak.computeDiff()
+  if not performanceSnapshot then
+    setPerformanceText('perfDiff', 'Take a Snapshot first to compare FPS and ping.')
+    return
+  end
+  local sample = readPerformance()
+  local function change(key, unit)
+    local before, after = performanceSnapshot[key], sample[key]
+    if not before or not after then return 'unavailable' end
+    return metricText(before, unit) .. ' -> ' .. metricText(after, unit) .. string.format(' (%+.0f%s)', after - before, unit)
+  end
+  setPerformanceText('perfDiff', string.format('Performance diff over %.1fs:\nFPS: %s | Game ping: %s\nProxy ping: %s',
+    (sample.timestamp - performanceSnapshot.timestamp) / 1000, change('fps', ''), change('ping', ' ms'), change('proxyPing', ' ms')))
+end
 function clearAlerts() g_memLeak.clearAlerts() end
 function forceGC() g_memLeak.forceGC() end

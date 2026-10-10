@@ -22,22 +22,35 @@ local function drainCanceled()
   end
 end
 local measured = 0
+local now, fps, ping, proxyPing, online = 0, 61, 51, 0, true
 local window
 local function newWidget(collection)
   local widget = {visible = false}
   collection[widget] = true
   function widget:destroy() assert(collection[self], 'double destroy'); collection[self] = nil end
   function widget:setOn(_) end
+  widget.labels = {}
+  function widget:recursiveGetChildById(id)
+    if not self.labels[id] then
+      self.labels[id] = {text = '', isDestroyed = function() return false end,
+        getText = function(label) return label.text end, setText = function(label, value) label.text = value end}
+    end
+    return self.labels[id]
+  end
   return widget
 end
 local env = {
+  g_clock = {millis = function() return now end},
+  g_app = {getFps = function() return fps end},
+  g_game = {isOnline = function() return online end, getPing = function() return ping end},
+  g_proxy = {getPing = function() return proxyPing end},
   g_keyboard = {
     bindKeyDown = function(key, fn) assert(not bindings[key]); bindings[key] = fn end,
     unbindKeyDown = function(key, fn) assert(bindings[key] == fn); bindings[key] = nil end,
   },
   g_ui = {displayUI = function() return newWidget(windows) end},
   modules = {client_topmenu = {addLeftButton = function() return newWidget(buttons) end}},
-  scheduleEvent = function(fn) local event = {}; events[event] = {callback = fn, canceled = false}; return event end,
+  scheduleEvent = function(fn, delay) local event = {}; events[event] = {callback = fn, canceled = false, delay = delay}; return event end,
   removeEvent = function(event)
     -- Like the real dispatcher: release the callback, retain the queue entry until poll().
     local entry = assert(events[event]); entry.canceled = true; entry.callback = nil
@@ -62,6 +75,7 @@ for _ = 1, 20 do
     'init must be idempotent and allocate no monitoring window/events')
   env.toggle()
   assert(count(windows) == 1 and activeEvents() == 2 and measured > 0)
+  assert(window.labels.perfCurrent.text:find('FPS: 61', 1, true) and window.labels.perfCurrent.text:find('Game ping: 51 ms', 1, true))
   local ticks = activeCallbacks()
   local beforeTick = measured
   for event, fn in pairs(ticks) do
@@ -91,6 +105,48 @@ for _ = 1, 20 do
   drainCanceled()
   assert(count(events) == 0, 'dispatcher eventually removes canceled entries')
 end
+-- Performance uses the same visible-only memory timer, with bounded history.
+local snapshots, diffs = 0, 0
+env.g_memLeak.takeSnapshot = function() snapshots = snapshots + 1 end
+env.g_memLeak.computeDiff = function() diffs = diffs + 1 end
+env.init(); env.toggle()
+fps, ping, proxyPing = 60, 50, 55
+env.takeSnapshot()
+assert(snapshots == 1 and window.labels.perfDiff.text:find('FPS 60', 1, true))
+local function sample(elapsed)
+  now = now + elapsed
+  for event, entry in pairs(events) do
+    if not entry.canceled and entry.delay == 2000 then
+      local fn = entry.callback; events[event] = nil; fn(); return
+    end
+  end
+  error('missing memory/performance timer')
+end
+for i = 1, 150 do fps = i % 2 == 0 and 30 or 60; sample(2000) end
+assert(window.labels.perfHistory.text:find('(120/120;', 1, true), 'performance history must remain bounded')
+assert(window.labels.perfHistory.text:find('FPS: avg 45 / min 30 / max 60', 1, true))
+ping, proxyPing = 250, 60; sample(2300)
+assert(window.labels.perfHistory.text:find('max 300', 1, true), 'late timers must be reported separately from network ping')
+env.showDiff()
+assert(diffs == 1 and window.labels.perfDiff.text:find('60 -> 30 (-30)', 1, true))
+assert(window.labels.perfDiff.text:find('50 ms -> 250 ms (+200 ms)', 1, true))
+online = false; sample(2000)
+assert(window.labels.perfCurrent.text:find('Game ping: unavailable', 1, true), 'offline is not zero ping')
+online, ping, proxyPing, fps = true, -1, 0, 0; sample(2000)
+assert(window.labels.perfCurrent.text:find('FPS: 0', 1, true) and window.labels.perfCurrent.text:find('Game ping: unavailable', 1, true))
+fps, ping, proxyPing = 0 / 0, math.huge, -1; sample(2000)
+assert(window.labels.perfCurrent.text:find('FPS: unavailable', 1, true) and window.labels.perfCurrent.text:find('Game ping: unavailable', 1, true),
+  'non-finite metrics must be treated as unavailable')
+env.g_app, env.g_proxy = nil, nil; sample(2000)
+assert(window.labels.perfCurrent.text:find('FPS: unavailable', 1, true), 'missing metrics must not fabricate readings')
+env.onClose(); env.takeSnapshot(); env.showDiff()
+assert(snapshots == 1 and diffs == 1 and activeEvents() == 0, 'closed diagnostics must not sample or snapshot')
+env.toggle()
+assert(window.labels.perfHistory.text:find('(1/120;', 1, true), 'reopening must reset performance history')
+env.showDiff()
+assert(window.labels.perfDiff.text:find('Take a Snapshot first', 1, true), 'old performance baselines must not survive reopening')
+env.terminate(); drainCanceled()
+
 env.g_memLeak = nil
 env.init()
 assert(count(bindings) == 0 and count(windows) == 0, 'old binaries must fail gracefully')
@@ -112,4 +168,4 @@ assert(snapshot:find('privateMemoryUsage()', 1, true) and not snapshot:find('g_p
 assert(cpp:find('Private commit delta: unavailable', 1, true), 'failed snapshot queries must not produce false deltas')
 assert(cpp:find('Scheduled queue entries (includes canceled, awaiting removal)', 1, true),
   'queue entries must not be advertised as active callbacks')
-print('Memory monitor module: lazy UI, visibility, stale callbacks and repeated reloads passed')
+print('Memory monitor: lazy lifecycle, bounded FPS/ping history, timer delay and Snapshot/Diff passed')

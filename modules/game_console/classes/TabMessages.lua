@@ -25,6 +25,7 @@ function TabMessages.new(name, content)
         activeLabels = 0,
 
         messagesPerSecond = 0,
+        messageWindowStart = nil,
         lastMessageTime = 0,
         event = nil,
         ownerPrivateChannel = false,
@@ -96,8 +97,22 @@ function TabMessages:isMuted()
 end
 
 function TabMessages:destroy()
+    if self.destroyed then return end
+    self.destroyed = true
     self:stopSlowMode()
+    self:clearMessages()
+    for _, key in ipairs({'inviteNameWindow', 'excludeNameWindow'}) do
+        local window = self[key]
+        if window and not window:isDestroyed() then
+            if g_ui.getCustomInputWidget() == window then g_client.setInputLockWidget(nil) end
+            window:destroy()
+        end
+        self[key] = nil
+    end
     self.tabBar:removeTab(self.widget)
+    self.widget = nil
+    self.tabBar = nil
+    self.messages = {}
 end
 
 function TabMessages:select()
@@ -117,6 +132,9 @@ function TabMessages:clearMessages()
         message:clear()
     end
     self.activeLabels = 0
+    self.messagesPerSecond = 0
+    self.messageWindowStart = nil
+    self.lastMessageTime = 0
     self:updateLabels()
 end
 
@@ -162,7 +180,19 @@ function TabMessages:isNpcChat()
 end
 
 function TabMessages:getMessagesPerSecond()
+    if not self.messageWindowStart or g_clock.millis() - self.messageWindowStart >= 1000 then return 0 end
     return self.messagesPerSecond
+end
+
+function TabMessages:recordMessage()
+    local now = g_clock.millis()
+    if not self.messageWindowStart or now - self.messageWindowStart >= 1000 then
+        self.messageWindowStart = now
+        self.messagesPerSecond = 1
+    else
+        self.messagesPerSecond = self.messagesPerSecond + 1
+    end
+    self.lastMessageTime = now
 end
 
 function TabMessages:getLastMessageTime()
@@ -213,7 +243,7 @@ function TabMessages:setOwnerPrivate(v)
 end
 
 function TabMessages:addMessage(name, level, mode, text, statement, groupId)
-    if self:isMuted() then
+    if self.destroyed or self:isMuted() then
         return
     end
 
@@ -223,13 +253,7 @@ function TabMessages:addMessage(name, level, mode, text, statement, groupId)
         return
     end
 
-    if self.lastMessageTime - g_clock.millis() < 1000 then
-        self.messagesPerSecond = self.messagesPerSecond + 1
-    else
-        self.messagesPerSecond = 0
-    end
-
-    self.lastMessageTime = g_clock.millis()
+    self:recordMessage()
 
     local firstObject = self.messages[1]
     table.remove(self.messages, 1)
@@ -253,8 +277,7 @@ function TabMessages:addMessage(name, level, mode, text, statement, groupId)
     -- show
     if self:isCurrent() or self:isFixed() then
         if self:getMessagesPerSecond() < MAX_MESSAGE_PER_SECOND then
-            self:stopSlowMode()
-            self:updateLastLabel()
+            if self:isInSlowMode() then self:stopSlowMode() else self:updateLastLabel() end
         else
             self:startSlowMode()
         end
@@ -262,6 +285,8 @@ function TabMessages:addMessage(name, level, mode, text, statement, groupId)
 end
 
 function TabMessages:addPrivateMessage(text, mode, name, isPrivateCommand, creatureName, noBlink, level, statement)
+    if self.destroyed then return end
+    self:recordMessage()
     local firstObject = self.messages[1]
     table.remove(self.messages, 1)
     table.insert(self.messages, firstObject)
@@ -273,8 +298,7 @@ function TabMessages:addPrivateMessage(text, mode, name, isPrivateCommand, creat
     -- show
     if self:getName() == g_chat:getCurrentTab():getName() then
         if self:getMessagesPerSecond() < MAX_MESSAGE_PER_SECOND then
-            self:stopSlowMode()
-            self:updateLastLabel()
+            if self:isInSlowMode() then self:stopSlowMode() else self:updateLastLabel() end
         else
             self:startSlowMode()
         end
@@ -315,7 +339,7 @@ function TabMessages:internalUpdateLastLabel(labels, buffer)
 end
 
 function TabMessages:updateLabels()
-    if not g_chat then
+    if self.destroyed or not g_chat then
         return
     end
     if self:isFixed() then
@@ -352,18 +376,19 @@ function TabMessages:internalUpdateLabels(labels)
 end
 
 function TabMessages:startSlowMode()
-    if self:isInSlowMode() or not g_game.isOnline() then
+    if self.destroyed or self:isInSlowMode() or not g_game.isOnline() then
         return
     end
 
     if self.name == NPC_NAME_CHAT then
-        self:updateLabels()
+        self:updateLastLabel()
         return
     end
 
     self:stopSlowMode()
     self.event = cycleEvent(function()
-        if self:getMessagesPerSecond() < MAX_MESSAGE_PER_SECOND or (self:getLastMessageTime() - g_clock.millis()) >= 1000 then
+        if self.destroyed then return end
+        if self:getMessagesPerSecond() < MAX_MESSAGE_PER_SECOND or (g_clock.millis() - self:getLastMessageTime()) >= 1000 then
             self:stopSlowMode()
             return
         end
@@ -381,7 +406,6 @@ function TabMessages:stopSlowMode()
         self:updateLabels()
         removeEvent(self.event)
         self.event = nil
-        self.messagesPerSecond = 0
     end
 end
 

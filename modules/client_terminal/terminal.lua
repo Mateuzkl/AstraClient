@@ -145,6 +145,9 @@ end
 
 -- public functions
 function init()
+  disabled = false
+  cachedLines = {}
+  allLines = {}
   terminalWindow = g_ui.displayUI('terminal')
   terminalWindow:hide()
 
@@ -199,6 +202,9 @@ function terminate()
   g_settings.setList('terminal-history', commandHistory)
 
   removeEvent(flushEvent)
+  flushEvent = nil
+  cachedLines = {}
+  disabled = true
   for _, event in ipairs(rebindHotkeyEvents) do
     removeEvent(event)
   end
@@ -227,6 +233,9 @@ function terminate()
   end
   commandEnv = nil
   _G.terminalLines = allLines
+  commandTextEdit = nil
+  terminalBuffer = nil
+  terminalSelectText = nil
 end
 
 function hideButton()
@@ -311,23 +320,21 @@ function bindHotkey()
 end
 
 function flushLines()
-  local numLines = terminalBuffer:getChildCount() + #cachedLines
-  local fulltext = terminalSelectText:getText()
+  if not terminalBuffer or terminalBuffer:isDestroyed() then return end
+  local layout = terminalBuffer:getLayout()
+  if layout then layout:disableUpdates() end
 
-  for _,line in pairs(cachedLines) do
-    -- delete old lines if needed
-    if numLines > MaxLogLines then
-      local firstChild = terminalBuffer:getChildByIndex(1)
-      if firstChild then
-        local len = #firstChild:getText()
-        firstChild:destroy()
-        table.remove(allLines, 1)
-        fulltext = string.sub(fulltext, len)
-      end
+  for _,line in ipairs(cachedLines) do
+    local label
+    if #allLines >= MaxLogLines then
+      -- Reuse the oldest row rather than allocating/destroying a widget per log.
+      label = terminalBuffer:getChildByIndex(1)
+      table.remove(allLines, 1)
+      terminalBuffer:moveChildToIndex(label, terminalBuffer:getChildCount())
+    else
+      label = g_ui.createWidget('TerminalLabel', terminalBuffer)
+      label:setId('terminalLabel' .. (#allLines + 1))
     end
-
-    local label = g_ui.createWidget('TerminalLabel', terminalBuffer)
-    label:setId('terminalLabel' .. numLines)
     label:setText(line.text)
 
   if line.color == 'pink' then
@@ -342,12 +349,15 @@ function flushLines()
     label:setColor(line.color) -- fallback
   end
 
-    table.insert(allLines, {text=line.text,color=line.color})
-
-    fulltext = fulltext .. '\n' .. line.text
+    table.insert(allLines, line)
   end
 
-  terminalSelectText:setText(fulltext)
+  -- Derive the copy buffer from the bounded log, avoiding accumulating stale
+  -- characters/newlines when old rows are evicted.
+  local texts = {}
+  for i, line in ipairs(allLines) do texts[i] = line.text end
+  terminalSelectText:setText(#texts > 0 and ('\n' .. table.concat(texts, '\n')) or '')
+  if layout then layout:enableUpdates(); layout:update() end
 
   cachedLines = {}
   removeEvent(flushEvent)
@@ -355,12 +365,14 @@ function flushLines()
 end
 
 function addLine(text, color)
+  if disabled then return end
   if not flushEvent then
     flushEvent = scheduleEvent(flushLines, 10)
   end
 
   text = string.gsub(text, '\t', '    ')
   table.insert(cachedLines, {text=text, color=color})
+  if #cachedLines > MaxLogLines then table.remove(cachedLines, 1) end
 end
 
 function terminalPrint(value)

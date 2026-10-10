@@ -14,6 +14,7 @@ on:
       - '.github/tests/web_credentials.lua'
       - '.github/tests/camviewer_files.lua'
       - '.github/tests/memleak_lifecycle.lua'
+      - '.github/tests/memory_growth_hotpaths.lua'
       - '.github/tests/memleak_history.cpp'
       - '.github/tests/memleak_metrics.cpp'
       - 'src/client/memleakhistory.h'
@@ -50,6 +51,7 @@ on:
       - '.github/tests/web_credentials.lua'
       - '.github/tests/camviewer_files.lua'
       - '.github/tests/memleak_lifecycle.lua'
+      - '.github/tests/memory_growth_hotpaths.lua'
       - '.github/tests/memleak_history.cpp'
       - '.github/tests/memleak_metrics.cpp'
       - 'src/client/memleakhistory.h'
@@ -190,6 +192,9 @@ jobs:
 
       - name: Test audited module lifecycle and lazy startup
         run: luajit .github/tests/module_lifecycle.lua
+
+      - name: Test memory hotpaths and gameplay cleanup
+        run: luajit .github/tests/memory_growth_hotpaths.lua
 
       - name: Test Wheel lifecycle and preset vocation
         run: luajit .github/tests/wheel_lifecycle.lua
