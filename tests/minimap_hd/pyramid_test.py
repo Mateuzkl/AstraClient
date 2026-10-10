@@ -1,6 +1,7 @@
 """Regression checks for geometry, floor separation and persistent pack output."""
 import importlib.util
 import tempfile
+from unittest.mock import patch
 from pathlib import Path
 from PIL import Image
 
@@ -39,4 +40,27 @@ with tempfile.TemporaryDirectory(prefix='astra-pyramid-test-') as task:
         pass
     else:
         raise AssertionError('Existing packs must not be silently overwritten')
-print('PASS: LOD geometry, transparent fallback, floors, OTMM preservation, manifest, no overwrite')
+    for name, limit, copy_failure in [('overflow', 6, False), ('copy-failure', 100000, True)]:
+        failed = root / name
+        with patch.object(module, 'MAX_PACK_CHUNKS', limit):
+            try:
+                if copy_failure:
+                    with patch.object(module.shutil, 'copyfile', side_effect=OSError('fixture copy failed')):
+                        module.build(source, failed)
+                else:
+                    module.build(source, failed)
+            except (ValueError, OSError):
+                pass
+            else:
+                raise AssertionError('Invalid/incomplete packs must fail')
+        assert not (failed / 'index.txt').exists(), 'Failed output must not be published'
+    (source / 'minimap.otmm').unlink()
+    missing = root / 'missing-otmm'
+    try:
+        module.build(source, missing)
+    except ValueError as error:
+        assert 'minimap.otmm' in str(error)
+    else:
+        raise AssertionError('OTMM must be required')
+    assert not (missing / 'index.txt').exists()
+print('PASS: LOD geometry, floors, OTMM preservation, manifest, no overwrite, overflow/missing/copy-failure rejection')

@@ -14,6 +14,9 @@ scheduleEvent(function()
   local count = g_minimap.exportSatelliteBase(directory)
   assert(count > 0, 'No image chunks were exported')
   g_minimap.saveOtmm(directory .. '/minimap.otmm')
+  assert(g_resources.fileExists(directory .. '/minimap.otmm') and
+         #g_resources.readFileContents(directory .. '/minimap.otmm') > 0,
+         'Revealed classic minimap was not saved; export is incomplete')
   g_logger.info('[HD EXPORT] OUTPUT: ' .. g_resources.getWriteDir() .. directory)
   g_logger.info('[HD EXPORT] PASS: ' .. count .. ' base chunks')
   g_map.clean()

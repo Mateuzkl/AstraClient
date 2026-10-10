@@ -19,6 +19,10 @@ O cliente carrega apenas as imagens necessárias à região visível, com cache
 limitado. O pacote completo permanece no disco depois de fechar o cliente, por
 isso não é necessário andar novamente para revelar o HD. Sem o pacote, o HD ao
 vivo só consegue desenhar terreno recebido do servidor naquela sessão.
+Há no máximo quatro decodificações simultâneas e 32 texturas em cache. Vistas
+grandes escolhem imagens de zoom mais distante para caber nesse limite; se nenhum
+nível couber, usam o mapa clássico. Arrastar para outra região não deixa as
+decodificações já concluídas bloqueando o carregamento de novas imagens.
 
 ## 1. Separe os arquivos corretos
 
@@ -77,6 +81,9 @@ Espere a mensagem `Persistent HD pack ready`. O tempo e o espaço necessário
 dependem do tamanho e da densidade do mapa. O script mostra progresso e o
 caminho dos logs. Se houver erro, mantém os logs e a saída incompleta para
 diagnóstico; não instale um pacote incompleto.
+O processo nativo tem limite de 30 minutos. Para mapas maiores, acrescente
+`-TimeoutSeconds 3600` para permitir uma hora. Se o tempo acabar, somente o
+processo de exportação é encerrado; os logs e arquivos de origem são preservados.
 
 ## 4. Confira o pacote
 
@@ -96,6 +103,9 @@ astra-world-v2/
 OTB, as assinaturas dos assets, andares e níveis de zoom. `minimap.otmm` fornece
 o mapa clássico revelado e suas informações de tiles. As imagens HD não mudam
 as regras de movimento/autowalk: os dados do mapa continuam sendo usados.
+O gerador exige um OTMM não vazio e aceita até 100.000 imagens contando todos
+os níveis. Só publica o `index.txt` depois de gerar as imagens, metadados e OTMM
+com sucesso.
 
 ## 5. Instale no cliente
 
@@ -110,6 +120,8 @@ as regras de movimento/autowalk: os dados do mapa continuam sendo usados.
 O botão fica verde quando HD está ativo. Clique novamente para usar o minimapa
 clássico. Botão e checkbox ficam sincronizados, a escolha fica salva e cada modo
 mantém seu zoom. Essa opção não liga o xBRZ/HD Sprite Upscaling.
+Ao abrir e fechar o mapa completo com `Ctrl+Shift+M`, os controles HD, Cyclopedia,
+zoom e andar continuam por cima do mapa, visíveis e clicáveis.
 
 O pacote local já gerado nesta implementação tem 4.702 imagens PNG, 11 níveis
 de zoom e os andares populados de 0 a 13, usando `world.otbm` da base escolhida
@@ -126,12 +138,22 @@ Na raiz do repositório, com o pacote instalado:
 
 ./tests/minimap_hd/Run-Smoke.ps1 `
   -BinaryPath './build/hd-minimap/bin/otclient_gl_x64.exe' -Satellite
+
+./tests/minimap_hd/Run-Smoke.ps1 `
+  -BinaryPath './build/hd-minimap/bin/otclient_gl_x64.exe' -Export
 ```
 
 Esses testes usam um perfil separado, janela oculta e nenhum login no servidor.
 Conferem controles, sincronização, zoom, persistência, cache e carregamento das
 imagens. Também confira visualmente no jogo, troque andares, afaste o zoom e
 feche/reabra o cliente: os testes ocultos não medem FPS nem garantem aparência.
+O teste nativo repete a abertura/fechamento do mapa completo nos dois modos e
+troca HD/clássico dentro dessa vista para conferir controles e zoom. `-Satellite`
+também testa carregamentos abandonados e o orçamento de cache em vistas 4K.
+`-Export` usa OTB/OTBM sintéticos, confere cobertura clássica em dois andares e
+compara pixels dos PNGs para validar a elevação das camadas superiores. Este
+último precisa de Python/Pillow, mas não de arquivos do servidor nem do pacote
+instalado.
 
 Distribua o executável atualizado, os módulos correspondentes, os assets e a
 pasta **inteira** `data/minimap_hd`. Ela fica ignorada no Git por ser um pacote
@@ -142,6 +164,8 @@ grande e específico do mapa. Fazer `git pull` não gera nem baixa essas imagens
 - **Mudou o mapa ou o DAT/SPR?** Gere outro pacote em uma pasta nova, faça backup
   do anterior e substitua a pasta instalada. Regere mesmo que as assinaturas no
   cabeçalho dos assets não tenham mudado.
+- **Pacote gerado antes da correção de elevação:** regere para que as imagens
+  também usem a elevação de chão/objetos ao desenhar a camada superior.
 - **Botão/checkbox desabilitado:** está usando executável antigo. Compile a
   versão que contém as novas funções nativas e use os módulos correspondentes.
 - **Só aparece HD depois de andar:** confira se o pacote completo está instalado,
@@ -152,6 +176,7 @@ grande e específico do mapa. Fazer `git pull` não gera nem baixa essas imagens
   de entrada; renomear PNGs ou adivinhar deslocamentos não resolve.
 - **Output already exists:** escolha uma pasta nova; o script não sobrescreve.
 - **Pillow não encontrado:** passe em `-Python` o interpretador em que ele foi instalado.
+- **Export timed out:** confira os logs antes de aumentar `-TimeoutSeconds`.
 - **PNG faltando/corrompido:** confira o log e reinstale o pacote completo.
 
 Diagnóstico no terminal Lua, depois de os assets serem carregados:

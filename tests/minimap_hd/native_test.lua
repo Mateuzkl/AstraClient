@@ -8,6 +8,17 @@ scheduleEvent(function()
   local window = modules.game_minimap.minimapWindow
   local hdButton = window:getChildById('minimapHDButton')
   local cyclopediaButton = window:getChildById('fullSize')
+  local function assertControlsOnTop()
+    assert(mini:getParent() == window and window:getChildIndex(mini) == 1,
+           'Minimap must be the background after leaving Ctrl+Shift+M')
+    for _, id in ipairs({'glass', 'centerMap', 'floorPosition', 'zoomInWidget',
+                         'zoomOutWidget', 'fullSize', 'minimapHDButton'}) do
+      local control = window:getChildById(id)
+      assert(control and window:getChildIndex(control) > window:getChildIndex(mini),
+             'Minimap covered control: ' .. id)
+    end
+  end
+  assertControlsOnTop()
   assert(hdButton and hdButton:isEnabled() and not hdButton:isOn(), 'Quick HD button is missing/incorrect')
   local hdPos, mapPos = hdButton:getPosition(), cyclopediaButton:getPosition()
   -- OTUI anchors use inclusive rectangle edges: margin 2 leaves a one-pixel gap.
@@ -71,7 +82,39 @@ scheduleEvent(function()
   assert(g_minimap.getSpriteCacheTileCount() > 0, 'Full map destroyed terrain cache')
   modules.game_minimap.toggleFullMap()
   assert(mini:getZoom() == 4)
+  assertControlsOnTop()
+  for _, enabled in ipairs({false, true}) do
+    modules.client_settings.setOption('minimapHD', enabled)
+    local smallZoom = mini:getZoom()
+    for cycle = 1, 5 do
+      modules.game_minimap.toggleFullMap()
+      assert(mini:setZoom(0))
+      modules.game_minimap.toggleFullMap()
+      assert(mini:getZoom() == smallZoom and mini:isSpriteMode() == enabled)
+      assertControlsOnTop()
+    end
+  end
+  -- Verify real native transitions that the standalone Lua mock cannot cover.
+  modules.game_minimap.toggleFullMap()
+  mini:setZoom(0)
+  modules.client_settings.setOption('minimapHD', false)
+  assert(mini:getZoom() == 0)
+  modules.game_minimap.toggleFullMap()
+  assert(mini:getZoom() == -1 and not mini:isSpriteMode())
+  assertControlsOnTop()
+  modules.game_minimap.toggleFullMap()
+  mini:setZoom(0)
+  modules.client_settings.setOption('minimapHD', true)
+  assert(mini:getZoom() == 0)
+  modules.game_minimap.toggleFullMap()
+  assert(mini:isSpriteMode() and mini:getZoom() == 3)
+  assertControlsOnTop()
+  mini:setZoom(4)
   local pos = { x = 101, y = 101, z = 7 }
+  -- Mode changes deliberately clear snapshots. Seed this tile again before
+  -- measuring one new item's delta, without depending on a visible renderer.
+  assert(g_map.removeThing(g_map.getTile(pos):getItems()[1]))
+  put(groundId, pos.x, pos.y)
   local before = g_minimap.getSpriteCacheItemCount()
   put(commonId, pos.x, pos.y)
   assert(g_minimap.getSpriteCacheItemCount() == before + 1, 'Terrain changes were not captured')

@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$WorldPath,
   [Parameter(Mandatory = $true)][string]$ItemsPath,
   [Parameter(Mandatory = $true)][string]$OutputPath,
-  [string]$Python = 'python'
+  [string]$Python = 'python',
+  [ValidateRange(1, 86400)][int]$TimeoutSeconds = 1800
 )
 $ErrorActionPreference = 'Stop'
 $repoPath = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -27,7 +28,12 @@ $stdout = Join-Path $taskDirectory 'stdout.log'
 $stderr = Join-Path $taskDirectory 'stderr.log'
 $process = Start-Process -FilePath $binary -ArgumentList @('--test') -WorkingDirectory $taskDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 Write-Output "Export process: $($process.Id); logs: $taskDirectory"
+$exportTimer = [System.Diagnostics.Stopwatch]::StartNew()
 while (-not $process.WaitForExit(1000)) {
+  if ($exportTimer.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
+    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    throw "Export timed out after $TimeoutSeconds seconds; source untouched, logs kept: $taskDirectory"
+  }
   # Native exporter logs progress. No visible client window or server login.
   if ((Get-Item -LiteralPath $stdout).Length -gt 0) {
     $progress = Get-Content -LiteralPath $stdout -Tail 1

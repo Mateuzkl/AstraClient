@@ -28,6 +28,8 @@ enable upscaling, change the interface layout, or require server/protocol change
   pre-rendered satellite imagery remains available (classic colors without a pack).
 - Full-map view (`Ctrl+Shift+M`) draws pre-rendered satellite LOD images without live-sprite work.
   Without a pack, it falls back to classic. HD/classic zooms are saved separately.
+  Returning restores the map behind its toolbar, keeping HD, Cyclopedia, zoom
+  and floor controls visible and clickable in either mode.
 - Enabling HD while stationary rehydrates visible terrain from the current map.
   Recent explored terrain remains cached after leaving awareness. Disabling HD,
   logging out, cleaning the minimap, or resetting the world clears live snapshots
@@ -40,7 +42,10 @@ OTBM/items.otb with this client's DAT/SPR. Reopening the client loads the same
 coverage, including areas never received from the server. Only visible PNGs are
 requested: four asynchronous decode jobs and 32 cached textures maximum. Eleven
 LOD levels (1–1024) keep distant/full-map views bounded; the index does not eagerly
-decode images. HD off releases images/live snapshots, retaining the small index.
+decode images. Wide views select a coarser level to fit the same 32-texture
+budget; if no level fits, they use classic colors. Completed off-screen decode
+jobs release their slots even after panning away. HD off releases images/live
+snapshots, retaining the small index.
 Runtime checks asset header signatures and static 512×512 PNGs with bounded
 encoded size. Missing/corrupt chunks fall back to OTMM; PNGs do not alter movement
 or pathfinding flags. Budgets are not a measured FPS guarantee.
@@ -121,6 +126,14 @@ elevation and ground/border/common/top layers, with a cross-sector sprite halo.
 The PNG pyramid/index is published after generation; existing output directories
 are refused and failed outputs/logs retained for diagnosis. Place the verified
 pack at `data/minimap_hd`, backing up an existing pack when replacing it.
+Generation requires a nonempty classic OTMM and limits the complete pyramid,
+not just its base level, to 100,000 chunks. The index is written only after all
+images, metadata and OTMM have been produced successfully. Native export has a
+30-minute deadline; set `-TimeoutSeconds 3600` for a one-hour deadline on larger
+maps. A timeout stops only the exporter's process and retains its logs.
+
+Regenerate packs made before the top-item elevation correction: ground/common
+item elevation now also offsets the top layer in both live HD and exported PNGs.
 
 The matching export includes a revealed classic `minimap.otmm`, loaded before
 the user's existing explored OTMM overlay. Native OTMM/server rules, not images,
@@ -145,6 +158,8 @@ need Python/Pillow. The export tool never replaces the normal executable/profile
 - **Output already exists:** choose a fresh output path. The exporter deliberately
   refuses to overwrite a previous pack. Keep failed output/logs for diagnosis.
 - **Python/Pillow missing:** use `-Python` with the interpreter that has Pillow.
+- **Export timed out:** inspect the retained logs before increasing
+  `-TimeoutSeconds`. Never install an incomplete output directory.
 - **A missing or damaged PNG:** that chunk falls back to classic colors and logs
   an error; reinstall a complete verified pack.
 
@@ -167,6 +182,7 @@ luajit tests/minimap_hd/options_test.lua
 python tests/minimap_hd/pyramid_test.py
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Satellite
+./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Export
 ```
 
 The standalone Lua test covers opt-in defaults, persistence, live toggling,
@@ -175,15 +191,25 @@ map is open), and old executable fallback. The native smoke test loads the real
 client modules and local 8.60 DAT/SPR, verifies the Graphics checkbox, quick-button
 placement/label size, synchronized toggling and persistence, bindings,
 terrain updates, tile/item cache limits, world resets, and marker/click alignment.
+It also exercises repeated full-map round trips in both modes and actual native
+zoom preservation when switching modes inside full-map view. The standalone
+mock isolates Lua logic; it does not substitute for these native checks.
 It uses a separate `astra_hd_minimap_smoke` profile, a temporary resource directory,
 and no server login. The default run hides the window and skips visual rendering.
 The pyramid test covers child placement, transparent gaps, floors, manifest counts,
-classic OTMM preservation and no-overwrite. `-Satellite` requires the generated
+classic OTMM preservation, no-overwrite, final-count overflow, missing OTMM and
+copy failures without publishing an index. `-Satellite` requires the generated
 local pack and checks lazy close/far LOD decode with zero live map tiles, retained
 coverage after logout/reset, disk reloading and optional classic mode. Run twice
 to verify fresh launches. These hidden checks do not establish visual parity/FPS.
 It also checks that known personal OTMM cells overlay the revealed map without
 unknown cells erasing the other revealed sectors in the same block.
+It checks abandoned-decode recovery and the 32-texture budget for 4K views.
+`-Export` creates synthetic OTB/OTBM inputs using the local DAT/SPR, checks literal
+ServerID 20026 and classic OTMM coverage on two floors after reloading, then
+compares real exported PNG pixels against an independent Pillow composition to
+verify top/common elevation. This test requires Python with Pillow but no server
+files, installed satellite pack or login.
 
 For an interactive renderer check and a synthetic-terrain screenshot, add
 `-Visual`. That run briefly opens a test window and verifies stationary HD
@@ -197,6 +223,7 @@ g_minimap.getSpriteCacheTileCount()
 g_minimap.getSpriteCacheItemCount()
 g_minimap.getSatelliteChunkCount()
 g_minimap.getSatelliteTextureCount()
+g_minimap.getSatelliteViewLevel({width = 3840, height = 2160}, 8)
 g_minimap.hasSatellitePack()
 g_minimap.hasSatelliteTile(g_game.getLocalPlayer():getPosition())
 ```

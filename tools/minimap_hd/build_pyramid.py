@@ -11,6 +11,8 @@ from collections import defaultdict
 from pathlib import Path
 from PIL import Image
 
+MAX_PACK_CHUNKS = 100000  # Same limit as Minimap::loadSatellitePack.
+
 
 def build(source: Path, destination: Path, world: Path | None = None,
           items: Path | None = None) -> dict:
@@ -21,8 +23,11 @@ def build(source: Path, destination: Path, world: Path | None = None,
     if (magic, version, tile_size) != ("ASTRAHDBASE", "1", "16"):
         raise ValueError("Invalid native export header")
     sprite_size, count = int(sprite_size), int(count)
-    if not 1 <= count <= 100000 or len(lines) != count + 1:
+    if not 1 <= count <= MAX_PACK_CHUNKS or len(lines) != count + 1:
         raise ValueError("Invalid native export count")
+    classic_map = source / 'minimap.otmm'
+    if not classic_map.is_file() or classic_map.stat().st_size == 0:
+        raise ValueError("Missing/empty minimap.otmm; native export is incomplete")
     entries = {}
     destination.mkdir(parents=True)
     for line in lines[1:]:
@@ -57,12 +62,13 @@ def build(source: Path, destination: Path, world: Path | None = None,
             canvas.resize((512, 512), Image.Resampling.LANCZOS).save(destination / name)
             previous[key] = name
         entries.update(previous)
+        if len(entries) > MAX_PACK_CHUNKS:
+            raise ValueError(f"Satellite index exceeds the client limit of {MAX_PACK_CHUNKS} entries")
         print(f"[HD EXPORT] LOD {level}: {len(previous)} chunks", flush=True)
     # Publish the index only after the entire PNG pyramid was produced.
     manifest = [f"ASTRAHD 1 16 32 {dat_sig} {spr_sig} {len(entries)}"]
     manifest.extend("%d %d %d %d %s" % (*key, name)
                     for key, name in sorted(entries.items()))
-    (destination / "index.txt").write_text("\n".join(manifest) + "\n", encoding="utf-8")
     def digest(path):
         if path is None:
             return None
@@ -74,8 +80,9 @@ def build(source: Path, destination: Path, world: Path | None = None,
             "spr_signature": int(spr_sig), "floors": sorted({key[3] for key in entries}),
             "levels": sorted({key[0] for key in entries})}
     (destination / "source.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
-    if (source / 'minimap.otmm').is_file():
-        shutil.copyfile(source / 'minimap.otmm', destination / 'minimap.otmm')
+    shutil.copyfile(classic_map, destination / 'minimap.otmm')
+    # The runtime's entry point is published last, only for a complete pack.
+    (destination / "index.txt").write_text("\n".join(manifest) + "\n", encoding="utf-8")
     return info
 
 

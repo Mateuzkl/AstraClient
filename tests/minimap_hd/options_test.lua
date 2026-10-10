@@ -70,6 +70,7 @@ function hdButton:setOn(value) self.on = value end
 function hdButton:setTooltip(value) self.tooltip = value end
 env.minimapWindow = {
   hide = noop, show = noop,
+  moveChildToIndex = noop,
   getChildById = function(_, id) return id == 'minimapHDButton' and hdButton or nil end
 }
 local checkbox = { checked = false }

@@ -100,6 +100,7 @@ public:
     bool preloadSatelliteTile(const Position& pos, float scale);
     size_t getSatelliteChunkCount();
     size_t getSatelliteTextureCount();
+    int getSatelliteViewLevel(const Size& viewSize, float scale);
     int exportSatelliteBase(const std::string& directory);
     void addSpriteView();
     void removeSpriteView();
@@ -132,6 +133,10 @@ private:
         return (uint64_t(level) << 40) | (uint64_t(z) << 32) | (uint64_t(y) << 16) | x;
     }
     int satelliteLevel(float scale); // Requires m_satelliteLock.
+    int satelliteViewLevel(const Rect& mapRect, float scale); // Requires m_satelliteLock.
+    static constexpr size_t SatelliteTextureLimit = 32;
+    static constexpr size_t SatelliteDecodeLimit = 4;
+    size_t finishSatelliteDecodes(); // Requires m_satelliteLock; returns active jobs.
     TexturePtr satelliteTexture(uint64_t key); // Requires m_satelliteLock.
     void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale);
     void clearSatelliteTextures();

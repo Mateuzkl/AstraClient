@@ -722,6 +722,9 @@ function toggleFullMap()
   else
     fullmapView = false
     minimapWidget:setParent(minimapWindow)
+    -- setParent appends the map after the toolbar. Keep it behind the controls
+    -- so returning from Ctrl+Shift+M cannot cover their drawing/hit targets.
+    minimapWindow:moveChildToIndex(minimapWidget, 1)
     minimapWidget:fill('parent')
     minimapWindow:show()
     minimapWidget:setAlternativeWidgetsVisible(false)

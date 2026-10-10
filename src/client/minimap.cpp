@@ -257,19 +257,63 @@ int Minimap::satelliteLevel(float scale)
     return result;
 }
 
+int Minimap::satelliteViewLevel(const Rect& mapRect, float scale)
+{
+    int level = satelliteLevel(scale);
+    if (!level) return 0;
+    // Reserve for partially visible chunks too. A view must fit the same cache
+    // used by satelliteTexture, or its own chunks churn on every frame.
+    while (int64_t(mapRect.width() / (16 * level) + 2) *
+           (mapRect.height() / (16 * level) + 2) > SatelliteTextureLimit) {
+        const auto next = m_satelliteLevels.upper_bound(level);
+        if (next == m_satelliteLevels.end()) return 0;
+        level = *next;
+    }
+    return level;
+}
+
+int Minimap::getSatelliteViewLevel(const Size& viewSize, float scale)
+{
+    if (viewSize.isEmpty() || scale <= 0 || !std::isfinite(scale)) return 0;
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return satelliteViewLevel(calcMapRect(Rect(0, 0, viewSize.width(), viewSize.height()),
+                                         Position(32768, 32768, 0), scale), scale);
+}
+
+size_t Minimap::finishSatelliteDecodes()
+{
+    size_t pending = 0;
+    for (auto& entry : m_satelliteTextures) {
+        auto& value = entry.second;
+        if (!value.image.valid())
+            continue;
+        if (value.image.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            ++pending;
+            continue;
+        }
+        auto image = value.image.get();
+        value.image = {};
+        if (image)
+            value.texture = std::make_shared<Texture>(image, false, false, true);
+        else if (auto failed = m_satelliteChunks.find(entry.first); failed != m_satelliteChunks.end())
+            failed->second.failed = true;
+    }
+    return pending;
+}
+
 TexturePtr Minimap::satelliteTexture(uint64_t key)
 {
+    // Harvest completed work even after its chunk leaves the viewport. A ready
+    // future must not permanently occupy one of the four pending decode slots.
+    const size_t pending = finishSatelliteDecodes();
     auto chunk = m_satelliteChunks.find(key);
     if (chunk == m_satelliteChunks.end() || chunk->second.failed)
         return nullptr;
     auto cached = m_satelliteTextures.find(key);
     if (cached == m_satelliteTextures.end()) {
-        size_t pending = 0;
-        for (const auto& entry : m_satelliteTextures)
-            if (entry.second.image.valid()) ++pending;
-        if (pending >= 4)
+        if (pending >= SatelliteDecodeLimit)
             return nullptr; // Never enqueue an entire world of background work.
-        while (m_satelliteTextures.size() >= 32) {
+        while (m_satelliteTextures.size() >= SatelliteTextureLimit) {
             m_satelliteTextures.erase(m_satelliteOrder.front());
             m_satelliteOrder.pop_front();
         }
@@ -298,14 +342,6 @@ TexturePtr Minimap::satelliteTexture(uint64_t key)
     }
     auto& value = cached->second;
     m_satelliteOrder.splice(m_satelliteOrder.end(), m_satelliteOrder, value.order);
-    if (value.image.valid() && value.image.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        auto image = value.image.get();
-        value.image = {};
-        if (image)
-            value.texture = std::make_shared<Texture>(image, false, false, true);
-        else
-            chunk->second.failed = true; // Log a corrupt/missing chunk once, then fall back.
-    }
     return value.texture;
 }
 
@@ -333,15 +369,9 @@ void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, f
     std::lock_guard<std::mutex> lock(m_satelliteLock);
     if (m_satelliteDatSignature != g_things.getDatSignature() || m_satelliteSprSignature != g_sprites.getSignature())
         return;
-    int level = satelliteLevel(scale);
-    if (!level) return;
     const auto mapRect = calcMapRect(screenRect, mapCenter, scale);
-    // Very large views use a coarser level to retain a bounded draw budget.
-    while (int64_t(mapRect.width() / (16 * level) + 2) * (mapRect.height() / (16 * level) + 2) > 256) {
-        auto next = m_satelliteLevels.upper_bound(level);
-        if (next == m_satelliteLevels.end()) return;
-        level = *next;
-    }
+    const int level = satelliteViewLevel(mapRect, scale);
+    if (!level) return;
     const auto size = 16 * level;
     const int left = std::max(0, mapRect.left()) / size * size;
     const int top = std::max(0, mapRect.top()) / size * size;
@@ -422,12 +452,20 @@ int Minimap::exportSatelliteBase(const std::string& directory)
                 const Point dest((pos.x - x) * pixels, (pos.y - y) * pixels);
                 int elevation = 0;
                 const auto items = tile->getItems();
+                if (pass == 2) {
+                    // Top items precede common items in the tile's stack order.
+                    // Calculate the complete underlying elevation before drawing.
+                    for (const auto& item : items)
+                        if (!item->isHidden() && !item->isOnTop())
+                            elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+                }
                 for (const auto& item : items) {
                     if (item->isHidden()) continue;
                     const bool base = item->isGround() || item->isGroundBorder() || item->isOnBottom();
                     const bool drawItem = (pass == 0 && item->isGround()) || (pass == 1 && base && !item->isGround()) || (pass == 2 && item->isOnTop());
                     if (drawItem) item->drawToImage(dest - elevation * g_sprites.getOffsetFactor(), image);
-                    if (base) elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+                    if (base && pass != 2)
+                        elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
                 }
                 if (pass == 1) {
                     for (auto it = items.rbegin(); it != items.rend(); ++it) {
@@ -627,13 +665,18 @@ void Minimap::drawSprites(const Rect& screenRect, const Position& mapCenter, flo
     for (int pass = 0; pass < 3; ++pass) {
         for (const auto& tile : tiles) {
             int elevation = 0;
+            if (pass == 2) {
+                for (const auto& item : tile.items)
+                    if (!item->isOnTop())
+                        elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+            }
             for (const auto& item : tile.items) {
                 const bool base = item->isGround() || item->isGroundBorder() || item->isOnBottom();
                 const bool drawItem = (pass == 0 && item->isGround()) ||
                     (pass == 1 && base && !item->isGround()) || (pass == 2 && item->isOnTop());
                 if (drawItem)
                     item->draw(tile.dest - elevation * g_sprites.getOffsetFactor(), false, nullptr);
-                if (base || (pass == 2 && !item->isOnTop()))
+                if (base && pass != 2)
                     elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
             }
             if (pass == 1) {
