@@ -207,6 +207,10 @@ MapDataPanel < Panel
               margin-top: 4
               margin-left: 4
               text: City names
+              text-auto-resize: true
+              font: $var-cip-font
+              color: $var-text-cip-color
+              text-offset: 17 -3
               checked: true
 
 

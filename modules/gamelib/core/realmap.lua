@@ -33,9 +33,14 @@ function RealMap.load()
         return
     end
 
-    RealMap.settings = g_settings.getNode('game_minimap') or { ignoreFlag = {} }
+    RealMap.loadSettings()
     RealMap.setMarkers()
     RealMap.loaded = true
+end
+
+function RealMap.loadSettings()
+  RealMap.settings = g_settings.getNode('game_minimap') or {}
+  RealMap.settings.ignoreFlag = RealMap.settings.ignoreFlag or {}
 end
 
 function RealMap.unload()
@@ -43,11 +48,10 @@ function RealMap.unload()
 end
 
 function RealMap.setIgnoreFlag(position)
+    RealMap.loadSettings()
     RealMap.settings.ignoreFlag[position.x .. ',' .. position.y .. ',' .. position.z] = true
 
-    local settings = {}
-    settings.ignoreFlag = RealMap.settings.ignoreFlag
-    g_settings.setNode('game_minimap', settings)
+    g_settings.setNode('game_minimap', RealMap.settings)
 end
 
 function RealMap.setRegions(minimapWidget, mainAreaId, regions)
@@ -178,42 +182,25 @@ function RealMap.setMarkers()
 end
 
 function RealMap.setUIMarkers(widget)
-  if not widget or widget._realMapMarkersLoading or widget._realMapMarkersLoaded then
-    return
-  end
-
-  widget._realMapMarkersLoading = true
-  local index = 1
-  local chunkSize = 125
-
-  local function loadChunk()
-    widget._realMapMarkerEvent = nil
-    if not widget or (widget.isDestroyed and widget:isDestroyed()) then
-      return
-    end
-
-    local lastIndex = math.min(index + chunkSize - 1, #RealMap.markers)
-    for markerIndex = index, lastIndex do
-      local markerInfo = RealMap.markers[markerIndex]
-      local filePath = markerInfo and flagToFilePath[markerInfo.icon]
-      if filePath then
-        widget:addWidget(filePath, {width = 11, height = 11}, markerInfo.pos, markerInfo.description)
-      elseif markerInfo then
-        print(markerInfo.icon, "not loaded!")
+  if not widget or widget:isDestroyed() then return end
+  RealMap.loadSettings()
+  if not RealMap.markerIndex or (RealMap.markerIndexSource and RealMap.markerIndexSource ~= RealMap.markers) then
+    RealMap.markerIndex = MapMarkerIndex.create()
+    RealMap.markerIndexSource = RealMap.markers
+    for id, marker in ipairs(RealMap.markers or {}) do
+      local path = flagToFilePath[marker.icon]
+      if path then
+        RealMap.markerIndex:insert({id = 'catalog-' .. id, imagePath = path,
+          imageSize = {width = 11, height = 11}, position = marker.pos,
+          tooltip = marker.description, priority = 0,
+          positionKey = marker.pos.x .. ',' .. marker.pos.y .. ',' .. marker.pos.z})
       end
     end
-
-    index = lastIndex + 1
-    if index <= #RealMap.markers then
-      widget._realMapMarkerEvent = scheduleEvent(loadChunk, 1)
-    else
-      widget._realMapMarkersLoading = false
-      widget._realMapMarkersLoaded = true
-    end
-    if widget.refreshMarks then widget:refreshMarks() end
   end
-
-  widget._realMapMarkerEvent = scheduleEvent(loadChunk, 1)
+  -- Reuse one data-only catalog between opens. UIRealMinimap owns only a small
+  -- visible pool, and its scheduled refresh is cancelled on destruction.
+  widget.markerCatalog = RealMap.markerIndex
+  widget:refreshMarks()
 end
 
 function RealMap.setLevelSeparator(widget, levelSeparator)

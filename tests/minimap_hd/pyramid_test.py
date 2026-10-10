@@ -54,6 +54,13 @@ with tempfile.TemporaryDirectory(prefix='astra-pyramid-test-') as task:
             else:
                 raise AssertionError('Invalid/incomplete packs must fail')
         assert not (failed / 'index.txt').exists(), 'Failed output must not be published'
+    # Optional town metadata must not make a valid PNG/OTMM pack unpublished.
+    # This synthetic base already exists; only its town metadata is malformed.
+    world = root / 'metadata-world.otbm'
+    world.write_bytes(b'OTBM' + bytes((254,0,254,12,254,13,1,255,255,255)))
+    optional = root / 'optional-labels'
+    module.build(source, optional, world=world)
+    assert (optional / 'index.txt').exists() and not (optional / 'cities.json').exists()
     (source / 'minimap.otmm').unlink()
     missing = root / 'missing-otmm'
     try:

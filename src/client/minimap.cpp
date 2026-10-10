@@ -790,7 +790,11 @@ void Minimap::removeSurfaceView()
 void Minimap::drawSurface(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, float backgroundOpacity)
 {
     draw(screenRect, mapCenter, scale, color);
-    if (mapCenter.z > 7) return; // 8.60 underground is classic, never the z7 image.
+    if (mapCenter.z > 7) {
+        std::lock_guard<std::mutex> lock(m_satelliteLock);
+        m_satelliteRenderedLevel = 0;
+        return; // 8.60 underground is classic, never the z7 image.
+    }
     drawSatellite(screenRect, mapCenter, scale, true,
                   std::isfinite(backgroundOpacity) ? std::clamp(backgroundOpacity, 0.f, 1.f) : 1.f);
 }

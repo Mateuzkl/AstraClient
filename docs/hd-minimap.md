@@ -280,3 +280,43 @@ g_minimap.getSatelliteViewLevel({width = 3840, height = 2160}, 8)
 g_minimap.hasSatellitePack()
 g_minimap.hasSatelliteTile(g_game.getLocalPlayer():getPosition())
 ```
+
+## Cyclopedia Surface View
+
+Open Cyclopedia **Map** from the minimap button, then select **Surface View**.
+It uses the same PNG pack/LOD/cache as HUD HD, but its preference is independent.
+**Map View** remains classic OTMM. Floors 0-7 support Surface; floors 8-15
+return to Map without forgetting the Surface preference.
+
+On upper surface floors, **Level Separator** (0-100) controls the background
+floors, composed from 7 toward the selected floor. The selected floor remains
+opaque wherever its PNG has terrain; PNG alpha preserves empty spaces. At
+floor 7 the separator is disabled. Switching views, pan, zoom and the separator
+require no server packets.
+
+### City names for your world
+
+New exports with `--world` produce optional `cities.json`, with OTBM town names,
+temple anchors and the exact world hash from `source.json`. For an existing
+pack with a matching source map, generate only the metadata:
+
+```powershell
+python tools/minimap_hd/city_labels.py 'C:/Servers/MyServer/data/world/world.otbm' data/minimap_hd
+```
+
+The tool refuses a different world and refuses to overwrite curated labels.
+Temple positions are real initial anchors, not guaranteed visual city centers.
+You may review/edit names, positions, priority and minimum zoom in `cities.json`,
+preserving its association with the correct world. Map files/PNGs stay outside
+Git. The client culls/declutters names into a maximum 32-label pool; **City names**
+hides them without altering the pack.
+
+Legacy static markers are indexed as data instead of one widget per world mark.
+Up to 128 visible icons are reused, prioritizing user flags and nearby marks.
+Dense zoomed-out views intentionally omit excess icons: zoom in to inspect them.
+Filters/Show All operate on the catalog, and flag edits/view preferences persist
+without reloading global OTMM. No modern Canary region discovery or donation
+protocol is added to an 8.60 server.
+
+See [tests and limitations](audits/cyclopedia-surface-view/TESTES.md) and
+[measured callback timings](audits/cyclopedia-surface-view/BENCHMARK.md).

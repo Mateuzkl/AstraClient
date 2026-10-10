@@ -24,6 +24,7 @@ Module
     dofile 'core/monster'
     dofile 'core/tile'
     dofile 'core/party'
+    dofile 'core/mapmarkers'
     dofile 'core/realmap'
     dofile 'core/markers'
     dofile 'core/regions'

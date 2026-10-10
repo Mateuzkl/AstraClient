@@ -86,7 +86,10 @@ def build(source: Path, destination: Path, world: Path | None = None,
         spec = importlib.util.spec_from_file_location('astra_city_labels', Path(__file__).with_name('city_labels.py'))
         cities = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cities)
-        cities.export(world, destination)
+        try:
+            cities.export(world, destination)
+        except cities.LabelParseError as error:
+            print(f'[HD EXPORT] City labels skipped: {error}', flush=True)
     shutil.copyfile(classic_map, destination / 'minimap.otmm')
     # The runtime's entry point is published last, only for a complete pack.
     (destination / "index.txt").write_text("\n".join(manifest) + "\n", encoding="utf-8")

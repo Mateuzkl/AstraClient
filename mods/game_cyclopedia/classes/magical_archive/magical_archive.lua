@@ -623,11 +623,13 @@ function MagicalArchive.onAimTargetChange(checkBox)
     end
 
     MagicalArchive.autoAimStorageData[tostring(spellFocused.spellData.id)] = checkBox:isChecked()
+    MagicalArchive.storageDirty = true
     g_game.sendUpdateAutoAimList(spellFocused.spellData.id, checkBox:isChecked())
 end
 
 function MagicalArchive.loadJson()
     if not LoadedPlayer:isLoaded() then return end
+    MagicalArchive.storageDirty = false
 
     local file = "/characterdata/" .. LoadedPlayer:getId() .. "/aimattargetconfigurationstorage.json"
     if g_resources.fileExists(file) then
@@ -646,6 +648,9 @@ function MagicalArchive.loadJson()
 end
 
 function MagicalArchive.saveJson()
+    -- Closing an unrelated tab (especially Map) must not serialize/write the
+    -- entire auto-aim profile. Only actual edits require persistence.
+    if not MagicalArchive.storageDirty or not LoadedPlayer:isLoaded() then return end
     local file = "/characterdata/" .. LoadedPlayer:getId() .. "/aimattargetconfigurationstorage.json"
     local status, result = pcall(function() return json.encode(MagicalArchive.autoAimStorageData, 2) end)
     if not status then
@@ -654,5 +659,5 @@ function MagicalArchive.saveJson()
     if result:len() > 100 * 1024 * 1024 then
         return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
     end
-    g_resources.writeFileContents(file, result)
+    if g_resources.writeFileContents(file, result) then MagicalArchive.storageDirty = false end
 end

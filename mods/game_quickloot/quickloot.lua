@@ -457,7 +457,8 @@ function getLootSelection(clientId)
   local listType = lootData.listType
   if listType ~= 'whitelist' and listType ~= 'blacklist' then return nil, false end
   local list = lootData[listType == 'whitelist' and 'whitelistTypes' or 'blacklistTypes']
-  return listType, type(list) == 'table' and table.contains(list, clientId) or false
+  if type(list) ~= 'table' then return nil, false end
+  return listType, table.contains(list, clientId)
 end
 
 function addToQuickLoot(clientId)

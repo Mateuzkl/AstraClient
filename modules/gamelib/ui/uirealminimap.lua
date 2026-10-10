@@ -20,6 +20,11 @@ function UIRealMinimap:onCreate()
   self.autowalk = true
   self.customMouseEvents = {}
   self.alternatives = {}
+  self.markerIndex = MapMarkerIndex.create()
+  self.markerIds = {}
+  self.markerPool = {}
+  self.nextMarkerId = 0
+  self.hiddenCatalogMarks = {}
 end
 
 function UIRealMinimap:onSetup()
@@ -39,6 +44,7 @@ function UIRealMinimap:onSetup()
     local uid = string.format("%d,%d,%d-%s-%s", pos.x, pos.y, pos.z, icon, description)
     local id = self.autoWidgets[uid]
     self:removeWidget(id)
+    self.autoWidgets[uid] = nil
   end
   connect(g_game, {
     onAddAutomapFlag = self.onAddAutomapFlag,
@@ -47,7 +53,8 @@ function UIRealMinimap:onSetup()
 end
 
 function UIRealMinimap:onDestroy()
-  if self._realMapMarkerEvent then removeEvent(self._realMapMarkerEvent); self._realMapMarkerEvent = nil end
+  self._closing = true
+  if self.markerEvent then removeEvent(self.markerEvent); self.markerEvent = nil end
   for _,widget in pairs(self.alternatives) do
     widget:destroy()
   end
@@ -57,6 +64,8 @@ function UIRealMinimap:onDestroy()
     onRemoveAutomapFlag = self.onRemoveAutomapFlag,
   })
   self:destroyFlagWindow()
+  self.markerPool, self.markerIds, self.markerCatalog = {}, {}, nil
+  self.markerIndex = nil
 end
 
 function UIRealMinimap:onVisibilityChange()
@@ -90,19 +99,26 @@ function UIRealMinimap:load()
   if settings then
     if settings.flags then
       for _,widget in pairs(settings.flags) do
-        self:addWidget(widget.imagePath, widget.imageSize, widget.position, widget.tooltip)
+        self:addWidget(widget.imagePath, widget.imageSize, widget.position, widget.description or widget.tooltip)
       end
     end
-    self:setZoom(settings.zoom)
+    self:setZoom(tonumber(settings.zoom) or -1)
+  end
+  -- Flags already received by the HUD remain available when Cyclopedia opens.
+  local hud = modules.game_minimap and modules.game_minimap.minimapWidget
+  for _, flag in pairs(hud and hud.flags or {}) do
+    self:addWidget(flag.imagePath, flag.imageSize, flag.position, flag.description)
+  end
+  for _, flag in pairs(hud and hud._minimapWidgets or {}) do
+    if not flag:isDestroyed() then self:addWidget(flag.imagePath, flag.imageSize, flag.pos, flag.tooltip) end
   end
 end
 
 function UIRealMinimap:save()
   local settings = { flags={} }
-  local currentWidgets = {}
-  for _,widget in pairs(currentWidgets) do
+  for _,widget in pairs(self.markerIndex and self.markerIndex.records or {}) do
     table.insert(settings.flags, {
-      position = widget.pos,
+      position = widget.position,
       imagePath = widget.imagePath,
       imageSize = widget.imageSize,
       description = widget.tooltip,
@@ -110,6 +126,95 @@ function UIRealMinimap:save()
   end
   settings.zoom = self:getZoom()
   g_settings.setNode('RealMinimap', settings)
+end
+
+function UIRealMinimap:addWidget(imagePath, imageSize, pos, tooltip)
+  if self:isDestroyed() or not pos or type(imagePath) ~= 'string' then return nil end
+  imagePath = imagePath:gsub('^/', '')
+  local uid = string.format('%d,%d,%d\0%s\0%s', pos.x, pos.y, pos.z, imagePath, tooltip or '')
+  if self.markerIds[uid] then return self.markerIds[uid] end
+  self.nextMarkerId = self.nextMarkerId + 1
+  local id = self.nextMarkerId
+  if not self.markerIndex:insert({id = id, uid = uid, imagePath = imagePath,
+      imageSize = imageSize or {width = 11, height = 11},
+      position = {x = pos.x, y = pos.y, z = pos.z}, tooltip = tooltip or '', priority = 1}) then return nil end
+  self.markerIds[uid] = id
+  self:refreshMarks()
+  return id
+end
+
+function UIRealMinimap:removeWidget(id)
+  if not id then return end
+  if type(id) == 'string' then self.hiddenCatalogMarks[id] = true
+  else
+    local record = self.markerIndex.records[id]
+    if record then self.markerIds[record.uid] = nil; self.markerIndex:remove(id) end
+  end
+  self:refreshMarks()
+end
+
+function UIRealMinimap:moveWidget(id, pos)
+  local record = self.markerIndex.records[id]
+  if not record then return end
+  local path, size, text = record.imagePath, record.imageSize, record.tooltip
+  self:removeWidget(id)
+  return self:addWidget(path, size, pos, text)
+end
+
+function UIRealMinimap:isWidgetIgnored(path)
+  return (self.ignoredMarks or {})[(path or ''):gsub('^/', '')] == true
+end
+
+function UIRealMinimap:getWidgetInfoFromPoint(point)
+  for _, widget in ipairs(self.markerPool) do
+    if widget:isVisible() and widget:containsPoint(point) and widget.marker then
+      local r = widget.marker
+      return {widgetId = r.id, pos = r.position, imagePath = r.imagePath,
+        tooltip = r.tooltip, fromUIRealMinimap = true}
+    end
+  end
+end
+
+function UIRealMinimap:updateVisibleMarkers()
+  if self:isDestroyed() then return end
+  for _, widget in ipairs(self.markerPool) do widget:hide() end
+  local rect, center = self:getPaddingRect(), self:getCameraPosition()
+  local first = self:getTilePosition({x = rect.x, y = rect.y})
+  local last = self:getTilePosition({x = rect.x + rect.width - 1, y = rect.y + rect.height - 1})
+  if not first or not last then return end
+  local bounds = {left = first.x, top = first.y, right = last.x, bottom = last.y}
+  local limit = 128
+  local candidates = self.markerIndex:query(bounds, center.z, center, limit, self.ignoredMarks)
+  if self.markerCatalog then
+    for _, candidate in ipairs(self.markerCatalog:query(bounds, center.z, center, limit, self.ignoredMarks, self.hiddenCatalogMarks, RealMap.settings.ignoreFlag)) do
+      candidates[#candidates + 1] = candidate
+    end
+    MapMarkerIndex.sortAndTrim(candidates, limit)
+  end
+  local started, created, more = g_clock.millis(), 0, false
+  for i, candidate in ipairs(candidates) do
+    local widget = self.markerPool[i]
+    if not widget then
+      -- Budget creation per dispatcher slice; even a dense world zoom cannot
+      -- turn into a 125-widget, hundreds-of-ms callback.
+      if created == 16 or g_clock.millis() - started >= 4 then more = true; break end
+      widget = g_ui.createWidget('MinimapFlag', self)
+      self.markerPool[i] = widget
+      created = created + 1
+    end
+    local record = candidate.record
+    if widget.marker ~= record then
+      widget:breakAnchors()
+      widget:setImageSource('/' .. record.imagePath)
+      widget:setSize(record.imageSize)
+      widget:setTooltip(record.tooltip)
+      widget.marker = record
+      self:centerInPosition(widget, record.position)
+    end
+    widget:show()
+  end
+  for i = #candidates + 1, #self.markerPool do self.markerPool[i]:hide() end
+  if more then self:refreshMarks() end
 end
 
 function UIRealMinimap:setCrossPosition(pos)
@@ -233,12 +338,15 @@ function UIRealMinimap:onHide()
 end
 
 function UIRealMinimap:setCurrentView(view)
-  self.currentView = view == 'satellite' and 'satellite' or 'minimap'
+  self.currentView = view -- Preserve legacy names such as fullMinimap.
+  -- Map opts into floor composition. House previews keep only their selected
+  -- surface floor, without changing zoom or enabling live terrain snapshots.
+  if not self.surfaceComposite and self.setSurfaceOpacity then self:setSurfaceOpacity(0) end
   if self.setSurfaceMode then self:setSurfaceMode(self.currentView == 'satellite') end
 end
 
 function UIRealMinimap:setLevelSeparator(value)
-  if self.setSurfaceOpacity then self:setSurfaceOpacity(math.max(0, math.min(100, value)) / 100) end
+  if self.setSurfaceOpacity then self:setSurfaceOpacity(self.surfaceComposite and math.max(0, math.min(100, value)) / 100 or 0) end
 end
 
 function UIRealMinimap:ignoreWidget(imagePath)
@@ -254,11 +362,11 @@ function UIRealMinimap:unignoreWidget(imagePath)
 end
 
 function UIRealMinimap:refreshMarks()
-  for _, widget in pairs(self._minimapWidgets or {}) do
-    if not widget:isDestroyed() then
-      widget:setVisible(not (self.ignoredMarks or {})[(widget.imagePath or ''):gsub('^/', '')])
-    end
-  end
+  if self.markerEvent or self:isDestroyed() then return end
+  self.markerEvent = scheduleEvent(function()
+    self.markerEvent = nil
+    if not self:isDestroyed() then self:updateVisibleMarkers() end
+  end, 16)
 end
 
 function UIRealMinimap:resetCustomMouseEvent()
@@ -379,7 +487,9 @@ function UIRealMinimap:createFlagWindow(pos)
   if not pos then return end
 
 
-  modules.game_cyclopedia.Cyclopedia.endGame()
+  -- Keep the map alive while editing a flag. Rebuilding it on confirmation
+  -- loses marker state and schedules a second world-catalog load.
+  modules.game_cyclopedia.cyclopediaWindow:hide()
   self.flagWindow = g_ui.createWidget('MinimapFlagWindow', rootWidget)
   g_client.setInputLockWidget(self.flagWindow)
 
@@ -400,14 +510,12 @@ function UIRealMinimap:createFlagWindow(pos)
   flagRadioGroup:selectWidget(flagRadioGroup:getFirstWidget())
 
   local successFunc = function()
-    modules.game_cyclopedia.toggleRedirect("Map")
-    local map = modules.game_cyclopedia.MapCyclopedia.getWidget()
-    map:addWidget("data/images/game/minimap/flag"..flagRadioGroup:getSelectedWidget().icon..".png", {width = 11, height = 11}, pos, description:getText())
+    self:addWidget("data/images/game/minimap/flag"..flagRadioGroup:getSelectedWidget().icon..".png", {width = 11, height = 11}, pos, description:getText())
+    self:save()
     self:destroyFlagWindow(pos)
   end
 
   local cancelFunc = function()
-    modules.game_cyclopedia.toggleRedirect("Map")
     self:destroyFlagWindow(pos)
   end
 
@@ -425,9 +533,11 @@ function UIRealMinimap:destroyFlagWindow(oldPos)
     self.flagWindow:destroy()
     self.flagWindow = nil
 
-    if oldPos then
-      local map = modules.game_cyclopedia.MapCyclopedia.getWidget()
-      map:setCameraPosition(oldPos)
+    if not self._closing and not self:isDestroyed() then
+      local window = modules.game_cyclopedia.cyclopediaWindow
+      window:show(true); window:raise(); window:focus()
+      g_client.setInputLockWidget(window)
+      if oldPos then self:setCameraPosition(oldPos) end
     end
   end
 end

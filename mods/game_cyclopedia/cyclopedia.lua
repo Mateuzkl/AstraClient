@@ -214,13 +214,6 @@ function terminate()
   MinimapViewCheckBox = nil
 
   cyclopediaOptionsPanel = nil
-  if VisibleCyclopediaPanel then
-    for _, widget in pairs(VisibleCyclopediaPanel:getChildren()) do
-      widget:destroy()
-      widget = nil
-    end
-  end
-
   VisibleCyclopediaPanel = nil
   BestiaryGroups = nil
 
@@ -302,12 +295,6 @@ function Cyclopedia:open(action)
 
   g_client.setInputLockWidget(cyclopediaWindow)
   searchFilterCharmText = ''
-  if VisibleCyclopediaPanel then
-    for _, widget in pairs(VisibleCyclopediaPanel:getChildren()) do
-      widget:destroy()
-      widget = nil
-    end
-  end
 
   for id, child in pairs(cyclopediaOptionsPanel:getChildren()) do
     if child.category:getText() == (action or 'Items') then
@@ -316,8 +303,11 @@ function Cyclopedia:open(action)
     end
   end
 
-  g_keyboard.bindKeyPress('Tab', toggleNextWindow, cyclopediaWindow)
-  g_keyboard.bindKeyPress('Shift+Tab', togglePreviousWindow, cyclopediaWindow)
+  if not Cyclopedia.tabKeysBound then
+    g_keyboard.bindKeyPress('Tab', toggleNextWindow, cyclopediaWindow)
+    g_keyboard.bindKeyPress('Shift+Tab', togglePreviousWindow, cyclopediaWindow)
+    Cyclopedia.tabKeysBound = true
+  end
 end
 
 function toggle()
@@ -327,8 +317,6 @@ function toggle()
         minimap:onHide()
     end
     Cyclopedia.endGame()
-    g_keyboard.unbindKeyPress('Tab', toggleNextWindow, cyclopediaWindow)
-    g_keyboard.unbindKeyPress('Shift+Tab', togglePreviousWindow, cyclopediaWindow)
   else
     Cyclopedia:open()
   end
@@ -525,6 +513,11 @@ function Cyclopedia.startGame()
 end
 
 function Cyclopedia.endGame()
+  if Cyclopedia.tabKeysBound then
+    g_keyboard.unbindKeyPress('Tab', toggleNextWindow, cyclopediaWindow)
+    g_keyboard.unbindKeyPress('Shift+Tab', togglePreviousWindow, cyclopediaWindow)
+    Cyclopedia.tabKeysBound = false
+  end
   cancelPanelWork()
   -- RealMap.unload()
   g_client.setInputLockWidget(nil)
@@ -659,35 +652,18 @@ function addButtonsToElementsMarks()
           modules.game_cyclopedia.MapCyclopedia.onChangeButtonMarks(newButton, i)
       end
   end
+  MapCyclopedia.syncMarkFilters()
 end
 
 function toggleDisplayShowAll()
-  local markShowall = g_ui.getRootWidget():recursiveGetChildById('markShowall')
-
-  if not markShowall then return end
-    if markShowallMark then
-      for i = 1, 23 do
-          local button = g_ui.getRootWidget():recursiveGetChildById('marksButton' .. i)
-          if button then
-            button:setImageClip("0 20 43 20")
-            MapCyclopedia.onChangeButtonMarks(button, i)
-          end
-
-      end
-      markShowall:setChecked(true)
-      markShowallMark = false
-    else
-      for i = 1, 23 do
-        local button = g_ui.getRootWidget():recursiveGetChildById('marksButton' .. i)
-        if button then
-          button:setImageClip("0 0 43 20")
-          MapCyclopedia.onChangeButtonMarks(button, i)
-        end
-      end
-
-      markShowall:setChecked(false)
-      markShowallMark = true
-    end
+  if not MapCyclopedia.getMinimapWidget() then return end
+  local markShowall = VisibleCyclopediaPanel:recursiveGetChildById('markShowall')
+  local checked = not markShowall:isChecked()
+  for i = 1, 23 do
+    local button = VisibleCyclopediaPanel:recursiveGetChildById('marksButton' .. i)
+    if button then MapCyclopedia.onChangeButtonMarks(button, i, checked) end
+  end
+  markShowall:setChecked(checked)
 end
 
 function toggleNextWindow()

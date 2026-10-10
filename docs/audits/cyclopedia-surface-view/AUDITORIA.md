@@ -32,4 +32,8 @@ Quickloot is sandboxed. Cyclopedia now queries its owning module through a read-
 
 Desktop OpenGL x64 and DirectX x64 builds succeeded. Existing GL real-GPU glitch regression passed (coherent LOD, delayed decode, zoom/full-map/floor transitions, fractional edges, and classic fallback).
 
-The user's subsequent profiler screenshots identify a separate marker-widget bottleneck in `RealMap.setUIMarkers`: callbacks up to 497 ms and over 18,000 live widgets. This initial feature commit preserves that evidence; a dedicated follow-up commit will replace eager marker materialization and add performance/lifecycle tests. Network overload has not been demonstrated by these screenshots.
+The user's subsequent profiler screenshots identify a separate marker-widget bottleneck in `RealMap.setUIMarkers`: callbacks up to 497 ms and over 18,000 live widgets. Initial feature commit `aca73d0` preserves that evidence. The follow-up in PR #205 replaces eager marker materialization with a shared data-only spatial catalog and a viewport pool of at most 128 icons, plus focused performance/lifecycle tests. Network overload has not been demonstrated by these screenshots.
+
+Map no longer requests bank/inventory resources on every open. Closing an unrelated tab no longer serializes the auto-aim profile without actual edits. Existing static marks are retained as data, with nearest/user-priority bounded selection when a view contains more than 128 candidates. Destroying a map cancels its refresh, disconnects automap callbacks, releases native subscriptions and drops its pool; the immutable catalog is reused across opens.
+
+Final validation includes both desktop GPU backends, 100 production panel lifecycles each, actual Items focus and absent quickloot configuration, missing-pack fallback, filters/flags/labels, and all six minimap smoke modes per backend. No connected gameplay/FPS/RAM/network guarantee is claimed. See TESTES.md and BENCHMARK.md for scope and measurements.

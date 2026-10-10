@@ -11,6 +11,10 @@ import struct
 from pathlib import Path
 
 
+class LabelParseError(ValueError):
+    """Optional town metadata failed, not a world-hash or file-write failure."""
+
+
 def town_labels(world: Path) -> list:
     if not 4 < world.stat().st_size <= 512 * 1024 * 1024:
         raise ValueError('Invalid/over-budget OTBM size')
@@ -60,7 +64,11 @@ def export(world: Path, pack: Path) -> dict:
         digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     if digest != source.get('world_sha256'):
         raise ValueError('OTBM does not match the installed HD pack; refusing wrong-world labels')
-    result = dict(format=1, world_sha256=digest, labels=town_labels(world))
+    try:
+        labels = town_labels(world)
+    except (ValueError, struct.error) as error:
+        raise LabelParseError(str(error)) from error
+    result = dict(format=1, world_sha256=digest, labels=labels)
     target = pack / 'cities.json'
     if target.exists(): raise ValueError('cities.json already exists; preserve/review it before exporting again')
     target.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

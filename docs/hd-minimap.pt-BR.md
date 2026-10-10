@@ -229,3 +229,37 @@ g_minimap.getSpriteTileLookupCount() -- Consultas acumuladas; não mede FPS.
 
 Detalhes técnicos, limites e testes adicionais:
 [documentação em inglês](hd-minimap.md).
+
+## Surface View da Cyclopedia
+
+Abra **Map** pelo botão da Cyclopedia e selecione **Surface View**. Ele usa o
+mesmo pacote PNG/cache do HD, mas não muda a opção HD do minimapa do HUD.
+**Map View** continua sendo OTMM clássico. Surface funciona nos pisos 0-7;
+no subsolo volta para Map, preservando a preferência Surface.
+
+O **Level Separator** (0-100) muda a transparência dos andares de fundo,
+desenhados do 7 até o andar selecionado. O terreno do andar selecionado fica
+opaco; a transparência original dos PNGs preserva os espaços vazios.
+No piso 7 o slider fica desabilitado. Alternar vistas, zoom e pisos não pede
+dados novos ao servidor.
+
+Exportações novas geram `cities.json` a partir das towns do `.otbm` correto.
+Para acrescentar nomes a um pacote existente, com o mesmo hash de mapa:
+
+```powershell
+python tools/minimap_hd/city_labels.py 'C:/Servidor/data/world/world.otbm' data/minimap_hd
+```
+
+O exportador recusa outro mapa e não sobrescreve um `cities.json` existente.
+As posições iniciais são os templos reais, não centros adivinhados. É possível
+ajustar os rótulos para seu mapa, mantendo o hash. **City names** mostra/esconde
+os nomes; no máximo 32 rótulos são reutilizados, sem sobreposições.
+
+Os marcadores da Cyclopedia agora são indexados como dados, sem criar milhares
+de widgets fora da tela. O pool tem até 128 ícones visíveis, priorizando flags
+do jogador e os mais próximos. Se houver mais que isso na vista, aproxime o
+zoom para ver os demais. Filtros, edição de flags e estado da janela continuam
+disponíveis. O mapa não recarrega o OTMM global ao abrir.
+
+Veja os [testes](audits/cyclopedia-surface-view/TESTES.md) e
+[medições/limitações](audits/cyclopedia-surface-view/BENCHMARK.md).
