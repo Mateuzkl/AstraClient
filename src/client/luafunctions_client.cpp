@@ -239,9 +239,11 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteDecodeCount", &Minimap::getSatelliteDecodeCount, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSpriteTileLookupCount", &Minimap::getSpriteTileLookupCount, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSpriteViewCount", &Minimap::getSpriteViewCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSurfaceViewCount", &Minimap::getSurfaceViewCount, &g_minimap);
     if (g_app.getStartupOptions().find("--test") != std::string::npos) {
         g_lua.bindSingletonFunction("g_minimap", "auditPrepareSpriteView", &Minimap::prepareSpriteView, &g_minimap);
         g_lua.bindSingletonFunction("g_minimap", "auditSatelliteFrame", &Minimap::auditSatelliteFrame, &g_minimap);
+        g_lua.bindSingletonFunction("g_minimap", "auditSurfaceFrame", &Minimap::auditSurfaceFrame, &g_minimap);
         g_lua.bindSingletonFunction("g_minimap", "setSatelliteTestDecodeDelay", &Minimap::setSatelliteTestDecodeDelay, &g_minimap);
     }
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteViewLevel", &Minimap::getSatelliteViewLevel, &g_minimap);
@@ -1181,6 +1183,10 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("zoomOut", &UIMinimap::zoomOut);
     g_lua.bindClassMemberFunction<UIMinimap>("setZoom", &UIMinimap::setZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setSpriteMode", &UIMinimap::setSpriteMode);
+    g_lua.bindClassMemberFunction<UIMinimap>("setSurfaceMode", &UIMinimap::setSurfaceMode);
+    g_lua.bindClassMemberFunction<UIMinimap>("isSurfaceMode", &UIMinimap::isSurfaceMode);
+    g_lua.bindClassMemberFunction<UIMinimap>("setSurfaceOpacity", &UIMinimap::setSurfaceOpacity);
+    g_lua.bindClassMemberFunction<UIMinimap>("getSurfaceOpacity", &UIMinimap::getSurfaceOpacity);
     g_lua.bindClassMemberFunction<UIMinimap>("isSpriteMode", &UIMinimap::isSpriteMode);
     g_lua.bindClassMemberFunction<UIMinimap>("setSpriteModeSuspended", &UIMinimap::setSpriteModeSuspended);
     g_lua.bindClassMemberFunction<UIMinimap>("getClassicZoom", &UIMinimap::getClassicZoom);

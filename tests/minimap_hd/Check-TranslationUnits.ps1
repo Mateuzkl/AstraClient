@@ -21,7 +21,7 @@ $flags = @('/nologo', '/Zs', '/std:c++17', '/EHsc', '/DNDEBUG', '/DWIN32',
   '/DNOMINMAX', '/DASIO_STANDALONE', '/DCURL_STATICLIB', '/DFW_GRAPHICS',
   '/DFW_NET', '/DFW_XML', '/DFW_SOUND', '/DFW_CAM', '/DWITH_ENCRYPTION',
   '/D_WIN32_WINNT=0x0601', "/I$includePath", "/I$(Join-Path $repoPath 'src')")
-foreach ($file in @('src/client/luafunctions_client.cpp', 'src/client/minimap.cpp')) {
+foreach ($file in @('src/client/luafunctions_client.cpp', 'src/client/minimap.cpp', 'src/client/uiminimap.cpp')) {
   & cl.exe @flags (Join-Path $repoPath $file)
   if ($LASTEXITCODE -ne 0) { throw "Standalone translation-unit check failed: $file" }
   Write-Output "PASS: standalone MSVC translation unit (no unity/PCH): $file"

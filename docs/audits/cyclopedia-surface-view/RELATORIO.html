@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyclopedia PNG Surface — PR #205</title>
+<style>body{max-width:900px;margin:40px auto;padding:0 24px;background:#151b22;color:#dce6ef;font:16px/1.6 system-ui}h1,h2{color:#f4cf80}a{color:#81c9fa}code{background:#25313d;padding:2px 5px}li{margin:8px 0}</style>
+<h1>Cyclopedia PNG Surface — correção do gargalo</h1>
+<p><a href="https://github.com/Mateuzkl/AstraClient/pull/205">PR #205</a> · branch <code>feat/cyclopedia-png-surface-view</code> · sem merge na main.</p>
+<h2>Causa e correção</h2>
+<p>O profiler do usuário mostrou lotes de marcadores de até 497 ms e mais de 18 mil widgets vivos. Isso bloqueia o cliente e pode atrasar respostas de ping, sem provar tráfego excessivo do servidor.</p>
+<ul><li>Catálogo de marcadores indexado como dados, reutilizado entre aberturas.</li><li>Até 128 ícones visíveis e 32 nomes de cidades, com culling e seleção limitada.</li><li>Eventos cancelados, callbacks desconectados e pool liberado ao destruir o mapa.</li><li>Sem consultas de saldo por abertura nem gravação de perfil de magias sem alterações.</li></ul>
+<h2>Surface e compatibilidade</h2>
+<p>Mesmo pipeline PNG/LOD/cache do PR #204. Surface independente do HD do HUD; pisos 7 até o selecionado com slider 0–100; subsolo em Map/OTMM clássico. Cidades extraídas do OTBM correto e associadas ao hash do pacote.</p>
+<p>O TFS e suas alterações locais foram preservados. Não há novos opcodes, banco de dados ou cópia de código GPL do Canary.</p>
+<h2>Validação e limites</h2>
+<p>Compilações OpenGL e DirectX/ANGLE, capturas reais da fila GPU, transparência/ordem de andares e 100 ciclos de painéis por backend. Regressões de OTMM, decoder assíncrono, exportação e glitches de zoom também passaram.</p>
+<p>As medições são locais/offline, não promessa de FPS, ping ou RAM em sessão conectada. Inicialização de UI/driver ainda pode apresentar picos isolados. O diagnóstico de memória tem custo próprio e seus avisos não foram ocultados.</p>
+<p><a href="AUDITORIA.md">Auditoria e SHAs</a> · <a href="FINDINGS.md">Achados</a> · <a href="TESTES.md">Testes</a> · <a href="BENCHMARK.md">Medições</a></p>
+</html>

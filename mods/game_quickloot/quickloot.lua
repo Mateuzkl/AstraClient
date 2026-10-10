@@ -450,6 +450,17 @@ function onParseLootContainers(quickLootFallbackToMainContainer, containers, obt
   refreshList()
 end
 
+-- Sandbox-safe, read-only access for Cyclopedia. Never invent another lootData
+-- global or a second list that diverges from this module's player profile.
+function getLootSelection(clientId)
+  if not lootDataLoaded or type(lootData) ~= 'table' then return nil, false end
+  local listType = lootData.listType
+  if listType ~= 'whitelist' and listType ~= 'blacklist' then return nil, false end
+  local list = lootData[listType == 'whitelist' and 'whitelistTypes' or 'blacklistTypes']
+  if type(list) ~= 'table' then return nil, false end
+  return listType, table.contains(list, clientId)
+end
+
 function addToQuickLoot(clientId)
   if type(clientId) ~= "number" then
     return

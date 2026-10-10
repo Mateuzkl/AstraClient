@@ -39,6 +39,10 @@ public:
 
     bool setZoom(int zoom);
     void setSpriteMode(bool enabled);
+    void setSurfaceMode(bool enabled);
+    bool isSurfaceMode() { return m_surfaceMode; }
+    void setSurfaceOpacity(float opacity);
+    float getSurfaceOpacity() { return m_surfaceOpacity; }
     bool isSpriteMode() { return m_spriteMode; }
     void setSpriteModeSuspended(bool suspended);
     int getClassicZoom() { return m_spriteMode ? m_classicZoom : m_zoom; }
@@ -84,6 +88,8 @@ private:
     int m_spriteZoom = 3;
     bool m_spriteMode = false;
     bool m_spriteModeSuspended = false;
+    bool m_surfaceMode = false;
+    float m_surfaceOpacity = 1.f;
 };
 
 #endif

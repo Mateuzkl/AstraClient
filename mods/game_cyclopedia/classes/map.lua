@@ -3,17 +3,143 @@ MapCyclopedia.__index = MapCyclopedia
 MapCyclopedia.currentArea = 0
 MapCyclopedia.currentAreaName = ''
 MapCyclopedia.askWindow = nil
+MapCyclopedia.preference = 'minimap'
+MapCyclopedia.cityLabels = {}
+
+function MapCyclopedia.getMinimapWidget()
+    if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed() or
+        VisibleCyclopediaPanel:getId() ~= 'MapDataPanel' then return nil end
+    return VisibleCyclopediaPanel:recursiveGetChildById('minimap')
+end
+
+function MapCyclopedia.updateViewMode()
+    local map = MapCyclopedia.getMinimapWidget()
+    if not map or not MinimapViewCheckBox then return end
+    local floor = map:getCameraPosition().z
+    local available = map.setSurfaceMode ~= nil and g_minimap.hasSatellitePack and g_minimap.hasSatellitePack() and floor <= 7
+    local surface = available and MapCyclopedia.preference == 'satellite'
+    local view = surface and 'satellite' or 'minimap'
+    local oldView = map.currentView
+    if oldView and oldView ~= view then MapCyclopedia.zooms[oldView] = map:getZoom() end
+    -- Deselect before disabling (the radio group must be able to uncheck).
+    MinimapViewCheckBox:selectWidget(surface and MapCyclopedia.surfaceView or MapCyclopedia.mapView, true)
+    MapCyclopedia.surfaceView:setEnabled(available)
+    MapCyclopedia.surfaceView:setTooltip(available and 'PNG satellite view (independent of HUD HD)' or 'Surface needs the updated executable and a matching HD pack; floors 0-7 only')
+    map:setCurrentView(view)
+    if oldView ~= view then map:setZoom(tonumber(MapCyclopedia.zooms[view]) or -1) end
+    map:setColor(floor <= 7 and '#274DA6' or '#000000')
+    MapCyclopedia.separator:setEnabled(surface and floor < 7)
+    VisibleCyclopediaPanel:recursiveGetChildById('levelSeparatorLabel'):setEnabled(surface and floor < 7)
+    MapCyclopedia.updateFloorImage(floor)
+    MapCyclopedia.queueLabels()
+end
+
+function MapCyclopedia.terminatePanel()
+    local map = MapCyclopedia.getMinimapWidget()
+    if MapCyclopedia.labelEvent then removeEvent(MapCyclopedia.labelEvent); MapCyclopedia.labelEvent = nil end
+    if map then
+        map:save()
+        MapCyclopedia.camera = map:getCameraPosition()
+        MapCyclopedia.zooms[map.currentView or 'minimap'] = map:getZoom()
+        g_settings.setNode('CyclopediaMap', {view = MapCyclopedia.preference,
+            zooms = MapCyclopedia.zooms, camera = MapCyclopedia.camera,
+            separator = MapCyclopedia.separator:getValue(), labels = MapCyclopedia.labelsEnabled,
+            ignoredMarks = map.ignoredMarks or {}, hiddenMarks = map.hiddenCatalogMarks or {}})
+        if map.setSurfaceMode then map:setSurfaceMode(false) end
+    end
+    MapCyclopedia.cityWidgets = {}
+end
+
+function MapCyclopedia.loadCityLabels()
+    MapCyclopedia.cityLabels = {}
+    if not g_resources.fileExists('/data/minimap_hd/cities.json') then return end
+    local ok, labels, source = pcall(function()
+        return json.decode(g_resources.readFileContents('/data/minimap_hd/cities.json')),
+            json.decode(g_resources.readFileContents('/data/minimap_hd/source.json'))
+    end)
+    if not ok or type(labels) ~= 'table' or type(source) ~= 'table' or labels.format ~= 1 or
+        labels.world_sha256 ~= source.world_sha256 or type(labels.world_sha256) ~= 'string' or
+        #labels.world_sha256 ~= 64 or not labels.world_sha256:match('^[a-fA-F0-9]+$') or
+        type(labels.labels) ~= 'table' or #labels.labels > 1024 then
+        g_logger.warning('[Cyclopedia] City labels do not match the installed pack; labels disabled')
+        return
+    end
+    local ids = {}
+    for _, label in ipairs(labels.labels) do
+        local p = type(label) == 'table' and label.position
+        if type(label) == 'table' and type(label.id) == 'string' and #label.id <= 80 and not ids[label.id] and type(label.name) == 'string' and
+            #label.name > 0 and #label.name <= 80 and type(p) == 'table' and
+            type(p.x) == 'number' and type(p.y) == 'number' and type(p.z) == 'number' and
+            p.x > 0 and p.x <= 65535 and p.y > 0 and p.y <= 65535 and p.z >= 0 and p.z <= 7 and
+            p.x == math.floor(p.x) and p.y == math.floor(p.y) and p.z == math.floor(p.z) then
+            ids[label.id] = true
+            local priority, minZoom = tonumber(label.priority), tonumber(label.minZoom)
+            label.priority = priority and priority >= -100000 and priority <= 100000 and priority or 0
+            label.minZoom = minZoom and minZoom >= -8 and minZoom <= 8 and minZoom or -8
+            MapCyclopedia.cityLabels[#MapCyclopedia.cityLabels + 1] = label
+        end
+    end
+    table.sort(MapCyclopedia.cityLabels, function(a, b)
+        if a.priority ~= b.priority then return a.priority > b.priority end
+        return a.id < b.id
+    end)
+end
+
+function MapCyclopedia.queueLabels()
+    if MapCyclopedia.labelEvent then return end
+    MapCyclopedia.labelEvent = scheduleEvent(function()
+        MapCyclopedia.labelEvent = nil
+        MapCyclopedia.updateLabels()
+    end, 1)
+end
+
+function MapCyclopedia.updateLabels()
+    local map = MapCyclopedia.getMinimapWidget()
+    if not map then return end
+    for _, widget in ipairs(MapCyclopedia.cityWidgets) do widget:hide() end
+    if not MapCyclopedia.labelsEnabled or map:getCameraPosition().z > 7 then return end
+    local used, boxes, bounds = 0, {}, map:getRect()
+    for _, label in ipairs(MapCyclopedia.cityLabels) do
+        if map:getZoom() >= label.minZoom then
+            local pos = {x = label.position.x, y = label.position.y, z = map:getCameraPosition().z}
+            local point = map:getTilePoint(pos)
+            if point.x >= bounds.x and point.x <= bounds.x + bounds.width and point.y >= bounds.y and point.y <= bounds.y + bounds.height then
+                local widget = MapCyclopedia.cityWidgets[used + 1]
+                if not widget then
+                    widget = g_ui.createWidget('CyclopediaCityLabel', map)
+                    MapCyclopedia.cityWidgets[used + 1] = widget
+                end
+                widget:hide()
+                widget:setText(label.name)
+                widget:resizeToText()
+                local box = {x = point.x - widget:getWidth()/2 - 3, y = point.y - widget:getHeight()/2 - 2,
+                    width = widget:getWidth() + 6, height = widget:getHeight() + 4}
+                local overlap = false
+                for _, other in ipairs(boxes) do
+                    if box.x < other.x + other.width and box.x + box.width > other.x and
+                        box.y < other.y + other.height and box.y + box.height > other.y then overlap = true; break end
+                end
+                if not overlap then
+                    used = used + 1
+                    boxes[#boxes + 1] = box
+                    map:centerInPosition(widget, pos)
+                    widget:show()
+                    if used == 32 then break end
+                end
+            end
+        end
+    end
+end
 
 MapCyclopedia.setup = function()
-    RealMap.load()
     MapCyclopedia.currentArea = 0
     MapCyclopedia.currentAreaName = ''
-    g_game.requestResource(ResourceBank)
-    g_game.requestResource(ResourceInventary)
+    -- Use already-received resource values. Rendering a local map requires no
+    -- balance request or network round-trip on every open.
 
     local player = g_game.getLocalPlayer()
-    local bankMoney = player:getResourceValue(ResourceBank)
-    local characterMoney = player:getResourceValue(ResourceInventary)
+    local bankMoney = player and player:getResourceValue(ResourceBank) or 0
+    local characterMoney = player and player:getResourceValue(ResourceInventary) or 0
 
     cyclopediaWindow:recursiveGetChildById('coinsAmount'):setText(comma_value(bankMoney + characterMoney))
 
@@ -27,45 +153,41 @@ MapCyclopedia.setup = function()
 
     local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
     if minimap then
-        -- Save live minimap to disk and load into cyclopedia widget (avoids per-flag packet flood)
-        g_minimap.saveOtmm('/minimap.otmm')
-        g_minimap.loadOtmm('/minimap.otmm')
+        minimap.surfaceComposite = true
+        -- Share in-memory OTMM and the indexed PNG cache. No save/clean/reload.
+        if minimap.setSurfaceMode and g_minimap.loadSatellitePack and not g_minimap.hasSatellitePack() and
+            g_resources.fileExists('/data/minimap_hd/index.txt') then g_minimap.loadSatellitePack('/data/minimap_hd') end
+        local settings = g_settings.getNode('CyclopediaMap') or {}
+        MapCyclopedia.preference = settings.view == 'satellite' and 'satellite' or 'minimap'
+        MapCyclopedia.zooms = settings.zooms or {minimap = -1, satellite = -1}
+        MapCyclopedia.labelsEnabled = settings.labels ~= false
+        MapCyclopedia.cityWidgets = {}
         minimap:load()
-        minimap:setCameraPosition(g_game.getLocalPlayer():getPosition())
-        minimap:setCrossPosition(g_game.getLocalPlayer():getPosition(), true)
-        minimap:setZoom(2)
-
-        minimap.view = "satellite"
-
-        minimap.onFloorChange = function(self, newPos, oldPos)
-            MapCyclopedia.updateFloorImage(minimap:getCameraPosition().z)
-            if newPos.z > 7 then
-                minimap:setCurrentView("minimap")
-                minimap:setBackgroundColor("#000000ff")
-                MinimapViewCheckBox:selectWidget(MapCyclopedia.mapView)
-                MapCyclopedia.surfaceView:setEnabled(false)
-            else
-                minimap:setCurrentView(minimap.view)
-                minimap:setBackgroundColor("#274DA6")
-                if not MapCyclopedia.surfaceView:isEnabled() then
-                    MapCyclopedia.surfaceView:setEnabled(true)
-                end
-            end
+        minimap.ignoredMarks = settings.ignoredMarks or {}
+        minimap.hiddenCatalogMarks = settings.hiddenMarks or {}
+        local position = player and player:getPosition() or {x = 32768, y = 32768, z = 7}
+        minimap:setCameraPosition(settings.camera or position)
+        minimap:setCrossPosition(position)
+        minimap:setZoom(tonumber(MapCyclopedia.zooms[MapCyclopedia.preference]) or -1)
+        minimap.onCameraPositionChange = function(self, newPos, oldPos)
+            UIRealMinimap.onCameraPositionChange(self, newPos)
+            self:refreshMarks()
+            MapCyclopedia.updateViewMode()
         end
+        minimap.onZoomChange = function(self, zoom)
+            UIRealMinimap.onZoomChange(self, zoom)
+            self:refreshMarks()
+            MapCyclopedia.queueLabels()
+        end
+        minimap.onGeometryChange = function(self) self:refreshMarks(); MapCyclopedia.queueLabels() end
 
         MinimapViewCheckBox = UIRadioGroup.create()
         MinimapViewCheckBox.onSelectionChange = function(widget, selectedWidget)
-            if selectedWidget:getId() == 'surfaceView' then
-                minimap:setCurrentView("satellite")
-                minimap.view = "satellite"
-            else
-                minimap:setCurrentView("minimap")
-                minimap.view = "minimap"
-            end
-
-            local localPlayer = g_game.getLocalPlayer()
-            local localPlayerPos = localPlayer:getPosition()
-            MapCyclopedia.updatePlayerPosition(localPlayer, localPlayerPos, localPlayerPos)
+            if not selectedWidget or minimap:isDestroyed() then return end
+            MapCyclopedia.zooms[minimap.currentView or 'minimap'] = minimap:getZoom()
+            MapCyclopedia.preference = selectedWidget:getId() == 'surfaceView' and 'satellite' or 'minimap'
+            MapCyclopedia.updateViewMode()
+            minimap:setZoom(tonumber(MapCyclopedia.zooms[minimap.currentView]) or -1)
         end
 
         MapCyclopedia.surfaceView = VisibleCyclopediaPanel:recursiveGetChildById('surfaceView')
@@ -74,10 +196,16 @@ MapCyclopedia.setup = function()
         MinimapViewCheckBox:addWidget(MapCyclopedia.surfaceView)
         MinimapViewCheckBox:addWidget(MapCyclopedia.mapView)
 
-        local playerPosition = g_game.getLocalPlayer():getPosition() or {x = 0, y = 0, z = 0}
-
-        MinimapViewCheckBox:selectWidget(playerPosition.z <= 7 and MapCyclopedia.surfaceView or MapCyclopedia.mapView)
-        MinimapViewCheckBox.onSelectionChange(MinimapViewCheckBox, MinimapViewCheckBox:getSelectedWidget())
+        MapCyclopedia.separator = VisibleCyclopediaPanel:recursiveGetChildById('levelSeparatorScroll')
+        MapCyclopedia.separator:setValue(math.max(0, math.min(100, tonumber(settings.separator) or 100)))
+        minimap:setLevelSeparator(MapCyclopedia.separator:getValue())
+        MapCyclopedia.separator.onValueChange = function(self, value) minimap:setLevelSeparator(value) end
+        local labels = VisibleCyclopediaPanel:recursiveGetChildById('cityLabels')
+        labels:setChecked(MapCyclopedia.labelsEnabled)
+        labels.onCheckChange = function(self, checked) MapCyclopedia.labelsEnabled = checked; MapCyclopedia.queueLabels() end
+        MapCyclopedia.loadCityLabels()
+        MapCyclopedia.updateViewMode()
+        RealMap.setUIMarkers(minimap)
 
         local zoomInButton = VisibleCyclopediaPanel:recursiveGetChildById('zoomInWidget')
         local zoomOutButton = VisibleCyclopediaPanel:recursiveGetChildById('zoomOutWidget')
@@ -124,20 +252,7 @@ MapCyclopedia.updatePlayerPosition = function(localPlayer, newPos, oldPos)
     if not minimap then
         return
     end
-    RealMap.setCrossPosition(minimap, g_game.getLocalPlayer():getPosition())
-
-    if newPos.z > 7 then
-        minimap:setCurrentView("minimap")
-        minimap:setBackgroundColor("#000000ff")
-        MinimapViewCheckBox:selectWidget(MapCyclopedia.mapView)
-        MapCyclopedia.surfaceView:setEnabled(false)
-    else
-        minimap:setCurrentView(minimap.view)
-        minimap:setBackgroundColor("#274DA6")
-        if not MapCyclopedia.surfaceView:isEnabled() then
-            MapCyclopedia.surfaceView:setEnabled(true)
-        end
-    end
+    if newPos then minimap:setCrossPosition(newPos) end -- Do not change the browsed virtual floor.
 end
 
 MapCyclopedia.zoomIn = function()
@@ -157,19 +272,11 @@ MapCyclopedia.zoomOut = function()
 end
 
 MapCyclopedia.floorUp = function()
-    local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
-    if minimap then
-        local currentFloor = minimap:getFloor()
-        minimap:setFloor(currentFloor - 1)
-    end
+    MapCyclopedia.floor(true)
 end
 
 MapCyclopedia.floorDown = function()
-    local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
-    if minimap then
-        local currentFloor = minimap:getFloor()
-        minimap:setFloor(currentFloor + 1)
-    end
+    MapCyclopedia.floor(false)
 end
 
 function MapCyclopedia.updateFloorImage(posZ)
@@ -177,10 +284,6 @@ function MapCyclopedia.updateFloorImage(posZ)
     if floorPos then
         floorPos:setImageClip((posZ * 14) .. " 0 14 67")
     end
-end
-
-function MapCyclopedia.getMinimapWidget()
-    return VisibleCyclopediaPanel:recursiveGetChildById('minimap')
 end
 
 function MapCyclopedia.floor(bool)
@@ -222,22 +325,36 @@ local icon = {
 }
 
 function MapCyclopedia.getWidget()
-    return VisibleCyclopediaPanel:recursiveGetChildById('minimap')
+    return MapCyclopedia.getMinimapWidget()
 end
 
-function MapCyclopedia.onChangeButtonMarks(button, i)
-    local icon = icon[i]
-    local isChecked = button:isChecked()
-    local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
-    if minimap.ignoreWidget then minimap:ignoreWidget(icon) end
-    if isChecked then
-        button:setImageClip("0 0 43 20")
-        button:setChecked(false)
-    else
-        button:setImageClip("0 20 43 20")
-        button:setChecked(true)
-        if minimap.unignoreWidget then minimap:unignoreWidget(icon) end
+function MapCyclopedia.onChangeButtonMarks(button, i, desired)
+    local map = MapCyclopedia.getMinimapWidget()
+    if not map then return end
+    local path = icon[i]
+    if not path or path == '' then button:setEnabled(false); return end
+    local checked = desired
+    if checked == nil then checked = not button:isChecked() end
+    button:setChecked(checked)
+    button:setImageClip(checked and '0 20 43 20' or '0 0 43 20')
+    if checked then map:unignoreWidget(path) else map:ignoreWidget(path) end
+end
+
+function MapCyclopedia.syncMarkFilters()
+    local map = MapCyclopedia.getMinimapWidget()
+    if not map then return end
+    local all = true
+    for i, path in ipairs(icon) do
+        local button = VisibleCyclopediaPanel:recursiveGetChildById('marksButton' .. i)
+        if button then
+            if path ~= '' then
+                local checked = not map:isWidgetIgnored(path)
+                MapCyclopedia.onChangeButtonMarks(button, i, checked)
+                if not checked then all = false end
+            else button:setEnabled(false) end
+        end
     end
+    VisibleCyclopediaPanel:recursiveGetChildById('markShowall'):setChecked(all)
 end
 
 function MapCyclopedia.onChangeArea(areaName, subAreaName)

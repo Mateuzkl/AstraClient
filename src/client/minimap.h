@@ -94,6 +94,10 @@ public:
 
     void draw(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color);
     void drawSprites(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, bool liveTerrain = true);
+    void drawSurface(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, float backgroundOpacity);
+    void addSurfaceView();
+    void removeSurfaceView();
+    unsigned getSurfaceViewCount();
     bool loadSatellitePack(const std::string& directory);
     void clearSatellitePack();
     bool hasSatellitePack();
@@ -113,6 +117,7 @@ public:
     unsigned getSpriteViewCount();
     void prepareSpriteView(const Size& viewSize, const Position& mapCenter, float scale);
     int auditSatelliteFrame(const Size& viewSize, const Position& mapCenter, float scale, const std::string& screenshot);
+    int auditSurfaceFrame(const Size& viewSize, const Position& mapCenter, float scale, float opacity, const std::string& screenshot);
     void setSatelliteTestDecodeDelay(unsigned milliseconds) { m_satelliteTestDecodeDelay = std::min(milliseconds, 500u); }
     Point getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
     Position getTilePosition(const Point& point, const Rect& screenRect, const Position& mapCenter, float scale);
@@ -153,7 +158,8 @@ private:
     TexturePtr satelliteTexture(uint64_t key, const std::set<uint64_t>* protectedKeys = nullptr); // Requires m_satelliteLock.
     std::vector<uint64_t> satelliteViewKeys(const Rect& mapRect, int level, int floor);
     bool satelliteViewReady(const std::vector<uint64_t>& keys);
-    void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale);
+    void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale, bool composite = false, float backgroundOpacity = 1.f);
+    int auditMapFrame(const Size& viewSize, const Position& mapCenter, float scale, bool surface, float opacity, const std::string& screenshot);
     void clearSatelliteTextures();
     std::unordered_map<uint64_t, SatelliteChunk> m_satelliteChunks;
     std::unordered_map<uint64_t, SatelliteTexture> m_satelliteTextures;
@@ -180,6 +186,7 @@ private:
     size_t m_spriteItemCount = 0;
     uint64_t m_spriteTileLookupCount = 0;
     unsigned m_spriteViews = 0;
+    unsigned m_surfaceViews = 0; // Render-only consumers; never enable live snapshots.
     std::atomic<bool> m_spriteCacheEnabled{false};
     std::mutex m_spriteLock;
 

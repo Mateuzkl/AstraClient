@@ -1,3 +1,11 @@
+CyclopediaCityLabel < Label
+  font: verdana-11px-rounded
+  color: #ffe49c
+  shadow: true
+  text-auto-resize: true
+  focusable: false
+  phantom: true
+
 markButton < UIButton
   id: marksButton
   size: 20 20
@@ -46,7 +54,7 @@ MapDataPanel < Panel
       vertical-scrollbar: mapListScrollBar
       NewWindow
         id: display
-        size: 146 253
+        size: 146 275
         !text: tr('Display')
         font: $var-cip-font
         color: #909090
@@ -69,7 +77,7 @@ MapDataPanel < Panel
         phantom: true
         UIWidget
           id: displayAncora
-          size: 146 233
+          size: 146 255
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
           draggable: false
@@ -134,7 +142,7 @@ MapDataPanel < Panel
           FlatPanel
             id: viewsPanel
             width: 132
-            height: 76
+            height: 98
             image-source: /game_cyclopedia/images/ui/panel-background
             image-border: 1
             anchors.top: viewsLabel.bottom
@@ -182,16 +190,28 @@ MapDataPanel < Panel
               anchors.left: parent.left
               margin-top: 5
               margin-left: 5
-              step: 27
+              step: 1
               pixels-scroll: true
-              value: 60
-              minimum: 10
-              maximum: 200
+              value: 100
+              minimum: 0
+              maximum: 100
               default-scroll: true
               enabled: false
               @onValueChange:
               $!on:
                 width: 0
+            CheckBox
+              id: cityLabels
+              anchors.top: levelSeparatorScroll.bottom
+              anchors.left: parent.left
+              margin-top: 4
+              margin-left: 4
+              text: City names
+              text-auto-resize: true
+              font: $var-cip-font
+              color: $var-text-cip-color
+              text-offset: 17 -3
+              checked: true
 
 
       UIButton
@@ -521,7 +541,7 @@ MapDataPanel < Panel
     RealMinimap
       id: minimap
       anchors.fill: parent
-      min-zoom: -1
+      min-zoom: -8
       max-zoom: 5
       @onHoverPosition: |
         function(self, mapPos)
