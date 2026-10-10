@@ -12,10 +12,9 @@ on:
   push:
     branches:
       - main
-      - 'fix/**'
-      - 'feat/**'
-      - 'refactor/**'
-
+      - fix/**
+      - feat/**
+      - refactor/**
     paths:
       - .github/workflows/build-vcpkg.yml
       - cmake/**
@@ -29,7 +28,6 @@ on:
       - data/images/splash.png
       - data/cursors/**
       - vc23/otclient.vcxproj
-
   pull_request:
     paths:
       - .github/workflows/build-vcpkg.yml
@@ -49,65 +47,104 @@ jobs:
   build-windows:
     name: Windows
     runs-on: windows-2022
-
     env:
-      # x-gha foi removido do vcpkg -> usar cache em pasta (files) + actions/cache.
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
-      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
-      # sccache: cache dos objetos do codigo (so o arquivo alterado recompila)
-      SCCACHE_DIR: ${{ github.workspace }}/sccache
-      SCCACHE_GHA_ENABLED: "false"
-
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/vcpkg-downloads
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
+      SCCACHE_LOG: warn
+      SCCACHE_ERROR_LOG: ${{ github.workspace }}/build/diagnostics/sccache.log
     steps:
-      - uses: actions/checkout@v4
 
-      - name: Get latest CMake
-        uses: lukka/get-cmake@v4.3.2
-
-      - name: Create vcpkg binary cache directory
-        run: mkdir -p "${{ github.workspace }}/vcpkg_cache"
-        shell: bash
-
-      - name: Restore vcpkg binary cache
-        uses: actions/cache/restore@v6
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-bincache-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
+          persist-credentials: false
+
+      - name: Read build context
+        shell: pwsh
+        run: |
+          & ./cmake/ci/ReadBuildContext.ps1
+        id: vcpkg-baseline
+
+      - name: Restore dependency cache
+        id: dependency-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            ${{ env.VCPKG_DOWNLOADS }}
+          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**') }}
           restore-keys: |
-            vcpkg-bincache-${{ hashFiles('vcpkg.json') }}-
+            vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-
+            vcpkg-bincache-x64-
             vcpkg-bincache-
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-
-      - name: Create sccache directory
-        run: mkdir -p "${{ github.workspace }}/sccache"
-        shell: bash
-
-      - name: Restore sccache
-        uses: actions/cache/restore@v6
+      - name: Expose compiler cache runtime
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          path: ${{ github.workspace }}/sccache
-          key: sccache-windows-${{ github.run_id }}
-          restore-keys: |
-            sccache-windows-
+          script: |
+            for (const name of ['ACTIONS_RESULTS_URL', 'ACTIONS_RUNTIME_TOKEN']) {
+              const value = process.env[name] || '';
+              if (name.endsWith('TOKEN') && value) core.setSecret(value);
+              core.exportVariable(name, value);
+            }
 
-      # cmd + vcvars64: garante o ambiente MSVC completo nos subprocessos que o
-      # vcpkg dispara pra buildar as portas (glew falhava com 'CMAKE_C_COMPILER not
-      # set' quando o ambiente era so exportado via msvc-dev-cmd + cmake cru).
-      - name: Setup MSVC, build vcpkg deps and AstraClient
-        shell: cmd
+      - name: Install verified compiler cache
+        shell: pwsh
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          if not exist vcpkg git clone https://github.com/microsoft/vcpkg vcpkg
-          call vcpkg\bootstrap-vcpkg.bat
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          & ./cmake/ci/SetupCompilerCache.ps1
+        continue-on-error: true
+
+      - name: Checkout pinned vcpkg
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ steps.vcpkg-baseline.outputs.commit }}
+          path: vcpkg
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name bootstrap -Executable cmd.exe -Arguments @('/d', '/c', 'vcpkg\bootstrap-vcpkg.bat', '-disableMetrics')
+
+      - name: Configure-CMake
+        shell: pwsh
+        run: |
+          $commands = @'
+          set "COMPILER_LAUNCHER="
+          where sccache >nul 2>&1 && set "COMPILER_LAUNCHER=sccache"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_CXX_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Configure-CMake' -CmdScript $commands
+        id: configure
+
+      - name: Save dependency cache
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.configure.outcome == 'success' && steps.dependency-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            ${{ env.VCPKG_DOWNLOADS }}
+          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**') }}
+
+      - name: Build-Release
+        shell: pwsh
+        run: |
+          $commands = @'
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
+          if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-Release' -CmdScript $commands
 
-      - name: Test standalone utilities and native networking
-        shell: cmd
+      - name: test-standalone-utilities-and-native-networking
+        shell: pwsh
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          $commands = @'
           if errorlevel 1 exit /b 1
           mkdir build\network-test
           cl /nologo /O2 /MT /Gy /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\utilities.exe /Fo:build\network-test\ .github\tests\standalone_util.cpp src\framework\stdext\string.cpp /link /OPT:REF ws2_32.lib
@@ -118,11 +155,13 @@ jobs:
           if errorlevel 1 exit /b 1
           node .github\tests\native_network_fixture.cjs build\network-test\network.exe build\network-test
           if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'test-standalone-utilities-and-native-networking' -CmdScript $commands
 
-      - name: Test Windows native splash lifecycle and resource ownership
-        shell: cmd
+      - name: test-windows-native-splash-lifecycle-and-resource-ownership
+        shell: pwsh
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          $commands = @'
           if errorlevel 1 exit /b 1
           mkdir build\native-splash-test\data\images
           copy /y data\images\splash.png build\native-splash-test\data\images\splash.png
@@ -131,6 +170,8 @@ jobs:
           if errorlevel 1 exit /b 1
           build\native-splash-test\native-splash-test.exe "%GITHUB_WORKSPACE%\data\cursors"
           if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'test-windows-native-splash-lifecycle-and-resource-ownership' -CmdScript $commands
 
       - name: Verify Windows splash packaging
         shell: pwsh
@@ -143,34 +184,48 @@ jobs:
             throw 'The direct Visual Studio build must also package native splash artwork.'
           }
 
-      # Salva mesmo em falha: as 90 deps compilam antes do erro de compile do codigo,
-      # entao a proxima run as restaura e pula direto pro compile (~20min -> ~minutos).
-      - name: Save vcpkg binary cache
-        if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ github.workspace }}/vcpkg_cache
-          key: vcpkg-bincache-${{ hashFiles('vcpkg.json') }}-${{ github.run_id }}
+      - name: Validate-runtime-package
+        shell: pwsh
+        run: |
+          $commands = @'
+          powershell -NoProfile -ExecutionPolicy Bypass -File cmake\ci\ValidateWindowsBinary.ps1 -Executable build\AstraClient.exe
+          if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Validate-runtime-package' -CmdScript $commands
 
-      - name: Save sccache
+      - name: Record compiler cache statistics
+        shell: pwsh
+        run: |
+          if (Get-Command sccache -ErrorAction SilentlyContinue) {
+            & ./cmake/ci/InvokeBuildStage.ps1 -Name compiler-cache -Executable sccache -Arguments @('--show-stats')
+          }
         if: always()
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ github.workspace }}/sccache
-          key: sccache-windows-${{ github.run_id }}
+        continue-on-error: true
 
-      - name: Upload build logs
-        uses: actions/upload-artifact@v4
+      - name: Upload build diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
         with:
-          name: logs-windows-${{ github.sha }}
-          path: ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
-        if: ${{ failure() }}
+          name: windows-diagnostics-${{ github.sha }}
+          path: |
+            build/diagnostics/
+            build/CMakeCache.txt
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/Testing/Temporary/
+            build/vcpkg-manifest-install.log
+            vcpkg/buildtrees/**/*.log
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Upload artifact binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: astraclient-windows-${{ github.sha }}
           path: |
             ${{ github.workspace }}/build/AstraClient.exe
             ${{ github.workspace }}/build/*.dll
             ${{ github.workspace }}/build/data/images/splash.png
+          if-no-files-found: error
+          retention-days: 14
+    timeout-minutes: 120
