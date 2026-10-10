@@ -132,7 +132,7 @@ class ItemType : public LuaObject
 public:
     ItemType();
 
-    void unserialize(const BinaryTreePtr& node);
+    void unserialize(const BinaryTreePtr& node, bool preserveServerIds = false);
 
     void setServerId(uint16 serverId) { m_attribs.set(ItemTypeAttrServerId, serverId); }
     uint16 getServerId() { return m_attribs.get<uint16>(ItemTypeAttrServerId); }

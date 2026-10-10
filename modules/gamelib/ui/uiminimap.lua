@@ -100,7 +100,10 @@ function UIMinimap:save()
       description = widget.description,
     })
   end
-  settings.zoom = self:getZoom()
+  settings.zoom = self.getClassicZoom and self:getClassicZoom() or self:getZoom()
+  if self.getSpriteZoom then
+    settings.spriteZoom = self:getSpriteZoom()
+  end
   g_settings.setNode('Minimap', settings)
 end
 

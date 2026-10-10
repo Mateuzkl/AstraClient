@@ -26,6 +26,8 @@
 #include "game.h"
 #include "gameconfig.h"
 #include "spritemanager.h"
+#include "item.h"
+#include "map.h"
 
 #include <framework/graphics/image.h>
 #include <framework/graphics/texture.h>
@@ -34,6 +36,10 @@
 #include <framework/graphics/framebuffermanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#include <framework/core/asyncdispatcher.h>
+#include <sstream>
+#include <chrono>
+#include <cmath>
 #include <zlib.h>
 
 #include <framework/util/stats.h>
@@ -91,10 +97,13 @@ void Minimap::init()
 void Minimap::terminate()
 {
     clean();
+    clearSatellitePack();
 }
 
 void Minimap::clean()
 {
+    clearSpriteCache();
+    clearSatelliteTextures(); // Keep the disk index: logout must not erase HD coverage.
     std::lock_guard<std::mutex> lock(m_lock);
     for (auto& tileBlocks : m_tileBlocks)
         tileBlocks.clear();
@@ -108,7 +117,7 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
     Rect mapRect = calcMapRect(screenRect, mapCenter, scale);
     g_drawQueue->addFilledRect(screenRect, color);
 
-    if(MMBLOCK_SIZE*scale <= 1 || !mapCenter.isMapPosition()) {
+    if(MMBLOCK_SIZE*scale <= 1 || !mapCenter.isMapPosition() || mapCenter.z > g_gameConfig.getMapMaxZ()) {
         return;
     }
 
@@ -143,6 +152,504 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
     }
 
     g_drawQueue->setClip(drawQueueStart, screenRect);
+}
+
+bool Minimap::loadSatellitePack(const std::string& directory)
+{
+    const std::string index = directory + "/index.txt";
+    if (!g_resources.fileExists(index) || !g_things.isDatLoaded() || !g_sprites.isLoaded())
+        return false;
+    try {
+        auto file = g_resources.openFile(index, true);
+        if (file->size() > 8 * 1024 * 1024)
+            stdext::throw_exception("satellite index exceeds its size limit");
+        std::string contents(file->size(), '\0');
+        if (file->read(contents.data(), contents.size()) != contents.size())
+            stdext::throw_exception("truncated satellite index");
+        std::istringstream input(contents);
+        std::string magic;
+        int version, chunkSize, pixelsPerTile;
+        uint32 datSignature, sprSignature;
+        size_t count;
+        if (!(input >> magic >> version >> chunkSize >> pixelsPerTile >> datSignature >> sprSignature >> count) ||
+            magic != "ASTRAHD" || version != 1 || chunkSize != 16 || pixelsPerTile != 32 || count == 0 || count > 100000)
+            stdext::throw_exception("invalid satellite index header");
+        if (datSignature != g_things.getDatSignature() || sprSignature != g_sprites.getSignature())
+            stdext::throw_exception("satellite pack was generated with different DAT/SPR assets");
+        std::unordered_map<uint64_t, SatelliteChunk> chunks;
+        std::set<int> levels;
+        for (size_t i = 0; i < count; ++i) {
+            int level, x, y, z;
+            std::string fileName;
+            if (!(input >> level >> x >> y >> z >> fileName) || level < 1 || level > 1024 || (level & (level - 1)) ||
+                x < 0 || y < 0 || x > 65535 || y > 65535 || z < 0 || z > g_gameConfig.getMapMaxZ() ||
+                x % (16 * level) || y % (16 * level))
+                stdext::throw_exception("invalid satellite chunk coordinates");
+            const auto expected = stdext::format("satellite-%d-%d-%d-%d.png", level, x, y, z);
+            if (fileName != expected || !chunks.emplace(satelliteKey(level, x, y, z), SatelliteChunk{directory + "/" + fileName}).second)
+                stdext::throw_exception("invalid or duplicate satellite filename");
+            levels.insert(level);
+        }
+        std::string extra;
+        if (input >> extra)
+            stdext::throw_exception("trailing satellite index data");
+        std::lock_guard<std::mutex> lock(m_satelliteLock);
+        m_satelliteTextures.clear();
+        m_satelliteOrder.clear();
+        m_satelliteChunks = std::move(chunks);
+        m_satelliteLevels = std::move(levels);
+        m_satelliteDatSignature = datSignature;
+        m_satelliteSprSignature = sprSignature;
+        g_logger.info(stdext::format("[HD Minimap] Indexed %u persistent satellite chunks (textures loaded on demand)", m_satelliteChunks.size()));
+        return true;
+    } catch (const std::exception& e) {
+        g_logger.error(stdext::format("[HD Minimap] Could not load '%s': %s", index, e.what()));
+        return false; // Preserve a previously valid index on failed replacement.
+    }
+}
+
+void Minimap::clearSatelliteTextures()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    m_satelliteTextures.clear();
+    m_satelliteOrder.clear();
+}
+
+void Minimap::clearSatellitePack()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    m_satelliteTextures.clear();
+    m_satelliteOrder.clear();
+    m_satelliteChunks.clear();
+    m_satelliteLevels.clear();
+}
+
+bool Minimap::hasSatellitePack()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return !m_satelliteChunks.empty() && m_satelliteDatSignature == g_things.getDatSignature() &&
+        m_satelliteSprSignature == g_sprites.getSignature();
+}
+
+size_t Minimap::getSatelliteChunkCount()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return m_satelliteChunks.size();
+}
+
+size_t Minimap::getSatelliteTextureCount()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return m_satelliteTextures.size();
+}
+
+int Minimap::satelliteLevel(float scale)
+{
+    if (m_satelliteLevels.empty() || scale <= 0 || !std::isfinite(scale))
+        return 0;
+    // Use the coarsest pre-rendered image that is not stretched past 1:1.
+    int result = *m_satelliteLevels.begin();
+    for (int level : m_satelliteLevels) {
+        if (level > 32.f / scale)
+            break;
+        result = level;
+    }
+    return result;
+}
+
+TexturePtr Minimap::satelliteTexture(uint64_t key)
+{
+    auto chunk = m_satelliteChunks.find(key);
+    if (chunk == m_satelliteChunks.end() || chunk->second.failed)
+        return nullptr;
+    auto cached = m_satelliteTextures.find(key);
+    if (cached == m_satelliteTextures.end()) {
+        size_t pending = 0;
+        for (const auto& entry : m_satelliteTextures)
+            if (entry.second.image.valid()) ++pending;
+        if (pending >= 4)
+            return nullptr; // Never enqueue an entire world of background work.
+        while (m_satelliteTextures.size() >= 32) {
+            m_satelliteTextures.erase(m_satelliteOrder.front());
+            m_satelliteOrder.pop_front();
+        }
+        m_satelliteOrder.push_back(key);
+        const auto path = chunk->second.file;
+        // The worker owns only a path, never a Map/Minimap/GL object. Clearing
+        // or replacing the index during logout cannot expose freed state.
+        auto future = g_asyncDispatcher.schedule([path]() -> ImagePtr {
+            try {
+                // Reject oversized/corrupt image headers before allocating decoded pixels.
+                const auto data = g_resources.readFileContents(path);
+                if (data.size() < 24 || data.size() > 4 * 1024 * 1024 ||
+                    data.compare(0, 8, "\x89PNG\r\n\x1a\n", 8) != 0 || data.compare(12, 4, "IHDR") != 0 ||
+                    data.compare(16, 8, "\0\0\2\0\0\0\2\0", 8) != 0)
+                    stdext::throw_exception("expected a bounded 512x512 PNG header");
+                auto image = Image::loadPNG(data.data(), data.size());
+                if (!image || image->getSize() != Size(512, 512) || image->isAnimated())
+                    stdext::throw_exception("expected a static 512x512 PNG");
+                return image;
+            } catch (const std::exception& e) {
+                g_logger.error(stdext::format("[HD Minimap] Cannot decode '%s': %s", path, e.what()));
+                return nullptr;
+            }
+        });
+        cached = m_satelliteTextures.emplace(key, SatelliteTexture{nullptr, future, std::prev(m_satelliteOrder.end())}).first;
+    }
+    auto& value = cached->second;
+    m_satelliteOrder.splice(m_satelliteOrder.end(), m_satelliteOrder, value.order);
+    if (value.image.valid() && value.image.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto image = value.image.get();
+        value.image = {};
+        if (image)
+            value.texture = std::make_shared<Texture>(image, false, false, true);
+        else
+            chunk->second.failed = true; // Log a corrupt/missing chunk once, then fall back.
+    }
+    return value.texture;
+}
+
+bool Minimap::hasSatelliteTile(const Position& pos)
+{
+    if (!pos.isMapPosition()) return false;
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return m_satelliteChunks.count(satelliteKey(1, pos.x - pos.x % 16, pos.y - pos.y % 16, pos.z)) != 0;
+}
+
+bool Minimap::preloadSatelliteTile(const Position& pos, float scale)
+{
+    if (!pos.isMapPosition()) return false;
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    const auto level = satelliteLevel(scale);
+    if (!level) return false;
+    const auto size = 16 * level;
+    return bool(satelliteTexture(satelliteKey(level, pos.x - pos.x % size, pos.y - pos.y % size, pos.z)));
+}
+
+void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale)
+{
+    if (screenRect.isEmpty() || !mapCenter.isMapPosition() || mapCenter.z > g_gameConfig.getMapMaxZ())
+        return;
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    if (m_satelliteDatSignature != g_things.getDatSignature() || m_satelliteSprSignature != g_sprites.getSignature())
+        return;
+    int level = satelliteLevel(scale);
+    if (!level) return;
+    const auto mapRect = calcMapRect(screenRect, mapCenter, scale);
+    // Very large views use a coarser level to retain a bounded draw budget.
+    while (int64_t(mapRect.width() / (16 * level) + 2) * (mapRect.height() / (16 * level) + 2) > 256) {
+        auto next = m_satelliteLevels.upper_bound(level);
+        if (next == m_satelliteLevels.end()) return;
+        level = *next;
+    }
+    const auto size = 16 * level;
+    const int left = std::max(0, mapRect.left()) / size * size;
+    const int top = std::max(0, mapRect.top()) / size * size;
+    const int right = std::min(65535, mapRect.right());
+    const int bottom = std::min(65535, mapRect.bottom());
+    const Point off = Point((mapRect.size() * scale).toPoint() - screenRect.size().toPoint()) / 2;
+    const Point origin = screenRect.topLeft() - off;
+    const auto start = g_drawQueue->size();
+    for (int y = top; y <= bottom; y += size) {
+        for (int x = left; x <= right; x += size) {
+            auto texture = satelliteTexture(satelliteKey(level, x, y, mapCenter.z));
+            if (!texture) continue;
+            const int dx = origin.x + std::lround((x - mapRect.left()) * scale);
+            const int dy = origin.y + std::lround((y - mapRect.top()) * scale);
+            const int endX = origin.x + std::lround((x + size - mapRect.left()) * scale);
+            const int endY = origin.y + std::lround((y + size - mapRect.top()) * scale);
+            g_drawQueue->addTexturedRect(Rect(dx, dy, endX - dx, endY - dy), texture, Rect(0, 0, 512, 512));
+        }
+    }
+    g_drawQueue->setClip(start, screenRect);
+}
+
+int Minimap::exportSatelliteBase(const std::string& directory)
+{
+    if (g_game.isOnline() || !g_things.isDatLoaded() || !g_things.isOtbLoaded() || !g_sprites.isLoaded())
+        stdext::throw_exception("satellite export requires offline mode and the matching DAT/SPR/OTB");
+    if (g_resources.directoryExists(directory))
+        stdext::throw_exception("satellite export destination already exists; use a new directory");
+    if (!g_resources.makeDir(directory))
+        stdext::throw_exception("cannot create satellite export directory");
+    constexpr int chunkSize = 16;
+    const int pixels = g_sprites.spriteSize();
+    std::set<uint64_t> chunks;
+    int leftExtent = 0, topExtent = 0, rightExtent = 0, bottomExtent = 0;
+    for (const auto& tile : g_map.getTiles()) {
+        const auto pos = tile->getPosition();
+        if (!pos.isMapPosition() || tile->getItems().empty()) continue;
+        chunks.insert(satelliteKey(1, pos.x / chunkSize * chunkSize, pos.y / chunkSize * chunkSize, pos.z));
+        for (const auto& item : tile->getItems()) {
+            if (!item->getId()) stdext::throw_exception("invalid item in offline map");
+            const auto disp = item->getDisplacement() * g_sprites.getOffsetFactor();
+            const int itemLeft = (item->getWidth() - 1) * pixels + disp.x + std::ceil(Otc::MAX_ELEVATION * g_sprites.getOffsetFactor());
+            const int itemTop = (item->getHeight() - 1) * pixels + disp.y + std::ceil(Otc::MAX_ELEVATION * g_sprites.getOffsetFactor());
+            leftExtent = std::max(leftExtent, itemLeft);
+            topExtent = std::max(topExtent, itemTop);
+            rightExtent = std::max(rightExtent, -disp.x);
+            bottomExtent = std::max(bottomExtent, -disp.y);
+            const int minX = std::max(0, pos.x - (std::max(0, itemLeft) + pixels - 1) / pixels);
+            const int minY = std::max(0, pos.y - (std::max(0, itemTop) + pixels - 1) / pixels);
+            const int maxX = std::min(65535, pos.x + (std::max(0, -disp.x) + pixels - 1) / pixels);
+            const int maxY = std::min(65535, pos.y + (std::max(0, -disp.y) + pixels - 1) / pixels);
+            for (int y = minY / chunkSize * chunkSize; y <= maxY; y += chunkSize)
+                for (int x = minX / chunkSize * chunkSize; x <= maxX; x += chunkSize)
+                    chunks.insert(satelliteKey(1, x, y, pos.z));
+        }
+    }
+    if (chunks.empty()) stdext::throw_exception("offline map contains no renderable tiles");
+    // A bounded halo covers displaced/oversized sprites across chunk borders.
+    const int haloRight = (leftExtent + pixels - 1) / pixels;
+    const int haloBottom = (topExtent + pixels - 1) / pixels;
+    const int haloLeft = (rightExtent + pixels - 1) / pixels;
+    const int haloTop = (bottomExtent + pixels - 1) / pixels;
+    if (std::max({haloLeft, haloTop, haloRight, haloBottom}) > 32)
+        stdext::throw_exception("sprite displacement exceeds the satellite export halo limit");
+    std::ostringstream index;
+    index << "ASTRAHDBASE 1 16 " << pixels << ' ' << g_things.getDatSignature() << ' ' << g_sprites.getSignature() << ' ' << chunks.size() << '\n';
+    int written = 0;
+    for (const auto key : chunks) {
+        const int x = key & 0xffff, y = (key >> 16) & 0xffff, z = (key >> 32) & 0xff;
+        auto image = std::make_shared<Image>(Size(chunkSize * pixels, chunkSize * pixels));
+        std::vector<TilePtr> tiles;
+        for (int ty = std::max(0, y - haloTop); ty <= std::min(65535, y + chunkSize - 1 + haloBottom); ++ty)
+            for (int tx = std::max(0, x - haloLeft); tx <= std::min(65535, x + chunkSize - 1 + haloRight); ++tx)
+                if (auto tile = g_map.getTile(Position(tx, ty, z))) tiles.push_back(tile);
+        for (int pass = 0; pass < 3; ++pass) {
+            for (const auto& tile : tiles) {
+                const auto pos = tile->getPosition();
+                const Point dest((pos.x - x) * pixels, (pos.y - y) * pixels);
+                int elevation = 0;
+                const auto items = tile->getItems();
+                for (const auto& item : items) {
+                    if (item->isHidden()) continue;
+                    const bool base = item->isGround() || item->isGroundBorder() || item->isOnBottom();
+                    const bool drawItem = (pass == 0 && item->isGround()) || (pass == 1 && base && !item->isGround()) || (pass == 2 && item->isOnTop());
+                    if (drawItem) item->drawToImage(dest - elevation * g_sprites.getOffsetFactor(), image);
+                    if (base) elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+                }
+                if (pass == 1) {
+                    for (auto it = items.rbegin(); it != items.rend(); ++it) {
+                        const auto& item = *it;
+                        if (item->isHidden() || item->isGround() || item->isGroundBorder() || item->isOnBottom() || item->isOnTop()) continue;
+                        item->drawToImage(dest - elevation * g_sprites.getOffsetFactor(), image);
+                        elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+                    }
+                }
+            }
+        }
+        const auto name = stdext::format("satellite-1-%d-%d-%d.png", x, y, z);
+        image->savePNG(directory + "/" + name);
+        index << "1 " << x << ' ' << y << ' ' << z << ' ' << name << '\n';
+        if (++written % 100 == 0 || written == chunks.size())
+            g_logger.info(stdext::format("[HD EXPORT] Base chunks: %d/%u", written, chunks.size()));
+    }
+    if (!g_resources.writeFileContents(directory + "/index.base.txt", index.str()))
+        stdext::throw_exception("could not write satellite export index");
+    return written;
+}
+
+void Minimap::clearSpriteCacheLocked()
+{
+    m_spriteTiles.clear();
+    m_spriteOrder.clear();
+    m_spriteItemCount = 0;
+}
+
+void Minimap::clearSpriteCache()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    clearSpriteCacheLocked();
+}
+
+size_t Minimap::getSpriteCacheTileCount()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    return m_spriteTiles.size();
+}
+
+size_t Minimap::getSpriteCacheItemCount()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    return m_spriteItemCount;
+}
+
+void Minimap::addSpriteView()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    ++m_spriteViews;
+    m_spriteCacheEnabled = true;
+}
+
+void Minimap::removeSpriteView()
+{
+    bool stopped;
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        if (m_spriteViews > 0)
+            --m_spriteViews;
+        stopped = m_spriteViews == 0;
+        if (stopped) {
+            m_spriteCacheEnabled = false;
+            clearSpriteCacheLocked();
+        }
+    }
+    if (stopped) clearSatelliteTextures(); // Off means no retained HD image cache.
+}
+
+void Minimap::eraseSpriteTile(uint64_t key)
+{
+    const auto found = m_spriteTiles.find(key);
+    if (found == m_spriteTiles.end())
+        return;
+    m_spriteItemCount -= found->second.items.size();
+    m_spriteOrder.erase(found->second.order);
+    m_spriteTiles.erase(found);
+}
+
+void Minimap::updateSpriteTile(const Position& pos, const TilePtr& tile)
+{
+    // No cloning/allocation in classic mode. Keep explored terrain when the
+    // server removes a tile from awareness; a real empty tile clears its snapshot.
+    if (!m_spriteCacheEnabled || !tile)
+        return;
+
+    std::vector<ItemPtr> source;
+    for (const auto& thing : tile->getThings()) {
+        if (thing->isItem() && !thing->isHidden())
+            source.push_back(thing->static_self_cast<Item>());
+    }
+
+    const auto key = spriteTileKey(pos);
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    if (!m_spriteCacheEnabled)
+        return;
+    constexpr size_t maxTiles = 8192;
+    constexpr size_t maxItems = 32768;
+    constexpr size_t maxItemsPerTile = 64;
+    if (source.empty() || source.size() > maxItemsPerTile) {
+        eraseSpriteTile(key);
+        return;
+    }
+
+    const auto found = m_spriteTiles.find(key);
+    if (found != m_spriteTiles.end() && found->second.items.size() == source.size()) {
+        const auto& previous = found->second.items;
+        bool unchanged = true;
+        for (size_t i = 0; i < source.size(); ++i) {
+            if (previous[i]->getId() != source[i]->getId() ||
+                previous[i]->getCountOrSubType() != source[i]->getCountOrSubType()) {
+                unchanged = false;
+                break;
+            }
+        }
+        if (unchanged) {
+            m_spriteOrder.splice(m_spriteOrder.end(), m_spriteOrder, found->second.order);
+            return; // Creature movement does not require new terrain snapshots.
+        }
+    }
+
+    std::vector<ItemPtr> snapshots;
+    snapshots.reserve(source.size());
+    for (const auto& item : source) {
+        auto snapshot = Item::create(item->getId(), item->getCountOrSubType());
+        snapshot->setPosition(pos); // Ground and fluid patterns use tile position/subtype.
+        snapshots.push_back(std::move(snapshot));
+    }
+    eraseSpriteTile(key);
+    while (m_spriteTiles.size() >= maxTiles || m_spriteItemCount + snapshots.size() > maxItems)
+        eraseSpriteTile(m_spriteOrder.front()); // O(1) LRU eviction.
+    m_spriteOrder.push_back(key);
+    m_spriteItemCount += snapshots.size();
+    m_spriteTiles.emplace(key, SpriteTile{std::move(snapshots), std::prev(m_spriteOrder.end())});
+}
+
+void Minimap::drawSprites(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, bool liveTerrain)
+{
+    // OTMM remains the background, pathfinding source and distant/unexplored fallback.
+    draw(screenRect, mapCenter, scale, color);
+    drawSatellite(screenRect, mapCenter, scale);
+    if (screenRect.isEmpty() || !mapCenter.isMapPosition() ||
+        mapCenter.z > g_gameConfig.getMapMaxZ() || scale < 2 || !m_spriteCacheEnabled || !liveTerrain)
+        return;
+
+    const auto mapRect = calcMapRect(screenRect, mapCenter, scale);
+    // Include neighbors whose oversized sprites extend into the viewport.
+    const int left = std::max(0, mapRect.left());
+    const int top = std::max(0, mapRect.top());
+    const int right = std::min(65535, mapRect.right() + 4);
+    const int bottom = std::min(65535, mapRect.bottom() + 4);
+    if (int64_t(right - left + 1) * (bottom - top + 1) > 4096)
+        return; // Wide views stay cheap instead of rendering the entire world.
+
+    std::vector<Position> missing;
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        for (int y = top; y <= bottom; ++y) {
+            for (int x = left; x <= right; ++x) {
+                const Position pos(x, y, mapCenter.z);
+                if (m_spriteTiles.find(spriteTileKey(pos)) == m_spriteTiles.end())
+                    missing.push_back(pos);
+            }
+        }
+    }
+    // Enabling HD while standing still (or cleaning OTMM on login) needs no step.
+    for (const auto& pos : missing)
+        updateSpriteTile(pos, g_map.getTile(pos));
+
+    struct FrameTile { Point dest; std::vector<ItemPtr> items; };
+    std::vector<FrameTile> tiles;
+    const int spriteSize = g_sprites.spriteSize();
+    if (spriteSize <= 0)
+        return;
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        size_t itemCount = 0;
+        for (int y = top; y <= bottom; ++y) {
+            for (int x = left; x <= right; ++x) {
+                const auto found = m_spriteTiles.find(spriteTileKey(Position(x, y, mapCenter.z)));
+                if (found == m_spriteTiles.end())
+                    continue;
+                itemCount += found->second.items.size();
+                if (itemCount > 8192)
+                    return; // Bound draw work even for unusually dense maps.
+                tiles.push_back({Point((x - mapRect.left()) * spriteSize,
+                                           (y - mapRect.top()) * spriteSize), found->second.items});
+                m_spriteOrder.splice(m_spriteOrder.end(), m_spriteOrder, found->second.order);
+            }
+        }
+    }
+
+    const size_t start = g_drawQueue->size();
+    // Match Tenkaiser's terrain layers: ground, borders/bottom/common, then top.
+    // Independent item snapshots never draw creatures, effects, lights or animations.
+    for (int pass = 0; pass < 3; ++pass) {
+        for (const auto& tile : tiles) {
+            int elevation = 0;
+            for (const auto& item : tile.items) {
+                const bool base = item->isGround() || item->isGroundBorder() || item->isOnBottom();
+                const bool drawItem = (pass == 0 && item->isGround()) ||
+                    (pass == 1 && base && !item->isGround()) || (pass == 2 && item->isOnTop());
+                if (drawItem)
+                    item->draw(tile.dest - elevation * g_sprites.getOffsetFactor(), false, nullptr);
+                if (base || (pass == 2 && !item->isOnTop()))
+                    elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+            }
+            if (pass == 1) {
+                for (auto it = tile.items.rbegin(); it != tile.items.rend(); ++it) {
+                    const auto& item = *it;
+                    if (item->isGround() || item->isGroundBorder() || item->isOnBottom() || item->isOnTop())
+                        continue;
+                    item->draw(tile.dest - elevation * g_sprites.getOffsetFactor(), false, nullptr);
+                    elevation = std::min<int>(elevation + item->getElevation(), Otc::MAX_ELEVATION);
+                }
+            }
+        }
+    }
+    const Point off = Point((mapRect.size() * scale).toPoint() - screenRect.size().toPoint()) / 2;
+    g_drawQueue->scaleTexturedRects(start, screenRect.topLeft() - off, scale / spriteSize);
+    g_drawQueue->setClip(start, screenRect);
 }
 
 Point Minimap::getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale)
@@ -188,6 +695,9 @@ Rect Minimap::calcMapRect(const Rect& screenRect, const Position& mapCenter, flo
 
 void Minimap::updateTile(const Position& pos, const TilePtr& tile)
 {
+    if (!pos.isMapPosition() || pos.z > g_gameConfig.getMapMaxZ())
+        return;
+    updateSpriteTile(pos, tile);
     MinimapTile minimapTile;
     if(tile) {
         minimapTile.color = tile->getMinimapColorByte();
@@ -339,6 +849,16 @@ void Minimap::saveImage(const std::string& fileName, int minX, int minY, int max
 
 bool Minimap::loadOtmm(const std::string& fileName)
 {
+    return loadOtmmImpl(fileName, false);
+}
+
+bool Minimap::mergeOtmm(const std::string& fileName)
+{
+    return loadOtmmImpl(fileName, true);
+}
+
+bool Minimap::loadOtmmImpl(const std::string& fileName, bool preserveUnknown)
+{
     try {
         FileStreamPtr fin = g_resources.openFile(fileName, g_game.getFeature(Otc::GameDontCacheFiles));
         if(!fin)
@@ -391,7 +911,16 @@ bool Minimap::loadOtmm(const std::string& fileName)
             if(ret != Z_OK || destLen != blockSize)
                 break;
 
-            memcpy((uchar*)&block.getTiles(), decompressBuffer.data(), blockSize);
+            if (preserveUnknown) {
+                for (size_t i = 0; i < block.getTiles().size(); ++i) {
+                    MinimapTile incoming;
+                    memcpy(&incoming, decompressBuffer.data() + i * sizeof(MinimapTile), sizeof(MinimapTile));
+                    if (incoming.hasFlag(MinimapTileWasSeen) || incoming.color != 255)
+                        block.getTiles()[i] = incoming;
+                }
+            } else {
+                memcpy((uchar*)&block.getTiles(), decompressBuffer.data(), blockSize);
+            }
             block.mustUpdate();
             block.justSaw();
         }

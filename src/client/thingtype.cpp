@@ -820,9 +820,12 @@ bool ThingType::drawToImage(const Point& dest, int xPattern, int yPattern, int z
             for (int h = 0; h < m_size.height(); ++h)
             {
                 int y = dest.y;
-                int dx = x + spriteSize * (m_size.width() - w - 1) - spriteSize * (m_size.width() - 1);
-                int dy = y + spriteSize * (m_size.height() - h - 1) - spriteSize * (m_size.height() - 1);
-                if (dx >= 0 && dy >= 0)
+                int dx = x - spriteSize * w - m_displacement.x * g_sprites.getOffsetFactor();
+                int dy = y - spriteSize * h - m_displacement.y * g_sprites.getOffsetFactor();
+                // Image::blit clips partial sprites at all four edges. Dropping
+                // a negative origin would leave seams between satellite chunks.
+                if (dx < image->getWidth() && dy < image->getHeight() &&
+                    dx + spriteSize > 0 && dy + spriteSize > 0)
                 {
                     anythingDrawn = true;
                     image->blit(Point(dx, dy), g_sprites.getSpriteImage(m_spritesIndex[getSpriteIndex(w, h, l, xPattern, yPattern, zPattern, 0)]));

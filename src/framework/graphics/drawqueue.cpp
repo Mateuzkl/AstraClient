@@ -344,6 +344,21 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
     }
 }
 
+void DrawQueue::scaleTexturedRects(size_t start, const Point& origin, float scale)
+{
+    for (size_t i = start; i < m_queue.size(); ++i) {
+        if (auto* item = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get())) {
+            const Rect dest = item->m_dest;
+            // Round shared edges identically, avoiding seams between adjacent tiles.
+            const int left = origin.x + int(std::round(dest.left() * scale));
+            const int top = origin.y + int(std::round(dest.top() * scale));
+            const int right = origin.x + int(std::round((dest.right() + 1) * scale));
+            const int bottom = origin.y + int(std::round((dest.bottom() + 1) * scale));
+            item->m_dest = Rect(left, top, right - left, bottom - top);
+        }
+    }
+}
+
 void DrawQueue::draw(DrawType drawType)
 {
     size_t start = 0;

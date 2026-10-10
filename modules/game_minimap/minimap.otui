@@ -215,9 +215,30 @@ MapMiniWindow
       image-source: /images/game/minimap/automap-button-cyclopediamap-down
 
   Button
+    id: minimapHDButton
+    size: 20 20
+    padding: 0
+    text: HD
+    text-offset: 0 0
+    color: #c0c0c0
+    anchors.verticalCenter: fullSize.verticalCenter
+    anchors.right: fullSize.left
+    margin-right: 2
+    tooltip: Enable HD minimap (satellite view)
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleMinimapHD()
+    $hover !disabled:
+      color: #ffffff
+    $on:
+      color: #80d780
+      text-offset: 0 0
+    $pressed:
+      text-offset: 1 1
+
+  Button
     id: downloadMapButton
     !text: tr('Download Map')
-    anchors.right: zoomInWidget.left
+    anchors.right: minimapHDButton.left
     anchors.bottom: parent.bottom
     margin-right: 4
     margin-bottom: 5

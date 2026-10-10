@@ -97,6 +97,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "replaceTextures", &ThingTypeManager::replaceTextures, &g_things);
 #endif
     g_lua.bindSingletonFunction("g_things", "loadOtb", &ThingTypeManager::loadOtb, &g_things);
+    g_lua.bindSingletonFunction("g_things", "loadOtbForMap", &ThingTypeManager::loadOtbForMap, &g_things);
     g_lua.bindSingletonFunction("g_things", "loadXml", &ThingTypeManager::loadXml, &g_things);
     g_lua.bindSingletonFunction("g_things", "loadOtml", &ThingTypeManager::loadOtml, &g_things);
     g_lua.bindSingletonFunction("g_things", "isDatLoaded", &ThingTypeManager::isDatLoaded, &g_things);
@@ -224,9 +225,21 @@ void Client::registerLuaFunctions()
 
     g_lua.registerSingletonClass("g_minimap");
     g_lua.bindSingletonFunction("g_minimap", "clean", &Minimap::clean, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "clearSpriteCache", &Minimap::clearSpriteCache, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSpriteCacheTileCount", &Minimap::getSpriteCacheTileCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSpriteCacheItemCount", &Minimap::getSpriteCacheItemCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "loadSatellitePack", &Minimap::loadSatellitePack, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "clearSatellitePack", &Minimap::clearSatellitePack, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "hasSatellitePack", &Minimap::hasSatellitePack, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "hasSatelliteTile", &Minimap::hasSatelliteTile, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "preloadSatelliteTile", &Minimap::preloadSatelliteTile, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSatelliteChunkCount", &Minimap::getSatelliteChunkCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSatelliteTextureCount", &Minimap::getSatelliteTextureCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "exportSatelliteBase", &Minimap::exportSatelliteBase, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "loadImage", &Minimap::loadImage, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "saveImage", &Minimap::saveImage, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "loadOtmm", &Minimap::loadOtmm, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "mergeOtmm", &Minimap::mergeOtmm, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "saveOtmm", &Minimap::saveOtmm, &g_minimap);
 
     g_lua.registerSingletonClass("g_creatures");
@@ -1157,6 +1170,11 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("zoomIn", &UIMinimap::zoomIn);
     g_lua.bindClassMemberFunction<UIMinimap>("zoomOut", &UIMinimap::zoomOut);
     g_lua.bindClassMemberFunction<UIMinimap>("setZoom", &UIMinimap::setZoom);
+    g_lua.bindClassMemberFunction<UIMinimap>("setSpriteMode", &UIMinimap::setSpriteMode);
+    g_lua.bindClassMemberFunction<UIMinimap>("isSpriteMode", &UIMinimap::isSpriteMode);
+    g_lua.bindClassMemberFunction<UIMinimap>("setSpriteModeSuspended", &UIMinimap::setSpriteModeSuspended);
+    g_lua.bindClassMemberFunction<UIMinimap>("getClassicZoom", &UIMinimap::getClassicZoom);
+    g_lua.bindClassMemberFunction<UIMinimap>("getSpriteZoom", &UIMinimap::getSpriteZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setupHouse", &UIMinimap::setupHouse);
     g_lua.bindClassMemberFunction<UIMinimap>("setMixZoom", &UIMinimap::setMinZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setMinZoom", &UIMinimap::setMinZoom);

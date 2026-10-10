@@ -1,4 +1,7 @@
 build
+/data/minimap_hd/
+/tools/minimap_hd/__pycache__/
+/.venv/
 data/things/*
 !data/things/860.rar
 pdbs

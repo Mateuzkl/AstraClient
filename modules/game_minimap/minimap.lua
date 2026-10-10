@@ -17,6 +17,77 @@ oldPos = nil
 local minimapFile = '/minimap.otmm'
 local minimapBackupFile = '/minimap.otmm.bak'
 
+local function updateMinimapHDButton(enabled)
+  local button = minimapWindow and minimapWindow:getChildById('minimapHDButton')
+  if not button then
+    return
+  end
+  local supported = minimapWidget ~= nil and minimapWidget.setSpriteMode ~= nil
+  button:setEnabled(supported)
+  button:setOn(supported and enabled == true)
+  if not supported then
+    button:setTooltip(tr('HD minimap requires the updated client executable'))
+  elseif enabled then
+    button:setTooltip(tr('HD minimap enabled. Click to use the classic map'))
+  else
+    button:setTooltip(tr('Enable HD minimap (satellite view)'))
+  end
+end
+
+-- The preference is optional and independent of HD Sprite Upscaling.
+-- Full-map view uses pre-rendered LOD chunks, not expensive live sprite draws.
+function setMinimapHD(enabled)
+  if enabled == true and g_minimap and g_minimap.loadSatellitePack and
+      not g_minimap.hasSatellitePack() and g_resources.fileExists('/data/minimap_hd/index.txt') then
+    g_minimap.loadSatellitePack('/data/minimap_hd')
+  end
+  if not minimapWidget then
+    updateMinimapHDButton(false)
+    return true -- Applied when the widget is created / the map is loaded.
+  end
+  if not minimapWidget.setSpriteMode then
+    updateMinimapHDButton(false)
+    return not enabled -- Older executables keep working in classic mode.
+  end
+  enabled = enabled == true
+  local wasEnabled = minimapWidget:isSpriteMode()
+  local fullZoom = fullmapView and minimapWidget:getZoom() or nil
+  minimapWidget:setSpriteModeSuspended(fullmapView)
+  if fullmapView and enabled and not wasEnabled and oldZoom then
+    minimapWidget:setZoom(oldZoom) -- Capture the small classic view's zoom, not the full map's.
+  end
+  minimapWidget:setSpriteMode(enabled)
+  if enabled and not wasEnabled then
+    local settings = g_settings.getNode('Minimap')
+    local zoom = settings and tonumber(settings.spriteZoom) or 3
+    zoom = math.max(minimapWidget:getMinZoom(), math.min(zoom, minimapWidget:getMaxZoom()))
+    if fullmapView then
+      oldZoom = zoom
+    else
+      minimapWidget:setZoom(zoom)
+    end
+  elseif fullmapView and wasEnabled and not enabled then
+    oldZoom = minimapWidget:getZoom() -- Return to the restored classic zoom after closing full map.
+  end
+  if fullZoom and wasEnabled ~= enabled then
+    minimapWidget:setZoom(fullZoom)
+  end
+  updateMinimapHDButton(enabled)
+  return true
+end
+
+function toggleMinimapHD()
+  if not minimapWidget or not minimapWidget.setSpriteMode then
+    return
+  end
+  -- Use the shared option controller to persist and update the Graphics checkbox.
+  modules.client_settings.setOption('minimapHD', not modules.client_settings.getOption('minimapHD'))
+end
+
+local function applyMinimapHDOption()
+  setMinimapHD(g_settings.getBoolean('minimapHD'))
+end
+
 local function saveMap()
   if not MinimapLoader.loaded then
     return
@@ -641,6 +712,9 @@ function toggleFullMap()
     oldZoom = minimapWidget:getZoom()
     oldPos = minimapWidget:getCameraPosition()
     fullmapView = true
+    if minimapWidget.setSpriteModeSuspended then
+      minimapWidget:setSpriteModeSuspended(true)
+    end
     minimapWindow:hide()
     minimapWidget:setParent(rootPanel)
     minimapWidget:fill('parent')
@@ -653,6 +727,9 @@ function toggleFullMap()
     minimapWidget:setAlternativeWidgetsVisible(false)
     if oldZoom then minimapWidget:setZoom(oldZoom) end
     if oldPos then minimapWidget:setCameraPosition(oldPos) end
+    if minimapWidget.setSpriteModeSuspended then
+      minimapWidget:setSpriteModeSuspended(false)
+    end
   end
 end
 
@@ -874,6 +951,7 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
+  applyMinimapHDOption()
   local downloadMapButton = getDownloadMapButton()
   if downloadMapButton then
     local hasDownloadUrl = Services and type(Services.minimap) == 'string' and Services.minimap ~= ''
@@ -998,6 +1076,9 @@ function init()
 end
 
 function terminate()
+  if fullmapView then
+    toggleFullMap()
+  end
   if minimapDownloadOperation then
     HTTP.cancel(minimapDownloadOperation)
     minimapDownloadOperation = nil
@@ -1112,6 +1193,7 @@ function online()
   if not MinimapLoader.loaded then
     loadMap(not preloaded)
   end
+  applyMinimapHDOption()
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
   if minimapWidget then
     -- The camera has no position until the first setCameraPosition, which does not
@@ -1134,6 +1216,9 @@ function offline()
   if not minimapWidget then
     return
   end
+  if fullmapView then
+    toggleFullMap()
+  end
 
   if expansionRestoreEvent then
     removeEvent(expansionRestoreEvent)
@@ -1143,6 +1228,9 @@ function offline()
   saveExpansionConfig()
   restoreMinimap(false)
   saveMap()
+  if g_minimap.clearSpriteCache then
+    g_minimap.clearSpriteCache()
+  end
 
   minimapWidget:resetParty()
   minimapWidget:clearWaypoints()
@@ -1155,15 +1243,29 @@ function loadMap(clean)
   end
 
   if not MinimapLoader.otmmLoaded then
+    -- The matching offline export also provides classic colors/path flags.
+    -- Load it first, then preserve the user's explored/current OTMM overlay.
+    local revealed = false
+    if g_minimap.mergeOtmm and g_resources.fileExists('/data/minimap_hd/minimap.otmm') then
+      revealed = g_minimap.loadOtmm('/data/minimap_hd/minimap.otmm')
+    end
     if g_resources.fileExists(minimapFile) then
-      g_minimap.loadOtmm(minimapFile)
+      if revealed then
+        g_minimap.mergeOtmm(minimapFile) -- Unknown cells must not erase the full-map background.
+      else
+        g_minimap.loadOtmm(minimapFile)
+      end
     end
     MinimapLoader.otmmLoaded = true
   end
 
   -- LoadTibiaMap()
   if minimapWidget and minimapWidget.load then
+    if minimapWidget.setSpriteMode then
+      minimapWidget:setSpriteMode(false)
+    end
     minimapWidget:load()
+    applyMinimapHDOption()
   end
   attachMinimapToPanel()
   MinimapLoader.loaded = true

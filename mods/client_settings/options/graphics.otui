@@ -324,6 +324,44 @@ GraphicsWindow < Panel
       image-source: /images/skin/show-gui-help-grey
       !tooltip: tr('If you are logged into the game, you can see your current frame \nrate here. Press Alt+F8 to show or hide your current frame rate in \nthe game window.')
 
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
+      id: minimapHD
+      size: 12 12
+      !text: tr('HD Minimap (Satellite View)')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 5
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      @onSetup: |
+        local supported = UIMinimap and UIMinimap.setSpriteMode ~= nil
+        self:setEnabled(supported)
+        if not supported then
+          self:setTooltip(tr('Compile the updated client to enable HD Minimap.'))
+        end
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Checked: satellite images plus a limited live-terrain cache.\nUnchecked: classic minimap, without the HD cache.\nFull-map views use pre-rendered LODs, or classic without a pack.\nIndependent of HD Sprite Upscaling; no restart needed to toggle.')
+
   Button
     id: resetButton
     size: 43 20

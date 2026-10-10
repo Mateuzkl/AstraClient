@@ -112,6 +112,16 @@ The project is designed for developers and server owners who want:
 | Configuration | Protocol features controlled through `g_game.enableFeature` / `g_game.disableFeature` |
 | Platforms | Windows, Linux and WebAssembly/WebGL 2 browser support |
 
+### Optional HD minimap
+
+The satellite minimap is opt-in and can be toggled in **Options → Graphics** or
+with the **HD** button beside **Go to Cyclopedia Map**. Generate a matching offline
+PNG pack to show the full map without exploration; only visible chunks are loaded.
+The classic minimap remains available, and the preference persists across launches.
+
+- [Technical documentation and generation steps (English)](docs/hd-minimap.md)
+- [Step-by-step generation and installation tutorial (PT-BR)](docs/hd-minimap.pt-BR.md)
+
 ---
 
 ## Protocol Features
