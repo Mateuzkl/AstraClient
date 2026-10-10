@@ -19,3 +19,8 @@ and packaged DLL dependency closure. Windows resolves API-set imports.
 Linux/GCC and WebAssembly jobs use bounded ccache storage. Linking, tests and
 package validation still execute on each run. Compare cold and warm timings
 separately; CI validation does not replace interactive application testing.
+
+Astra pins vcpkg's tool checkout in vcpkg-tool.sha separately from the manifest
+baseline. Its version database must contain the explicitly required curl 8.21
+while the baseline continues to select the other existing dependency versions.
+The tool commit also participates in the binary dependency-cache key.

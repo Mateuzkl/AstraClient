@@ -75,7 +75,7 @@ jobs:
           path: |
             ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             ${{ env.VCPKG_DOWNLOADS }}
-          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**') }}
+          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**', 'cmake/ci/vcpkg-tool.sha') }}
           restore-keys: |
             vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-
             vcpkg-bincache-x64-
@@ -130,7 +130,7 @@ jobs:
           path: |
             ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
             ${{ env.VCPKG_DOWNLOADS }}
-          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**') }}
+          key: vcpkg-bincache-x64-${{ steps.vcpkg-baseline.outputs.toolset }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlays/**', 'cmake/ci/vcpkg-tool.sha') }}
 
       - name: Build-Release
         shell: pwsh

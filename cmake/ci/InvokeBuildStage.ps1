@@ -9,7 +9,9 @@ if ($CmdScript) {
     if ($LASTEXITCODE -ne 0 -or -not $vs) { throw 'MSVC was not found.' }
     $script = Join-Path $directory "$Name.cmd"
     $setup = 'call "{0}\VC\Auxiliary\Build\vcvars64.bat"' -f $vs
-    @('@echo off', $setup, 'if errorlevel 1 exit /b 1', $CmdScript) | Set-Content -LiteralPath $script -Encoding ascii
+    $ninjaPath = Join-Path $vs 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja'
+    $ninjaSetup = 'if exist "{0}\ninja.exe" set "PATH={0};%PATH%"' -f $ninjaPath
+    @('@echo off', $setup, 'if errorlevel 1 exit /b 1', $ninjaSetup, $CmdScript) | Set-Content -LiteralPath $script -Encoding ascii
     $Executable = 'cmd.exe'
     $Arguments = @('/d', '/c', $script)
 }
