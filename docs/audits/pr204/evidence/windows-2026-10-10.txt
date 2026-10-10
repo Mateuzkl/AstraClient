@@ -1,0 +1,73 @@
+PR #204 audit execution excerpts — 2026-10-10
+Baseline: 1d40ea3f5fc7519a995f0bde68913187507fabc2 + audit fixes in this commit.
+Windows x64; isolated test profile; no login; hidden native tests, not FPS measurements.
+Runner matrix completed with exit 0. Expected fixture errors are allowlisted by Run-Smoke.ps1.
+Build logs (local): build/hd-minimap-audit-gl.log and build/hd-minimap-audit-dx.log.
+Both final builds: 0 warnings, 0 errors.
+
+OpenGL/Audit — astra-hd-minimap-4d166331a40b4bdba19cfa678bc494a7 — stderr 0 bytes
+GPU Intel(R) UHD Graphics (Intel)
+OpenGL 4.6.0 - Build 27.20.100.9664
+[HD AUDIT] PASS: 100 retained destroyed views, 200 single callbacks, 100 pan/reset cycles, job bound <=4 and visible recovery
+ERROR: failed to load OTMM minimap: corrupt compressed minimap block
+[HD AUDIT] Static empty viewport: first=1008 map lookups; next 100 preparations=0; new terrain immediately visible
+ERROR: [HD Minimap] Could not load '/negative/bad-signature/index.txt': satellite pack was generated with different DAT/SPR assets
+ERROR: [HD Minimap] Could not load '/negative/bad-index/index.txt': invalid satellite chunk coordinates
+ERROR: [HD Minimap] Cannot decode '/negative/oversized/satellite-1-96-96-7.png': invalid file size for '/negative/oversized/satellite-1-96-96-7.png'
+ERROR: [HD Minimap] Cannot decode '/negative/animated/satellite-1-96-96-7.png': expected a complete static PNG
+ERROR: [HD Minimap] Cannot decode '/negative/truncated/satellite-1-96-96-7.png': missing PNG end marker
+ERROR: [HD Minimap] Cannot decode '/negative/enc3-bomb/satellite-1-96-96-7.png': decrypted resource exceeds its read budget
+ERROR: [HD Minimap] Cannot decode '/negative/missing/satellite-1-96-96-7.png': unable to open file '/negative/missing/satellite-1-96-96-7.png': not found
+ERROR: [HD Minimap] Cannot decode '/negative/bad-seed/satellite-1-96-96-7.png': unable to decrypt bounded resource: /negative/bad-seed/satellite-1-96-96-7.png
+[HD MINIMAP TEST] PASS: audit lifecycle, callback count, real decode budget/reset recovery, negative snapshots, invalid pack/PNG/ENC3/OTMM rejection
+
+OpenGL/Native — astra-hd-minimap-bba49cd8e9f84379bbe12137fcd60e07 — stderr 0 bytes
+GPU Intel(R) UHD Graphics (Intel)
+OpenGL 4.6.0 - Build 27.20.100.9664
+[HD MINIMAP TEST] PASS: native bindings, quick toggle layout/checkbox sync, settings UI, zooms, updates, cache budgets, world reset, marker alignment
+
+OpenGL/Satellite — astra-hd-minimap-a5a45a2fe05f4173b12fce78df427d1b — stderr 0 bytes
+GPU Intel(R) UHD Graphics (Intel)
+OpenGL 4.6.0 - Build 27.20.100.9664
+[HD MINIMAP TEST] PASS: persistent pack, no exploration, classic merge, abandoned-decode recovery, 4K LOD budget, logout/restart, optional classic mode
+
+OpenGL/Export — astra-hd-minimap-3183508c30ef4c418e7d447d33ba0c6f — stderr 0 bytes
+GPU Intel(R) UHD Graphics (Intel)
+OpenGL 4.6.0 - Build 27.20.100.9664
+[HD MINIMAP TEST] PASS: synthetic OTB/OTBM, literal ServerID 20026, classic OTMM coverage, exported terrain layers
+
+DirectX/Audit — astra-hd-minimap-f9f34aa994044d02937f8a490809ecc0 — stderr 0 bytes
+GPU ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11-27.20.100.9664) (Google Inc. (Intel))
+OpenGL OpenGL ES 3.0.0 (ANGLE 2.1.5414 git hash: aa63ea230e0c)
+[HD AUDIT] PASS: 100 retained destroyed views, 200 single callbacks, 100 pan/reset cycles, job bound <=4 and visible recovery
+ERROR: failed to load OTMM minimap: corrupt compressed minimap block
+[HD AUDIT] Static empty viewport: first=1008 map lookups; next 100 preparations=0; new terrain immediately visible
+ERROR: [HD Minimap] Could not load '/negative/bad-signature/index.txt': satellite pack was generated with different DAT/SPR assets
+ERROR: [HD Minimap] Could not load '/negative/bad-index/index.txt': invalid satellite chunk coordinates
+ERROR: [HD Minimap] Cannot decode '/negative/oversized/satellite-1-96-96-7.png': invalid file size for '/negative/oversized/satellite-1-96-96-7.png'
+ERROR: [HD Minimap] Cannot decode '/negative/animated/satellite-1-96-96-7.png': expected a complete static PNG
+ERROR: [HD Minimap] Cannot decode '/negative/truncated/satellite-1-96-96-7.png': missing PNG end marker
+ERROR: [HD Minimap] Cannot decode '/negative/enc3-bomb/satellite-1-96-96-7.png': decrypted resource exceeds its read budget
+ERROR: [HD Minimap] Cannot decode '/negative/missing/satellite-1-96-96-7.png': unable to open file '/negative/missing/satellite-1-96-96-7.png': not found
+ERROR: [HD Minimap] Cannot decode '/negative/bad-seed/satellite-1-96-96-7.png': unable to decrypt bounded resource: /negative/bad-seed/satellite-1-96-96-7.png
+[HD MINIMAP TEST] PASS: audit lifecycle, callback count, real decode budget/reset recovery, negative snapshots, invalid pack/PNG/ENC3/OTMM rejection
+
+DirectX/Native — astra-hd-minimap-87243eba448043e38503687116a1b374 — stderr 0 bytes
+GPU ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11-27.20.100.9664) (Google Inc. (Intel))
+OpenGL OpenGL ES 3.0.0 (ANGLE 2.1.5414 git hash: aa63ea230e0c)
+[HD MINIMAP TEST] PASS: native bindings, quick toggle layout/checkbox sync, settings UI, zooms, updates, cache budgets, world reset, marker alignment
+
+DirectX/Satellite — astra-hd-minimap-bd5e20324d9248548c37d60447244427 — stderr 0 bytes
+GPU ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11-27.20.100.9664) (Google Inc. (Intel))
+OpenGL OpenGL ES 3.0.0 (ANGLE 2.1.5414 git hash: aa63ea230e0c)
+[HD MINIMAP TEST] PASS: persistent pack, no exploration, classic merge, abandoned-decode recovery, 4K LOD budget, logout/restart, optional classic mode
+
+DirectX/Export — astra-hd-minimap-3255db9565a84199a58105de26d04e8d — stderr 0 bytes
+GPU ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0, D3D11-27.20.100.9664) (Google Inc. (Intel))
+OpenGL OpenGL ES 3.0.0 (ANGLE 2.1.5414 git hash: aa63ea230e0c)
+[HD MINIMAP TEST] PASS: synthetic OTB/OTBM, literal ServerID 20026, classic OTMM coverage, exported terrain layers
+
+Independent Pillow export pixel comparison: PASS on both exported fixtures.
+Lua: PASS opt-in, quick toggle/checkbox sync, persistence, zoom restore, full-map round trip, legacy fallback, syntax.
+Python: PASS LOD geometry, floors, OTMM preservation, manifest, no overwrite, overflow/missing/copy-failure rejection.
+ASan/TSan/LSan, FPS/frametime/RAM/VRAM A/B: NOT EXECUTED / NOT MEASURED.

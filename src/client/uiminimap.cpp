@@ -44,8 +44,17 @@ UIMinimap::~UIMinimap()
         g_minimap.removeSpriteView();
 }
 
+void UIMinimap::onDestroy()
+{
+    if (m_spriteMode) {
+        m_spriteMode = false;
+        g_minimap.removeSpriteView();
+    }
+}
+
 void UIMinimap::setSpriteMode(bool enabled)
 {
+    if (isDestroyed()) return; // A retained Lua reference cannot resubscribe a dead view.
     if (m_spriteMode == enabled)
         return;
     m_spriteMode = enabled;

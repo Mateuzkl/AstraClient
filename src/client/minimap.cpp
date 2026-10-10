@@ -32,7 +32,6 @@
 #include <framework/graphics/image.h>
 #include <framework/graphics/texture.h>
 #include <framework/graphics/painter.h>
-#include <framework/graphics/image.h>
 #include <framework/graphics/framebuffermanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
@@ -98,6 +97,9 @@ void Minimap::terminate()
 {
     clean();
     clearSatellitePack();
+    // Application deinit has already joined the async worker before client teardown.
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    m_satelliteDecodes.clear();
 }
 
 void Minimap::clean()
@@ -194,6 +196,7 @@ bool Minimap::loadSatellitePack(const std::string& directory)
         if (input >> extra)
             stdext::throw_exception("trailing satellite index data");
         std::lock_guard<std::mutex> lock(m_satelliteLock);
+        cancelSatelliteDecodes();
         m_satelliteTextures.clear();
         m_satelliteOrder.clear();
         m_satelliteChunks = std::move(chunks);
@@ -211,6 +214,7 @@ bool Minimap::loadSatellitePack(const std::string& directory)
 void Minimap::clearSatelliteTextures()
 {
     std::lock_guard<std::mutex> lock(m_satelliteLock);
+    cancelSatelliteDecodes();
     m_satelliteTextures.clear();
     m_satelliteOrder.clear();
 }
@@ -218,6 +222,7 @@ void Minimap::clearSatelliteTextures()
 void Minimap::clearSatellitePack()
 {
     std::lock_guard<std::mutex> lock(m_satelliteLock);
+    cancelSatelliteDecodes();
     m_satelliteTextures.clear();
     m_satelliteOrder.clear();
     m_satelliteChunks.clear();
@@ -241,6 +246,12 @@ size_t Minimap::getSatelliteTextureCount()
 {
     std::lock_guard<std::mutex> lock(m_satelliteLock);
     return m_satelliteTextures.size();
+}
+
+size_t Minimap::getSatelliteDecodeCount()
+{
+    std::lock_guard<std::mutex> lock(m_satelliteLock);
+    return m_satelliteDecodes.size(); // Includes completed results not collected yet.
 }
 
 int Minimap::satelliteLevel(float scale)
@@ -282,23 +293,37 @@ int Minimap::getSatelliteViewLevel(const Size& viewSize, float scale)
 
 size_t Minimap::finishSatelliteDecodes()
 {
-    size_t pending = 0;
-    for (auto& entry : m_satelliteTextures) {
-        auto& value = entry.second;
-        if (!value.image.valid())
-            continue;
-        if (value.image.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            ++pending;
+    for (auto it = m_satelliteDecodes.begin(); it != m_satelliteDecodes.end();) {
+        if (it->image.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            ++it;
             continue;
         }
-        auto image = value.image.get();
-        value.image = {};
-        if (image)
-            value.texture = std::make_shared<Texture>(image, false, false, true);
-        else if (auto failed = m_satelliteChunks.find(entry.first); failed != m_satelliteChunks.end())
-            failed->second.failed = true;
+        ImagePtr image;
+        try {
+            image = it->image.get(); // Ready only: never waits in the draw path.
+        } catch (const std::exception& e) {
+            if (!*it->cancelled)
+                g_logger.error(stdext::format("[HD Minimap] Decode task failed: %s", e.what()));
+        }
+        const auto cached = m_satelliteTextures.find(it->key);
+        if (!*it->cancelled && cached != m_satelliteTextures.end()) {
+            if (image)
+                cached->second.texture = std::make_shared<Texture>(image, false, false, true);
+            else if (auto failed = m_satelliteChunks.find(it->key); failed != m_satelliteChunks.end())
+                failed->second.failed = true;
+        }
+        it = m_satelliteDecodes.erase(it);
     }
-    return pending;
+    return m_satelliteDecodes.size();
+}
+
+void Minimap::cancelSatelliteDecodes()
+{
+    for (const auto& decode : m_satelliteDecodes)
+        *decode.cancelled = true;
+    finishSatelliteDecodes(); // Discard already-completed results immediately.
+    // Keep ownership/admission slots until each task finishes. Erasing a future
+    // does not remove its promise/closure from the dispatcher's global queue.
 }
 
 TexturePtr Minimap::satelliteTexture(uint64_t key)
@@ -314,31 +339,59 @@ TexturePtr Minimap::satelliteTexture(uint64_t key)
         if (pending >= SatelliteDecodeLimit)
             return nullptr; // Never enqueue an entire world of background work.
         while (m_satelliteTextures.size() >= SatelliteTextureLimit) {
-            m_satelliteTextures.erase(m_satelliteOrder.front());
+            const auto evicted = m_satelliteOrder.front();
+            for (const auto& decode : m_satelliteDecodes)
+                if (decode.key == evicted) *decode.cancelled = true;
+            m_satelliteTextures.erase(evicted);
             m_satelliteOrder.pop_front();
         }
         m_satelliteOrder.push_back(key);
         const auto path = chunk->second.file;
+        const auto cancelled = std::make_shared<std::atomic<bool>>(false);
         // The worker owns only a path, never a Map/Minimap/GL object. Clearing
         // or replacing the index during logout cannot expose freed state.
-        auto future = g_asyncDispatcher.schedule([path]() -> ImagePtr {
+        auto future = g_asyncDispatcher.schedule([path, cancelled]() -> ImagePtr {
             try {
+                if (*cancelled) return nullptr;
                 // Reject oversized/corrupt image headers before allocating decoded pixels.
-                const auto data = g_resources.readFileContents(path);
+                const auto data = g_resources.readFileContentsBounded(path, 4 * 1024 * 1024);
+                if (*cancelled) return nullptr;
                 if (data.size() < 24 || data.size() > 4 * 1024 * 1024 ||
                     data.compare(0, 8, "\x89PNG\r\n\x1a\n", 8) != 0 || data.compare(12, 4, "IHDR") != 0 ||
                     data.compare(16, 8, "\0\0\2\0\0\0\2\0", 8) != 0)
                     stdext::throw_exception("expected a bounded 512x512 PNG header");
+                // The APNG loader allocates frames before isAnimated() can reject
+                // them. Reject animation/truncated chunks before entering it.
+                size_t offset = 8;
+                bool ended = false;
+                while (offset + 12 <= data.size()) {
+                    const auto* bytes = reinterpret_cast<const uint8_t*>(data.data() + offset);
+                    const uint32_t length = (uint32_t(bytes[0]) << 24) | (uint32_t(bytes[1]) << 16) |
+                                            (uint32_t(bytes[2]) << 8) | bytes[3];
+                    if (length > data.size() - offset - 12 ||
+                        data.compare(offset + 4, 4, "acTL") == 0 ||
+                        data.compare(offset + 4, 4, "fcTL") == 0 ||
+                        data.compare(offset + 4, 4, "fdAT") == 0 ||
+                        (data.compare(offset + 4, 4, "IHDR") == 0 && (offset != 8 || length != 13)))
+                        stdext::throw_exception("expected a complete static PNG");
+                    offset += size_t(length) + 12;
+                    if (data.compare(offset - length - 8, 4, "IEND") == 0) {
+                        ended = length == 0 && offset == data.size();
+                        break;
+                    }
+                }
+                if (!ended) stdext::throw_exception("missing PNG end marker");
                 auto image = Image::loadPNG(data.data(), data.size());
                 if (!image || image->getSize() != Size(512, 512) || image->isAnimated())
                     stdext::throw_exception("expected a static 512x512 PNG");
-                return image;
+                return *cancelled ? nullptr : image;
             } catch (const std::exception& e) {
                 g_logger.error(stdext::format("[HD Minimap] Cannot decode '%s': %s", path, e.what()));
                 return nullptr;
             }
         });
-        cached = m_satelliteTextures.emplace(key, SatelliteTexture{nullptr, future, std::prev(m_satelliteOrder.end())}).first;
+        m_satelliteDecodes.push_back({key, std::move(future), cancelled});
+        cached = m_satelliteTextures.emplace(key, SatelliteTexture{nullptr, std::prev(m_satelliteOrder.end())}).first;
     }
     auto& value = cached->second;
     m_satelliteOrder.splice(m_satelliteOrder.end(), m_satelliteOrder, value.order);
@@ -513,6 +566,18 @@ size_t Minimap::getSpriteCacheItemCount()
     return m_spriteItemCount;
 }
 
+uint64_t Minimap::getSpriteTileLookupCount()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    return m_spriteTileLookupCount;
+}
+
+unsigned Minimap::getSpriteViewCount()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    return m_spriteViews;
+}
+
 void Minimap::addSpriteView()
 {
     std::lock_guard<std::mutex> lock(m_spriteLock);
@@ -550,14 +615,15 @@ void Minimap::updateSpriteTile(const Position& pos, const TilePtr& tile)
 {
     // No cloning/allocation in classic mode. Keep explored terrain when the
     // server removes a tile from awareness; a real empty tile clears its snapshot.
-    if (!m_spriteCacheEnabled || !tile)
+    if (!m_spriteCacheEnabled)
         return;
 
     std::vector<ItemPtr> source;
-    for (const auto& thing : tile->getThings()) {
-        if (thing->isItem() && !thing->isHidden())
-            source.push_back(thing->static_self_cast<Item>());
-    }
+    if (tile)
+        for (const auto& thing : tile->getThings()) {
+            if (thing->isItem() && !thing->isHidden())
+                source.push_back(thing->static_self_cast<Item>());
+        }
 
     const auto key = spriteTileKey(pos);
     std::lock_guard<std::mutex> lock(m_spriteLock);
@@ -566,12 +632,11 @@ void Minimap::updateSpriteTile(const Position& pos, const TilePtr& tile)
     constexpr size_t maxTiles = 8192;
     constexpr size_t maxItems = 32768;
     constexpr size_t maxItemsPerTile = 64;
-    if (source.empty() || source.size() > maxItemsPerTile) {
-        eraseSpriteTile(key);
-        return;
-    }
-
     const auto found = m_spriteTiles.find(key);
+    if (!tile && found != m_spriteTiles.end())
+        return; // Preserve explored terrain after leaving server awareness.
+    if (source.size() > maxItemsPerTile)
+        source.clear(); // Bounded absence sentinel, not an oversized snapshot.
     if (found != m_spriteTiles.end() && found->second.items.size() == source.size()) {
         const auto& previous = found->second.items;
         bool unchanged = true;
@@ -621,20 +686,7 @@ void Minimap::drawSprites(const Rect& screenRect, const Position& mapCenter, flo
     if (int64_t(right - left + 1) * (bottom - top + 1) > 4096)
         return; // Wide views stay cheap instead of rendering the entire world.
 
-    std::vector<Position> missing;
-    {
-        std::lock_guard<std::mutex> lock(m_spriteLock);
-        for (int y = top; y <= bottom; ++y) {
-            for (int x = left; x <= right; ++x) {
-                const Position pos(x, y, mapCenter.z);
-                if (m_spriteTiles.find(spriteTileKey(pos)) == m_spriteTiles.end())
-                    missing.push_back(pos);
-            }
-        }
-    }
-    // Enabling HD while standing still (or cleaning OTMM on login) needs no step.
-    for (const auto& pos : missing)
-        updateSpriteTile(pos, g_map.getTile(pos));
+    prepareSpriteView(screenRect.size(), mapCenter, scale);
 
     struct FrameTile { Point dest; std::vector<ItemPtr> items; };
     std::vector<FrameTile> tiles;
@@ -647,7 +699,7 @@ void Minimap::drawSprites(const Rect& screenRect, const Position& mapCenter, flo
         for (int y = top; y <= bottom; ++y) {
             for (int x = left; x <= right; ++x) {
                 const auto found = m_spriteTiles.find(spriteTileKey(Position(x, y, mapCenter.z)));
-                if (found == m_spriteTiles.end())
+                if (found == m_spriteTiles.end() || found->second.items.empty())
                     continue;
                 itemCount += found->second.items.size();
                 if (itemCount > 8192)
@@ -693,6 +745,36 @@ void Minimap::drawSprites(const Rect& screenRect, const Position& mapCenter, flo
     const Point off = Point((mapRect.size() * scale).toPoint() - screenRect.size().toPoint()) / 2;
     g_drawQueue->scaleTexturedRects(start, screenRect.topLeft() - off, scale / spriteSize);
     g_drawQueue->setClip(start, screenRect);
+}
+
+void Minimap::prepareSpriteView(const Size& viewSize, const Position& mapCenter, float scale)
+{
+    if (viewSize.isEmpty() || !mapCenter.isMapPosition() ||
+        mapCenter.z > g_gameConfig.getMapMaxZ() || !std::isfinite(scale) || scale < 2 || !m_spriteCacheEnabled)
+        return;
+    const auto mapRect = calcMapRect(Rect(0, 0, viewSize.width(), viewSize.height()), mapCenter, scale);
+    const int left = std::max(0, mapRect.left()), top = std::max(0, mapRect.top());
+    const int right = std::min(65535, mapRect.right() + 4), bottom = std::min(65535, mapRect.bottom() + 4);
+    if (int64_t(right - left + 1) * (bottom - top + 1) > 4096) return;
+    std::vector<Position> missing;
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        for (int y = top; y <= bottom; ++y) {
+            for (int x = left; x <= right; ++x) {
+                const Position pos(x, y, mapCenter.z);
+                if (m_spriteTiles.find(spriteTileKey(pos)) == m_spriteTiles.end())
+                    missing.push_back(pos);
+            }
+        }
+    }
+    // Enabling HD while standing still (or cleaning OTMM on login) needs no step.
+    for (const auto& pos : missing)
+        updateSpriteTile(pos, g_map.getTile(pos));
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        m_spriteTileLookupCount += missing.size();
+    }
+
 }
 
 Point Minimap::getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale)
@@ -952,7 +1034,7 @@ bool Minimap::loadOtmmImpl(const std::string& fileName, bool preserveUnknown)
             MinimapBlock& block = getBlock(pos);
             int ret = uncompress(decompressBuffer.data(), &destLen, compressBuffer.data(), len);
             if(ret != Z_OK || destLen != blockSize)
-                break;
+                stdext::throw_exception("corrupt compressed minimap block");
 
             if (preserveUnknown) {
                 for (size_t i = 0; i < block.getTiles().size(); ++i) {

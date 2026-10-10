@@ -100,6 +100,7 @@ public:
     bool preloadSatelliteTile(const Position& pos, float scale);
     size_t getSatelliteChunkCount();
     size_t getSatelliteTextureCount();
+    size_t getSatelliteDecodeCount();
     int getSatelliteViewLevel(const Size& viewSize, float scale);
     int exportSatelliteBase(const std::string& directory);
     void addSpriteView();
@@ -107,6 +108,9 @@ public:
     void clearSpriteCache();
     size_t getSpriteCacheTileCount();
     size_t getSpriteCacheItemCount();
+    uint64_t getSpriteTileLookupCount();
+    unsigned getSpriteViewCount();
+    void prepareSpriteView(const Size& viewSize, const Position& mapCenter, float scale);
     Point getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
     Position getTilePosition(const Point& point, const Rect& screenRect, const Position& mapCenter, float scale);
     Rect getTileRect(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
@@ -126,8 +130,12 @@ private:
     struct SatelliteChunk { std::string file; bool failed = false; };
     struct SatelliteTexture {
         TexturePtr texture;
-        std::shared_future<ImagePtr> image;
         std::list<uint64_t>::iterator order;
+    };
+    struct SatelliteDecode {
+        uint64_t key;
+        std::shared_future<ImagePtr> image;
+        std::shared_ptr<std::atomic<bool>> cancelled;
     };
     static uint64_t satelliteKey(int level, int x, int y, int z) {
         return (uint64_t(level) << 40) | (uint64_t(z) << 32) | (uint64_t(y) << 16) | x;
@@ -137,11 +145,13 @@ private:
     static constexpr size_t SatelliteTextureLimit = 32;
     static constexpr size_t SatelliteDecodeLimit = 4;
     size_t finishSatelliteDecodes(); // Requires m_satelliteLock; returns active jobs.
+    void cancelSatelliteDecodes(); // Requires m_satelliteLock; never drops pending jobs.
     TexturePtr satelliteTexture(uint64_t key); // Requires m_satelliteLock.
     void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale);
     void clearSatelliteTextures();
     std::unordered_map<uint64_t, SatelliteChunk> m_satelliteChunks;
     std::unordered_map<uint64_t, SatelliteTexture> m_satelliteTextures;
+    std::vector<SatelliteDecode> m_satelliteDecodes; // Independent of texture LRU and pack lifetime; at most four.
     std::list<uint64_t> m_satelliteOrder;
     std::set<int> m_satelliteLevels;
     uint32 m_satelliteDatSignature = 0;
@@ -160,6 +170,7 @@ private:
     std::unordered_map<uint64_t, SpriteTile> m_spriteTiles;
     std::list<uint64_t> m_spriteOrder;
     size_t m_spriteItemCount = 0;
+    uint64_t m_spriteTileLookupCount = 0;
     unsigned m_spriteViews = 0;
     std::atomic<bool> m_spriteCacheEnabled{false};
     std::mutex m_spriteLock;

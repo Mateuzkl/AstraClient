@@ -65,6 +65,7 @@ public:
     void centerInPosition(const UIWidgetPtr& anchoredWidget, const Position& hookedPosition);
 
 protected:
+    void onDestroy() override;
     virtual void onZoomChange(int zoom, int oldZoom);
     virtual void onCameraPositionChange(const Position& position, const Position& oldPosition);
     virtual void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);

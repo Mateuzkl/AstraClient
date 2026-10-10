@@ -175,6 +175,9 @@ existing Lua member-function binder.
 
 ## Verification
 
+The follow-up audit, confirmed findings, test evidence and unmeasured performance
+criteria are documented in [the PR #204 audit](audits/pr204/AUDITORIA_PR204_FULL.md).
+
 From the repository root:
 
 ```powershell
@@ -183,6 +186,7 @@ python tests/minimap_hd/pyramid_test.py
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Satellite
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Export
+./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Audit
 ```
 
 The standalone Lua test covers opt-in defaults, persistence, live toggling,
@@ -216,6 +220,29 @@ For an interactive renderer check and a synthetic-terrain screenshot, add
 rehydration through the actual renderer. Logs/artifacts are retained in the
 temporary directory printed by the script.
 
+`-Audit` requires the installed pack and Python/Pillow. It tests retained destroyed
+widgets, single option callbacks, rapid resets/toggles, empty-view lookups, and
+isolated malformed index/PNG/ENC3/OTMM fixtures. Valid plain/encrypted PNGs and
+custom-seed discovery remain supported; a conflicting seed is rejected. Only
+fixture-specific error messages are allowed by the runner. Normal `--test`
+remains fail-fast. These tests do not replace FPS profiling or sanitizers.
+
+Decode admission is independent of the texture LRU: canceled jobs keep their
+slots until completion, including after cache eviction, HD-off and pack resets.
+The four-job bound applies to minimap work, not other users of the shared async
+dispatcher. Cancellation is cooperative and cannot interrupt an ongoing PNG
+decode. Results from canceled jobs cannot enter a replacement pack. A destroyed
+HD widget releases its subscription immediately, even if Lua retains the object.
+
+Empty, unavailable and over-budget terrain gets a bounded negative snapshot in
+the same 8,192-entry cache. Item notifications replace it when terrain arrives;
+stationary empty views no longer repeat map lookups every preparation. The tile
+counter includes negative entries; the item counter counts actual snapshots.
+Satellite file reads enforce the 4 MiB budget before allocation, also bounding
+declared ENC3 decompression size. APNG/truncated chunks are rejected before PNG
+decoding. Invalid OTMM compression now returns failure; OTMM loading is still
+not transactional and may have applied earlier valid blocks before an error.
+
 Cache diagnostics are available in the Lua terminal:
 
 ```lua
@@ -223,6 +250,9 @@ g_minimap.getSpriteCacheTileCount()
 g_minimap.getSpriteCacheItemCount()
 g_minimap.getSatelliteChunkCount()
 g_minimap.getSatelliteTextureCount()
+g_minimap.getSatelliteDecodeCount() -- Outstanding slots, including completed uncollected results.
+g_minimap.getSpriteViewCount()
+g_minimap.getSpriteTileLookupCount() -- Cumulative lookups, not frame duration.
 g_minimap.getSatelliteViewLevel({width = 3840, height = 2160}, 8)
 g_minimap.hasSatellitePack()
 g_minimap.hasSatelliteTile(g_game.getLocalPlayer():getPosition())

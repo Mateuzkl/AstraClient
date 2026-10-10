@@ -498,31 +498,41 @@ void ResourceManager::readFileStream(const std::string& fileName, std::iostream&
 
 std::string ResourceManager::readFileContents(const std::string& fileName, bool safe)
 {
+    return readFileContentsImpl(fileName, safe, 512ULL * 1024 * 1024);
+}
+
+std::string ResourceManager::readFileContentsBounded(const std::string& fileName, size_t maxBytes)
+{
+    return readFileContentsImpl(fileName, false, maxBytes);
+}
+
+std::string ResourceManager::readFileContentsImpl(const std::string& fileName, bool safe, size_t maxBytes)
+{
     std::string fullPath = resolvePath(fileName);
     
     if (fullPath.find("/downloads") != std::string::npos) {
         auto dfile = g_http.getFile(fullPath.substr(10));
-        if (dfile)
+        if (dfile) {
+            if (dfile->body.size() > maxBytes)
+                stdext::throw_exception("resource exceeds its read budget");
             return std::string(dfile->body.begin(), dfile->body.end());
+        }
     }
 
-    PHYSFS_File* file = PHYSFS_openRead(fullPath.c_str());
+    std::unique_ptr<PHYSFS_File, decltype(&PHYSFS_close)> file(PHYSFS_openRead(fullPath.c_str()), &PHYSFS_close);
     if(!file)
         stdext::throw_exception(stdext::format("unable to open file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
-    const PHYSFS_sint64 fileSize = PHYSFS_fileLength(file);
-    constexpr PHYSFS_sint64 MAX_RESOURCE_SIZE = 512LL * 1024 * 1024;
-    if (fileSize < 0 || fileSize > MAX_RESOURCE_SIZE) {
-        PHYSFS_close(file);
+    const PHYSFS_sint64 fileSize = PHYSFS_fileLength(file.get());
+    if (fileSize < 0 || static_cast<uint64_t>(fileSize) > maxBytes) {
         stdext::throw_exception(stdext::format("invalid file size for '%s'", fullPath));
     }
 
     std::string buffer(static_cast<size_t>(fileSize), 0);
-    if (fileSize > 0 && PHYSFS_readBytes(file, buffer.data(), fileSize) != fileSize) {
-        PHYSFS_close(file);
+    if (fileSize > 0 && PHYSFS_readBytes(file.get(), buffer.data(), fileSize) != fileSize) {
         stdext::throw_exception(stdext::format("unable to read file '%s'", fullPath));
     }
-    PHYSFS_close(file);
+    file.reset();
 
     if (safe) {
         return buffer;
@@ -535,17 +545,25 @@ std::string ResourceManager::readFileContents(const std::string& fileName, bool 
 
     static std::string unencryptedExtensions[] = { ".otml", ".otmm", ".dmp", ".log", ".txt", ".dll", ".exe", ".zip" };
 
+    // Reject the declared decompressed ENC3 size before decryptBuffer allocates it.
+    if (buffer.size() >= ENC3_HEADER_SIZE && buffer.compare(0, 4, "ENC3") == 0 &&
+        stdext::readULE32(reinterpret_cast<const uint8_t*>(buffer.data()) + 16) > maxBytes)
+        stdext::throw_exception("decrypted resource exceeds its read budget");
     if (!decryptBuffer(buffer)) {
-        bool ignore = (m_customEncryption == 0);
+        bool ignore = (m_customEncryption.load(std::memory_order_relaxed) == 0);
         for (auto& it : unencryptedExtensions) {
             if (fileName.find(it) == fileName.size() - it.size()) {
                 ignore = true;
             }
         }
+        if (!ignore && maxBytes < 512ULL * 1024 * 1024)
+            stdext::throw_exception(stdext::format("unable to decrypt bounded resource: %s", fullPath));
         if(!ignore)
             g_logger.fatal(stdext::format("unable to decrypt file: %s", fullPath));
     }
 
+    if (buffer.size() > maxBytes)
+        stdext::throw_exception("decoded resource exceeds its read budget");
     return buffer;
 }
 
@@ -1639,10 +1657,11 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
     uint32_t addlerCheck = stdext::adler32(reinterpret_cast<const uint8_t*>(new_buffer.data()), size);
     if (adler != addlerCheck) {
         uint32_t cseed = adler ^ addlerCheck;
-        if (m_customEncryption == 0) {
-            m_customEncryption = cseed;
-        }
-        if ((addlerCheck ^ m_customEncryption) != adler) {
+        uint32_t noSeed = 0;
+        // Preserve the first discovered seed even if two readers discover it
+        // concurrently. This atomic publishes only the seed, not other state.
+        m_customEncryption.compare_exchange_strong(noSeed, cseed, std::memory_order_relaxed);
+        if ((addlerCheck ^ m_customEncryption.load(std::memory_order_relaxed)) != adler) {
             return false;
         }
     }

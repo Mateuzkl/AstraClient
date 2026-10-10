@@ -24,6 +24,7 @@
 #define RESOURCES_H
 
 #include "declarations.h"
+#include <atomic>
 
 // @bindsingleton g_resources
 class ResourceManager
@@ -47,6 +48,8 @@ public:
     // @dontbind
     void readFileStream(const std::string& fileName, std::iostream& out);
     std::string readFileContents(const std::string& fileName, bool safe = false);
+    // @dontbind
+    std::string readFileContentsBounded(const std::string& fileName, size_t maxBytes);
     std::string readFileContentsSafe(const std::string& fileName) { return readFileContents(fileName, true); }
     bool isFileEncryptedOrCompressed(const std::string& fileName);
     // @dontbind
@@ -115,6 +118,7 @@ public:
     }
 
 private:
+    std::string readFileContentsImpl(const std::string& fileName, bool safe, size_t maxBytes);
     bool mountDiskData(const std::filesystem::path& path);
     void unmountDiskData();
     bool mountMemoryData(const std::shared_ptr<std::vector<uint8_t>>& data);
@@ -128,7 +132,7 @@ private:
     bool m_loadedFromArchive = false;
     std::shared_ptr<std::vector<uint8_t>> m_memoryData;
     uint64 m_generation = 0;
-    uint32_t m_customEncryption = 0;
+    std::atomic<uint32_t> m_customEncryption{0}; // File reads can run on the async worker.
     std::string m_layout;
 };
 

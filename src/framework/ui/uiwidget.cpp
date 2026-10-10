@@ -875,6 +875,7 @@ void UIWidget::internalDestroy()
         child->internalDestroy();
     m_children.clear();
 
+    onDestroy(); // Native lifecycle cleanup must not wait for Lua GC.
     callLuaField("onDestroy");
 
     releaseLuaFieldsTable();

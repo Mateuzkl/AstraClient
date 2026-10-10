@@ -130,6 +130,9 @@ mapa, não um requisito para outros mapas.
 
 ## 6. Teste e distribua
 
+Consulte também a [auditoria do PR #204](audits/pr204/AUDITORIA_PR204_FULL.md),
+com achados, testes executados e limitações de desempenho ainda não medidas.
+
 Na raiz do repositório, com o pacote instalado:
 
 ```powershell
@@ -141,6 +144,9 @@ Na raiz do repositório, com o pacote instalado:
 
 ./tests/minimap_hd/Run-Smoke.ps1 `
   -BinaryPath './build/hd-minimap/bin/otclient_gl_x64.exe' -Export
+
+./tests/minimap_hd/Run-Smoke.ps1 `
+  -BinaryPath './build/hd-minimap/bin/otclient_gl_x64.exe' -Audit
 ```
 
 Esses testes usam um perfil separado, janela oculta e nenhum login no servidor.
@@ -154,6 +160,22 @@ também testa carregamentos abandonados e o orçamento de cache em vistas 4K.
 compara pixels dos PNGs para validar a elevação das camadas superiores. Este
 último precisa de Python/Pillow, mas não de arquivos do servidor nem do pacote
 instalado.
+
+`-Audit` precisa do pacote instalado e de Python/Pillow. Testa destruição de
+widgets ainda referenciados pelo Lua, callbacks, alternâncias/resets rápidos,
+cache de posições vazias e arquivos inválidos isolados. Também valida PNG/ENC3
+válidos e rejeita uma chave de configuração conflitante. Os erros dessas
+fixtures são esperados; qualquer erro inesperado faz o runner falhar.
+
+O limite de quatro jobs agora permanece válido mesmo após expulsão do cache,
+troca de pacote ou desligamento do HD. O cancelamento é cooperativo: um decode
+já iniciado pode terminar, mas seu resultado cancelado não entra no novo pacote.
+Esse limite não inclui tarefas de outros sistemas na fila global do cliente.
+Posições sem terreno entram no mesmo cache limitado e são substituídas quando
+chegam itens; o contador de tiles inclui essas entradas vazias. Leituras PNG e
+o tamanho declarado da descompressão ENC3 são limitados antes da alocação;
+animações APNG são rejeitadas antes do decode. OTMM corrompido retorna falha,
+mas a leitura ainda pode ter aplicado blocos válidos anteriores ao erro.
 
 Distribua o executável atualizado, os módulos correspondentes, os assets e a
 pasta **inteira** `data/minimap_hd`. Ela fica ignorada no Git por ser um pacote
@@ -185,6 +207,9 @@ Diagnóstico no terminal Lua, depois de os assets serem carregados:
 g_minimap.hasSatellitePack()
 g_minimap.getSatelliteChunkCount()
 g_minimap.getSatelliteTextureCount()
+g_minimap.getSatelliteDecodeCount() -- Inclui resultados concluídos ainda não coletados.
+g_minimap.getSpriteViewCount()
+g_minimap.getSpriteTileLookupCount() -- Consultas acumuladas; não mede FPS.
 ```
 
 Detalhes técnicos, limites e testes adicionais:

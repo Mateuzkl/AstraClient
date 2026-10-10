@@ -235,6 +235,11 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_minimap", "preloadSatelliteTile", &Minimap::preloadSatelliteTile, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteChunkCount", &Minimap::getSatelliteChunkCount, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteTextureCount", &Minimap::getSatelliteTextureCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSatelliteDecodeCount", &Minimap::getSatelliteDecodeCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSpriteTileLookupCount", &Minimap::getSpriteTileLookupCount, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getSpriteViewCount", &Minimap::getSpriteViewCount, &g_minimap);
+    if (g_app.getStartupOptions().find("--test") != std::string::npos)
+        g_lua.bindSingletonFunction("g_minimap", "auditPrepareSpriteView", &Minimap::prepareSpriteView, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteViewLevel", &Minimap::getSatelliteViewLevel, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "exportSatelliteBase", &Minimap::exportSatelliteBase, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "loadImage", &Minimap::loadImage, &g_minimap);
