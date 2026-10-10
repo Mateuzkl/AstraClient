@@ -159,8 +159,10 @@ do -- Public/private bursts must stop batching after silence; buffers stay bound
 end
 
 do -- Native portrait references and unchanged UI updates.
+  local targetReads = 0
   local env = {UIWidget = {}, extends = function() return {} end, SkullNone = 0, EmblemNone = 0,
-    g_game = {getAttackingCreature = noop, getFollowingCreature = noop}}
+    g_game = {getAttackingCreature = function() targetReads = targetReads + 1 end,
+      getFollowingCreature = function() targetReads = targetReads + 1 end}}
   loadProduction('modules/corelib/table.lua', env)
   loadProduction('modules/gamelib/ui/uicreaturebutton.lua', env)
   local children = {}
@@ -175,6 +177,15 @@ do -- Native portrait references and unchanged UI updates.
     getManaBarPercent = function() return mp end, getSkull = function() return 0 end,
     getEmblem = function() return 0 end, getEchoRaidVisualState = function() return -1 end,
     getIcons = function() return icons end, isMonster = function() return monster end}
+  children.creature.setBorderWidth = function(self, value) self.borderWidth = value end
+  children.creature.setBorderColor = function(self, value) self.borderColor = value end
+  button:creatureSetup(creature, {attacking = creature})
+  assert(targetReads == 0 and children.creature.borderColor == '#df3f3f', 'shared target context must avoid native getter calls')
+  button:update({following = creature})
+  assert(targetReads == 0 and children.creature.borderColor == '#3fdf3f', 'shared follow context must retain immediate styling')
+  button.isHovered = true; button:update()
+  assert(targetReads == 2 and children.creature.borderColor == '#f7f7f7', 'standalone hover updates must still read current targets')
+  button.isHovered = false
   button:creatureSetup(creature)
   assert(children.lifeBar.percent == 80 and children.manaBar.percent == 80 and children.manaBar.visible,
     'equal health and mana still need separate caches')
@@ -193,18 +204,22 @@ do -- Native portrait references and unchanged UI updates.
 end
 
 do -- A crowded map must not filter all spectators after filling the 30-row pool.
-  local online, spectators, positionCalls, filterCalls = true, {}, 0, 0
+  local online, spectators, positionCalls, filterCalls, targetCalls, rowUpdates = true, {}, 0, 0, 0, 0
   local player = {getPosition = function() positionCalls = positionCalls + 1; return {x = 0, y = 0, z = 7} end}
   local env = {g_clock = {millis = function() return 1000 end},
     KeyBind = {getKeyBind = function() return {} end},
-    g_game = {isOnline = function() return online end, getLocalPlayer = function() return player end},
+    g_game = {isOnline = function() return online end, getLocalPlayer = function() return player end,
+      getAttackingCreature = function() targetCalls = targetCalls + 1 end,
+      getFollowingCreature = function() targetCalls = targetCalls + 1 end},
     g_map = {getSpectatorsInRangeEx = function() return spectators end},
     m_interface = {getMapPanel = function() return {getVisibleDimension = function() return {width = 15, height = 11} end} end}}
   loadProduction('modules/game_battle/battle.lua', env)
-  env.updateBattleButtons = noop
   local buttons = {}
   for i = 1, 30 do
-    buttons[i] = {creatureSetup = function(self, value) self.creature = value end, show = noop, hide = noop,
+    buttons[i] = {creatureSetup = function(self, value, targetState)
+      assert(targetState); self.creature = value; rowUpdates = rowUpdates + 1
+    end, show = noop, hide = noop, isHidden = function() return false end,
+      update = function(_, targetState) assert(targetState); rowUpdates = rowUpdates + 1 end,
       setOn = noop, setCreature = function(self, value) self.creature = value end}
   end
   local battle = {panel = {getLayout = noop}, buttons = buttons, sortType = {'byDistanceAscending'},
@@ -219,12 +234,26 @@ do -- A crowded map must not filter all spectators after filling the 30-row pool
       getId = function() return id end, getName = function() return string.format('Name%03d', 31 - id) end}
   end
   env.checkCreatures()
-  assert(filterCalls == 30 and positionCalls == 32, 'cap filters and compute player sort position only once')
+  assert(filterCalls == 30 and positionCalls == 1, 'cap filters and share the player position across filtering/sorting')
+  assert(targetCalls == 2 and rowUpdates == 30, 'one target snapshot and one row update per battle tick')
   for i = 1, 30 do assert(buttons[i].creature == spectators[31 - i]) end
   battle.sortType[1] = 'byNameDescending'; env.checkCreatures()
   for i = 1, 30 do assert(buttons[i].creature == spectators[i]) end
   battle.sortType[1] = 'byHitpointsAscending'; env.checkCreatures()
   for i = 1, 30 do assert(buttons[i].creature == spectators[i], 'ties preserve age ordering') end
+  local checks, filters = 0, {showPlayers = false}
+  battle.filterPanel = {buttons = {getChildById = function(_, name)
+    checks = checks + 1; return {isChecked = function() return filters[name] ~= false end}
+  end}}
+  for i = 1, 10 do spectators[i].isPlayer = function() return true end end
+  env.checkCreatures()
+  assert(checks == 11, 'read each filter once per battle, not once per spectator')
+  for _, button in ipairs(buttons) do assert(button.creature:getId() > 10, 'disabled player filter still excludes players') end
+  filters.showPlayers = true; env.checkCreatures()
+  for i = 1, 30 do assert(buttons[i].creature == spectators[i], 'filter changes apply on the next tick') end
+  local before = targetCalls
+  env.onTargetStateChange()
+  assert(targetCalls == before + 2, 'immediate target events share their native getters across all rows')
   online = false; env.checkCreatures()
   for _, button in ipairs(buttons) do assert(button.creature == nil) end
 end
@@ -295,16 +324,15 @@ end
 
 do -- Terminal spam must not grow the copy buffer or allocate rows indefinitely.
   local events, schedule, cancel, fire = scheduler()
-  local created, rows, depth = 0, {}, 0
+  local created, rows, depth, reorders, layouts = 0, {}, 0, 0, 0
   local buffer, selection = widget(), widget()
   local layout = {disableUpdates = function() depth = depth + 1 end,
-    enableUpdates = function() depth = depth - 1 end, update = noop}
+    enableUpdates = function() depth = depth - 1 end, update = function() layouts = layouts + 1 end}
   function buffer:getLayout() return layout end
   function buffer:getChildCount() return #rows end
   function buffer:getChildByIndex(index) return rows[index] end
-  function buffer:moveChildToIndex(label, index)
-    for i, child in ipairs(rows) do if child == label then table.remove(rows, i); break end end
-    table.insert(rows, index, label)
+  function buffer:reorderChildren(ordered)
+    assert(#ordered == #rows); rows = ordered; reorders = reorders + 1
   end
   function buffer:destroyChildren() for _, row in ipairs(rows) do row:destroy() end; rows = {} end
   local env = {LogDebug = 1, LogInfo = 2, LogWarning = 3, LogError = 4,
@@ -330,12 +358,35 @@ do -- Terminal spam must not grow the copy buffer or allocate rows indefinitely.
   end
   for i = 1, 10000 do env.addLine('burst ' .. i, 'pink') end
   assert(#upvalue(env.addLine, 'cachedLines') == 128, 'pending logs must be bounded even before a flush')
+  assert(next(events).delay == 50, 'terminal display should batch spam without altering game/bot timers')
   flush()
   assert(#rows == 128 and created == 128 and rows[1].text == 'burst 9873' and rows[128].text == 'burst 10000')
   for i = 1, 3000 do env.addLine(string.rep('x', i % 80 + 1), 'yellow'); flush() end
   assert(#rows == 128 and created == 128 and #selection.text <= 128 * 81,
     'continuous log replacement must reuse rows and bound the copy buffer')
+  local before = reorders
+  for i = 1, 64 do env.addLine('batch ' .. i, 'red') end
+  flush()
+  assert(reorders == before + 1 and rows[65].text == 'batch 1' and rows[128].text == 'batch 64',
+    'a batch must rotate all reused rows once and preserve their final order')
+  assert(rows[128].color == '#ff4444', 'reused rows must refresh log severity colors')
+
+  local window = widget()
+  function window:isVisible() return self.visible end
+  window.raise, window.focus = noop, noop
+  upvalue(env.show, 'terminalWindow', window)
+  local oldText, oldLayouts, oldReorders = selection.text, layouts, reorders
+  for i = 1, 10000 do env.addLine('hidden ' .. i, 'white') end
+  assert(count(events) == 1); fire(next(events))
+  assert(#upvalue(env.flushLines, 'allLines') == 128 and layouts == oldLayouts and reorders == oldReorders and selection.text == oldText,
+    'hidden terminal must retain bounded logs without wrapping text or rebuilding layouts')
+  env.show()
+  assert(rows[1].text == 'hidden 9873' and rows[128].text == 'hidden 10000' and created == 128 and layouts == oldLayouts + 1,
+    'show must render the latest hidden history once and reuse the bounded row pool')
+  env.show(); assert(layouts == oldLayouts + 1, 'showing unchanged terminal must not rebuild its layout')
   env.clear(); assert(#rows == 0 and selection.text == '' and #upvalue(env.flushLines, 'allLines') == 0)
+  env.addLine('discard on clear', 'white'); env.clear()
+  assert(count(events) == 0 and #upvalue(env.addLine, 'cachedLines') == 0, 'clear must cancel pending display work too')
   env.addLine('last log', 'white'); local stale = next(events).callback
   env.terminate()
   assert(count(events) == 0 and env.terminalSelectText == nil and upvalue(env.flushLines, 'terminalBuffer') == nil)

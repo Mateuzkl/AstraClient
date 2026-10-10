@@ -166,6 +166,14 @@ local snapshot = assert(cpp:match('void MemLeakManager::takeSnapshot%(%)%s*(.-)s
 assert(snapshot:find('privateMemoryUsage()', 1, true) and not snapshot:find('g_platform.getMemoryUsage', 1, true),
   'snapshot memory baseline must use the same private-commit metric as alerts')
 assert(cpp:find('Private commit delta: unavailable', 1, true), 'failed snapshot queries must not produce false deltas')
-assert(cpp:find('Scheduled queue entries (includes canceled, awaiting removal)', 1, true),
+assert(cpp:find('g_dispatcher.getScheduledEventDiagnostics()', 1, true),
+  'periodic queue diagnostics must distinguish active/canceled events and show their sources')
+local source = assert(io.open('src/framework/core/eventdispatcher.cpp', 'rb'))
+local dispatcher = source:read('*a'); source:close()
+assert(dispatcher:find('Scheduled queue entries (includes canceled, awaiting removal)', 1, true),
   'queue entries must not be advertised as active callbacks')
+assert(dispatcher:find('Active:', 1, true) and dispatcher:find('Canceled:', 1, true) and dispatcher:find('Due now:', 1, true))
+local canceledCheck = assert(dispatcher:find('if(scheduledEvent->isCanceled())', 1, true))
+local deadlineCheck = assert(dispatcher:find('if(scheduledEvent->remainingTicks() > 0)', 1, true))
+assert(canceledCheck < deadlineCheck, 'canceled queue heads must be removed before checking their future deadline')
 print('Memory monitor: lazy lifecycle, bounded FPS/ping history, timer delay and Snapshot/Diff passed')

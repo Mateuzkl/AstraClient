@@ -59,7 +59,7 @@ function UICreatureButton:setup(id)
   self.creatureIcons = {}
 end
 
-function UICreatureButton:update()
+function UICreatureButton:update(targetState)
   if not self.creature then
     return
   end
@@ -69,10 +69,11 @@ function UICreatureButton:update()
   local labelColor = echoColor or (self.isHovered and CreatureButtonColors.onIdle.hovered or CreatureButtonColors.onIdle.notHovered)
   local borderColor = echoColor
 
-  if self.creature == g_game.getAttackingCreature() then
+  targetState = targetState or {attacking = g_game.getAttackingCreature(), following = g_game.getFollowingCreature()}
+  if self.creature == targetState.attacking then
     borderColor = self.isHovered and CreatureButtonColors.onTargeted.hovered or CreatureButtonColors.onTargeted.notHovered
     labelColor = echoColor or borderColor
-  elseif self.creature == g_game.getFollowingCreature() then
+  elseif self.creature == targetState.following then
     borderColor = self.isHovered and CreatureButtonColors.onFollowed.hovered or CreatureButtonColors.onFollowed.notHovered
     labelColor = echoColor or borderColor
   elseif self.isHovered then
@@ -94,7 +95,7 @@ function UICreatureButton:update()
   self.labelWidget:setColor(labelColor)
 end
 
-function UICreatureButton:creatureSetup(creature)
+function UICreatureButton:creatureSetup(creature, targetState)
   if self.creature ~= creature then
     self.creature = creature
     self.healthPercent = nil
@@ -118,7 +119,7 @@ function UICreatureButton:creatureSetup(creature)
   self:updateEmblem()
   self:updateIcons()
 
-  self:update()
+  self:update(targetState)
 end
 
 function UICreatureButton:updateSkull()
