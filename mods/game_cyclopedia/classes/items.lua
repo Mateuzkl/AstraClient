@@ -883,7 +883,8 @@ function CyclopediaItems.categoryListChildFocus(self, selected)
 end
 
 function CyclopediaItems.itemListChildFocus(self, selected)
-  if not selected or not selected.item then return end
+  if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed() or
+      VisibleCyclopediaPanel:getId() ~= 'itemDataPanel' or not selected or not selected.item then return end
 
   local item = selected.item:getItem()
   local itemId = selected.item:getItemId()
@@ -923,14 +924,15 @@ function CyclopediaItems.itemListChildFocus(self, selected)
     VisibleCyclopediaPanel.leftInfo.circlemarket:setChecked(false)
   end
 
-  local lootConfig = lootData["listType"]
-  local lootTable = (lootConfig == "whitelist" and lootData["whitelistTypes"] or lootData["blacklistTypes"])
-
-  if lootTable and table.contains(lootTable, selected.item:getItem():getId()) then
-    VisibleCyclopediaPanel.panelitemshide.checkLootbox:setChecked(true)
-  else
-    VisibleCyclopediaPanel.panelitemshide.checkLootbox:setChecked(false)
+  local quickLoot = modules.game_quickloot
+  local lootConfig, listed
+  if quickLoot and quickLoot.getLootSelection then
+    lootConfig, listed = quickLoot.getLootSelection(itemId)
   end
+  local lootBox = VisibleCyclopediaPanel.panelitemshide.checkLootbox
+  lootBox:setChecked(listed == true)
+  lootBox:setEnabled(lootConfig ~= nil)
+  VisibleCyclopediaPanel.panelitemshide.lootBox:setEnabled(lootConfig ~= nil)
 
   if lootConfig == "blacklist" then
     VisibleCyclopediaPanel.panelitemshide.lootBox:setImageSource("/mods/game_cyclopedia/images/ui/names/skipwhen")
@@ -1369,6 +1371,10 @@ function CyclopediaItems.manageQuickloot(widget, checked)
 	if not lastSelectedItem or not lastSelectedItem.item then
 		return true
 	end
+
+  local quickLoot = modules.game_quickloot
+  if not quickLoot or not quickLoot.getLootSelection or
+      not quickLoot.getLootSelection(lastSelectedItem.item:getItemId()) then return true end
 
 	if not checked then
 		modules.game_quickloot.addToQuickLoot(lastSelectedItem.item:getItem():getId())

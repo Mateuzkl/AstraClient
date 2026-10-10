@@ -37,6 +37,7 @@ local lastTabSwitchTime = 0
 local characterInitEvent = nil
 
 local function cancelPanelWork()
+  if MapCyclopedia and MapCyclopedia.terminatePanel then MapCyclopedia.terminatePanel() end
   if characterInitEvent then
     removeEvent(characterInitEvent)
     characterInitEvent = nil
@@ -292,7 +293,7 @@ function Cyclopedia.onServerTime(hour, minute)
   end
 end
 
-function Cyclopedia:open()
+function Cyclopedia:open(action)
   if cyclopediaWindow:isHidden() then
     cyclopediaWindow:show(true)
     cyclopediaWindow:raise()
@@ -309,7 +310,7 @@ function Cyclopedia:open()
   end
 
   for id, child in pairs(cyclopediaOptionsPanel:getChildren()) do
-    if child.category:getText() == 'Items' then
+    if child.category:getText() == (action or 'Items') then
       onOptionChange(child)
       break
     end
@@ -377,8 +378,7 @@ function toggleRedirect(action, raceId)
       end
     end
   elseif action == "Map" then
-    Cyclopedia:open()
-    onOptionChange(cyclopediaOptionsPanel:recursiveGetChildById('4'))
+    Cyclopedia:open('Map') -- Do not create/focus Items and request data first.
   end
 end
 
@@ -423,7 +423,8 @@ function onOptionChange(widget)
 
   if VisibleCyclopediaPanel then
     cyclopediaWindow.bestiarytrackerButton:setVisible(false)
-    VisibleCyclopediaPanel:destroyChildren()
+    VisibleCyclopediaPanel:destroy()
+    VisibleCyclopediaPanel = nil
   end
 
   selectedOption = widget:getId()
@@ -573,7 +574,7 @@ function toggleDisplayChildren()
           child:setVisible(true)
       end
       miniButtonDisplay:setImageClip("99 29 12 12")
-      display:setHeight(253)
+      display:setHeight(275)
   end
 end
 

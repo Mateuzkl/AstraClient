@@ -47,6 +47,7 @@ function UIRealMinimap:onSetup()
 end
 
 function UIRealMinimap:onDestroy()
+  if self._realMapMarkerEvent then removeEvent(self._realMapMarkerEvent); self._realMapMarkerEvent = nil end
   for _,widget in pairs(self.alternatives) do
     widget:destroy()
   end
@@ -112,6 +113,8 @@ function UIRealMinimap:save()
 end
 
 function UIRealMinimap:setCrossPosition(pos)
+  if not pos then return end
+  pos = {x = pos.x, y = pos.y, z = self:getCameraPosition().z}
   local cross = self.cross
   if not self.cross then
     cross = g_ui.createWidget('MinimapCross', self)
@@ -226,10 +229,34 @@ function UIRealMinimap:onMouseMove(mousePos, mouseMoved)
 end
 
 function UIRealMinimap:onHide()
-  -- table.dump(self.customMouseEvents)
-  for buttonType, customMouseEvents in pairs(self.customMouseEvents) do
-    for _, customMouseEvent in ipairs(customMouseEvents) do
-      customMouseEvent.callback(self, customMouseEvent.fromMapPos, customMouseEvent.fromMapPos)
+  self:destroyFlagWindow() -- Hiding a map must never synthesize region clicks.
+end
+
+function UIRealMinimap:setCurrentView(view)
+  self.currentView = view == 'satellite' and 'satellite' or 'minimap'
+  if self.setSurfaceMode then self:setSurfaceMode(self.currentView == 'satellite') end
+end
+
+function UIRealMinimap:setLevelSeparator(value)
+  if self.setSurfaceOpacity then self:setSurfaceOpacity(math.max(0, math.min(100, value)) / 100) end
+end
+
+function UIRealMinimap:ignoreWidget(imagePath)
+  self.ignoredMarks = self.ignoredMarks or {}
+  self.ignoredMarks[imagePath:gsub('^/', '')] = true
+  self:refreshMarks()
+end
+
+function UIRealMinimap:unignoreWidget(imagePath)
+  self.ignoredMarks = self.ignoredMarks or {}
+  self.ignoredMarks[imagePath:gsub('^/', '')] = nil
+  self:refreshMarks()
+end
+
+function UIRealMinimap:refreshMarks()
+  for _, widget in pairs(self._minimapWidgets or {}) do
+    if not widget:isDestroyed() then
+      widget:setVisible(not (self.ignoredMarks or {})[(widget.imagePath or ''):gsub('^/', '')])
     end
   end
 end

@@ -80,6 +80,13 @@ def build(source: Path, destination: Path, world: Path | None = None,
             "spr_signature": int(spr_sig), "floors": sorted({key[3] for key in entries}),
             "levels": sorted({key[0] for key in entries})}
     (destination / "source.json").write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    if world is not None:
+        # Optional metadata, read only from the exact hashed map source.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('astra_city_labels', Path(__file__).with_name('city_labels.py'))
+        cities = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cities)
+        cities.export(world, destination)
     shutil.copyfile(classic_map, destination / 'minimap.otmm')
     # The runtime's entry point is published last, only for a complete pack.
     (destination / "index.txt").write_text("\n".join(manifest) + "\n", encoding="utf-8")

@@ -187,6 +187,7 @@ function RealMap.setUIMarkers(widget)
   local chunkSize = 125
 
   local function loadChunk()
+    widget._realMapMarkerEvent = nil
     if not widget or (widget.isDestroyed and widget:isDestroyed()) then
       return
     end
@@ -204,14 +205,15 @@ function RealMap.setUIMarkers(widget)
 
     index = lastIndex + 1
     if index <= #RealMap.markers then
-      scheduleEvent(loadChunk, 1)
+      widget._realMapMarkerEvent = scheduleEvent(loadChunk, 1)
     else
       widget._realMapMarkersLoading = false
       widget._realMapMarkersLoaded = true
     end
+    if widget.refreshMarks then widget:refreshMarks() end
   end
 
-  scheduleEvent(loadChunk, 1)
+  widget._realMapMarkerEvent = scheduleEvent(loadChunk, 1)
 end
 
 function RealMap.setLevelSeparator(widget, levelSeparator)

@@ -28,6 +28,8 @@
 #include "luavaluecasts_client.h"
 
 #include <framework/graphics/painter.h>
+#include <algorithm>
+#include <cmath>
 #include "uimapanchorlayout.h"
 
 UIMinimap::UIMinimap()
@@ -42,14 +44,30 @@ UIMinimap::~UIMinimap()
 {
     if (m_spriteMode)
         g_minimap.removeSpriteView();
+    if (m_surfaceMode) g_minimap.removeSurfaceView();
 }
 
 void UIMinimap::onDestroy()
 {
+    setSurfaceMode(false);
     if (m_spriteMode) {
         m_spriteMode = false;
         g_minimap.removeSpriteView();
     }
+}
+
+void UIMinimap::setSurfaceMode(bool enabled)
+{
+    if (enabled && isDestroyed()) return;
+    if (m_surfaceMode == enabled) return;
+    m_surfaceMode = enabled;
+    if (enabled) g_minimap.addSurfaceView();
+    else g_minimap.removeSurfaceView();
+}
+
+void UIMinimap::setSurfaceOpacity(float opacity)
+{
+    m_surfaceOpacity = std::isfinite(opacity) ? std::clamp(opacity, 0.f, 1.f) : 1.f;
 }
 
 void UIMinimap::setSpriteMode(bool enabled)
@@ -97,7 +115,9 @@ void UIMinimap::drawSelf(Fw::DrawPane drawPane)
 
     ensureLayout();
 
-    if (m_spriteMode)
+    if (m_surfaceMode && getCameraPosition().z <= 7)
+        g_minimap.drawSurface(getPaddingRect(), getCameraPosition(), m_scale, m_color, m_surfaceOpacity);
+    else if (m_spriteMode)
         g_minimap.drawSprites(getPaddingRect(), getCameraPosition(), m_scale, m_color, !m_spriteModeSuspended);
     else
         g_minimap.draw(getPaddingRect(), getCameraPosition(), m_scale, m_color);

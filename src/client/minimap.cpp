@@ -452,7 +452,7 @@ bool Minimap::satelliteViewReady(const std::vector<uint64_t>& keys)
     return true;
 }
 
-void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale)
+void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale, bool composite, float backgroundOpacity)
 {
     if (screenRect.isEmpty() || !mapCenter.isMapPosition() || mapCenter.z > g_gameConfig.getMapMaxZ() ||
         scale <= 0 || !std::isfinite(scale))
@@ -465,19 +465,36 @@ void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, f
     const auto mapRect = calcMapRect(screenRect, mapCenter, scale);
     int target = satelliteViewLevel(mapRect, scale);
     if (!target) return;
+    std::vector<int> floors;
+    for (int floor = composite ? 7 : mapCenter.z; floor >= mapCenter.z; --floor)
+        if (floor == mapCenter.z || backgroundOpacity > 0) floors.push_back(floor);
+    const auto viewKeys = [&](int level) {
+        std::vector<uint64_t> keys;
+        for (const int floor : floors) {
+            auto layer = satelliteViewKeys(mapRect, level, floor);
+            keys.insert(keys.end(), layer.begin(), layer.end());
+        }
+        return keys;
+    };
+    const auto footprint = [&](int level) -> int64_t {
+        const int size = 16 * level;
+        const int columns = std::min(65535, mapRect.right()) / size - std::max(0, mapRect.left()) / size + 1;
+        const int rows = std::min(65535, mapRect.bottom()) / size - std::max(0, mapRect.top()) / size + 1;
+        return int64_t(std::max(0, columns)) * std::max(0, rows) * floors.size();
+    };
     // A bounded overview of the visible region survives zoom/full-map changes.
     // Only indexed chunks touching this view are requested, never the whole floor.
-    const auto overview = satelliteViewKeys(mapRect, *m_satelliteLevels.rbegin(), mapCenter.z);
-    auto desired = satelliteViewKeys(mapRect, target, mapCenter.z);
+    const auto overview = viewKeys(*m_satelliteLevels.rbegin());
+    auto desired = viewKeys(target);
     std::set<uint64_t> protectedKeys;
     for (;;) {
         protectedKeys = {overview.begin(), overview.end()};
         protectedKeys.insert(desired.begin(), desired.end());
-        if (protectedKeys.size() <= SatelliteTextureLimit - 4) break;
+        if (footprint(target) <= SatelliteViewLimit && protectedKeys.size() <= SatelliteTextureLimit - 4) break;
         const auto next = m_satelliteLevels.upper_bound(target);
         if (next == m_satelliteLevels.end()) return;
         target = *next;
-        desired = satelliteViewKeys(mapRect, target, mapCenter.z);
+        desired = viewKeys(target);
     }
 
     // Keep the best complete cached LOD pinned while the new one is loading.
@@ -489,9 +506,8 @@ void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, f
         // Once the target is complete, release the previous finer LOD so the
         // bounded neighbor prefetch can use its slots instead of pinning it.
         if (desiredReady && candidate != target) continue;
-        if (int64_t(mapRect.width() / (16 * candidate) + 2) *
-            (mapRect.height() / (16 * candidate) + 2) > SatelliteTextureLimit) continue;
-        auto keys = satelliteViewKeys(mapRect, candidate, mapCenter.z);
+        if (footprint(candidate) > SatelliteTextureLimit) continue;
+        auto keys = viewKeys(candidate);
         if (!satelliteViewReady(keys)) continue;
         auto pinned = protectedKeys;
         pinned.insert(keys.begin(), keys.end());
@@ -518,6 +534,7 @@ void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, f
         const Rect nearby(mapRect.left() - halo, mapRect.top() - halo,
                           mapRect.width() + 2 * halo, mapRect.height() + 2 * halo);
         unsigned prefetched = 0;
+        // Prefetch target-floor neighbors only; other layers are visible-demand.
         for (const auto key : satelliteViewKeys(nearby, target, mapCenter.z)) {
             if (protectedKeys.count(key)) continue;
             if (prefetched == 4 || protectedKeys.size() == SatelliteTextureLimit) break;
@@ -547,12 +564,25 @@ void Minimap::drawSatellite(const Rect& screenRect, const Position& mapCenter, f
         const int dy = origin.y + std::lround((y - mapRect.top()) * scale);
         const int endX = origin.x + std::lround((x + size - mapRect.left()) * scale);
         const int endY = origin.y + std::lround((y + size - mapRect.top()) * scale);
+        const auto layerStart = g_drawQueue->size();
         g_drawQueue->addTexturedRect(Rect(dx, dy, endX - dx, endY - dy), texture, Rect(0, 0, 512, 512));
+        if (composite && int((key >> 32) & 0xff) != mapCenter.z)
+            g_drawQueue->setOpacity(layerStart, backgroundOpacity);
     }
     g_drawQueue->setClip(start, screenRect);
 }
 
 int Minimap::auditSatelliteFrame(const Size& viewSize, const Position& mapCenter, float scale, const std::string& screenshot)
+{
+    return auditMapFrame(viewSize, mapCenter, scale, false, 1.f, screenshot);
+}
+
+int Minimap::auditSurfaceFrame(const Size& viewSize, const Position& mapCenter, float scale, float opacity, const std::string& screenshot)
+{
+    return auditMapFrame(viewSize, mapCenter, scale, true, opacity, screenshot);
+}
+
+int Minimap::auditMapFrame(const Size& viewSize, const Position& mapCenter, float scale, bool surface, float opacity, const std::string& screenshot)
 {
     // Only exposed in --test. Build the same queue used by UIMinimap, including
     // OTMM background, then optionally render it offscreen on the GL thread.
@@ -560,7 +590,10 @@ int Minimap::auditSatelliteFrame(const Size& viewSize, const Position& mapCenter
     auto previous = g_drawQueue;
     auto queue = std::make_shared<DrawQueue>();
     g_drawQueue = queue;
-    drawSprites(Rect(Point(0, 0), viewSize), mapCenter, scale, Color::black, false);
+    if (surface)
+        drawSurface(Rect(Point(0, 0), viewSize), mapCenter, scale, Color::black, opacity);
+    else
+        drawSprites(Rect(Point(0, 0), viewSize), mapCenter, scale, Color::black, false);
     g_drawQueue = previous;
     if (!screenshot.empty()) {
         g_graphicsDispatcher.addEvent([queue, viewSize, screenshot] {
@@ -722,13 +755,44 @@ void Minimap::removeSpriteView()
         std::lock_guard<std::mutex> lock(m_spriteLock);
         if (m_spriteViews > 0)
             --m_spriteViews;
-        stopped = m_spriteViews == 0;
-        if (stopped) {
+        if (m_spriteViews == 0) {
             m_spriteCacheEnabled = false;
             clearSpriteCacheLocked();
         }
+        stopped = m_spriteViews == 0 && m_surfaceViews == 0;
     }
     if (stopped) clearSatelliteTextures(); // Off means no retained HD image cache.
+}
+
+void Minimap::addSurfaceView()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    ++m_surfaceViews;
+}
+
+unsigned Minimap::getSurfaceViewCount()
+{
+    std::lock_guard<std::mutex> lock(m_spriteLock);
+    return m_surfaceViews;
+}
+
+void Minimap::removeSurfaceView()
+{
+    bool stopped;
+    {
+        std::lock_guard<std::mutex> lock(m_spriteLock);
+        if (m_surfaceViews) --m_surfaceViews;
+        stopped = m_surfaceViews == 0 && m_spriteViews == 0;
+    }
+    if (stopped) clearSatelliteTextures();
+}
+
+void Minimap::drawSurface(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, float backgroundOpacity)
+{
+    draw(screenRect, mapCenter, scale, color);
+    if (mapCenter.z > 7) return; // 8.60 underground is classic, never the z7 image.
+    drawSatellite(screenRect, mapCenter, scale, true,
+                  std::isfinite(backgroundOpacity) ? std::clamp(backgroundOpacity, 0.f, 1.f) : 1.f);
 }
 
 void Minimap::eraseSpriteTile(uint64_t key)
