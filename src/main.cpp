@@ -183,7 +183,9 @@ int main(int argc, const char* argv[]) {
 #endif
 
     bool testMode = std::find(args.begin(), args.end(), "--test") != args.end();
-    if (testMode) {
+    // Negative fixture suites deliberately exercise recoverable error logging.
+    // The runner validates an explicit allowlist; ordinary --test remains fail-fast.
+    if (testMode && std::find(args.begin(), args.end(), "--test-expected-errors") == args.end()) {
         g_logger.setTestingMode();    
     }
 

@@ -214,6 +214,7 @@ private:
 // event processing
 protected:
     virtual void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
+    virtual void onDestroy() {}
     virtual void onGeometryChange(const Rect& oldRect, const Rect& newRect);
     virtual void onLayoutUpdate();
     virtual void onFocusChange(bool focused, Fw::FocusReason reason);

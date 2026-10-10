@@ -92,6 +92,7 @@ void Map::requestVisibleTilesCacheUpdate() {
 
 void Map::clean()
 {
+    g_minimap.clearSpriteCache(); // Never retain HD terrain across world/dat resets.
     cleanDynamicThings();
 
     for (auto& tileBlocks : m_tileBlocks)

@@ -41,6 +41,7 @@ public:
     bool loadDat(std::string file);
     bool loadOtml(std::string file);
     void loadOtb(const std::string& file);
+    void loadOtbForMap(const std::string& file);
     void loadXml(const std::string& file);
     void parseItemType(uint16 id, TiXmlElement *elem);
     bool saveDatDisplacementToWorkDir(const std::string& virtualPath, uint16 id, ThingCategory category);
@@ -101,6 +102,7 @@ public:
     bool isValidOtbId(uint16 id) { return id >= 1 && id < m_itemTypes.size(); }
 
 private:
+    void loadOtbImpl(const std::string& file, bool preserveServerIds);
     ThingTypeList m_thingTypes[ThingLastCategory];
     ItemTypeList m_reverseItemTypes;
     ItemTypeList m_itemTypes;

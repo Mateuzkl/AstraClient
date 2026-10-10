@@ -38,6 +38,50 @@ UIMinimap::UIMinimap()
     m_maxZoom = 5;
 }
 
+UIMinimap::~UIMinimap()
+{
+    if (m_spriteMode)
+        g_minimap.removeSpriteView();
+}
+
+void UIMinimap::onDestroy()
+{
+    if (m_spriteMode) {
+        m_spriteMode = false;
+        g_minimap.removeSpriteView();
+    }
+}
+
+void UIMinimap::setSpriteMode(bool enabled)
+{
+    if (isDestroyed()) return; // A retained Lua reference cannot resubscribe a dead view.
+    if (m_spriteMode == enabled)
+        return;
+    m_spriteMode = enabled;
+    if (enabled) {
+        m_classicZoom = m_zoom;
+        g_minimap.addSpriteView();
+        if (!m_spriteModeSuspended)
+            setZoom(std::max(getMinZoom(), std::min(m_spriteZoom, m_maxZoom)));
+    } else {
+        g_minimap.removeSpriteView();
+        setZoom(std::max(m_minZoom, std::min(m_classicZoom, m_maxZoom)));
+    }
+}
+
+void UIMinimap::setSpriteModeSuspended(bool suspended)
+{
+    m_spriteModeSuspended = suspended;
+    if (m_zoom < getMinZoom())
+        setZoom(std::max(getMinZoom(), std::min(3, m_maxZoom)));
+}
+
+int UIMinimap::getMinZoom()
+{
+    return m_spriteMode && !m_spriteModeSuspended && !g_minimap.hasSatellitePack()
+        ? std::max(1, m_minZoom) : m_minZoom;
+}
+
 void UIMinimap::ensureLayout()
 {
     if (!m_layout)
@@ -53,7 +97,10 @@ void UIMinimap::drawSelf(Fw::DrawPane drawPane)
 
     ensureLayout();
 
-    g_minimap.draw(getPaddingRect(), getCameraPosition(), m_scale, m_color);
+    if (m_spriteMode)
+        g_minimap.drawSprites(getPaddingRect(), getCameraPosition(), m_scale, m_color, !m_spriteModeSuspended);
+    else
+        g_minimap.draw(getPaddingRect(), getCameraPosition(), m_scale, m_color);
 }
 
 bool UIMinimap::setZoom(int zoom)
@@ -61,11 +108,13 @@ bool UIMinimap::setZoom(int zoom)
     if(zoom == m_zoom)
         return true;
 
-    if(zoom < m_minZoom || zoom > m_maxZoom)
+    if(zoom < getMinZoom() || zoom > m_maxZoom)
         return false;
 
     int oldZoom = m_zoom;
     m_zoom = zoom;
+    if (m_spriteMode && !m_spriteModeSuspended)
+        m_spriteZoom = zoom;
     if(m_zoom < 0)
         m_scale = 1.0f / (1 << std::abs(zoom));
     else if(m_zoom > 0)

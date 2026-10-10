@@ -30,6 +30,7 @@ class UIMinimap : public UIWidget
 {
 public:
     UIMinimap();
+    ~UIMinimap() override;
 
     void drawSelf(Fw::DrawPane drawPane);
 
@@ -37,6 +38,11 @@ public:
     bool zoomOut() { return setZoom(m_zoom-1); }
 
     bool setZoom(int zoom);
+    void setSpriteMode(bool enabled);
+    bool isSpriteMode() { return m_spriteMode; }
+    void setSpriteModeSuspended(bool suspended);
+    int getClassicZoom() { return m_spriteMode ? m_classicZoom : m_zoom; }
+    int getSpriteZoom() { return m_spriteZoom; }
     void setupHouse(uint32 houseId);
     void setMinZoom(int minZoom) { m_minZoom = minZoom; }
     void setMaxZoom(int maxZoom) { m_maxZoom = maxZoom; }
@@ -49,7 +55,7 @@ public:
     Position getTilePosition(const Point& mousePos);
 
     Position getCameraPosition() { return m_cameraPosition; }
-    int getMinZoom() { return m_minZoom; }
+    int getMinZoom();
     int getMaxZoom() { return m_maxZoom; }
     int getZoom() { return m_zoom; }
     float getScale() { return m_scale; }
@@ -59,6 +65,7 @@ public:
     void centerInPosition(const UIWidgetPtr& anchoredWidget, const Position& hookedPosition);
 
 protected:
+    void onDestroy() override;
     virtual void onZoomChange(int zoom, int oldZoom);
     virtual void onCameraPositionChange(const Position& position, const Position& oldPosition);
     virtual void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
@@ -73,6 +80,10 @@ private:
     int m_zoom;
     int m_minZoom;
     int m_maxZoom;
+    int m_classicZoom = 0;
+    int m_spriteZoom = 3;
+    bool m_spriteMode = false;
+    bool m_spriteModeSuspended = false;
 };
 
 #endif

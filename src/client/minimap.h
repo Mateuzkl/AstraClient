@@ -26,6 +26,11 @@
 
 #include "declarations.h"
 #include <framework/graphics/declarations.h>
+#include <atomic>
+#include <algorithm>
+#include <list>
+#include <future>
+#include <set>
 
 enum {
     MMBLOCK_SIZE = 64,
@@ -88,6 +93,27 @@ public:
     void clean();
 
     void draw(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color);
+    void drawSprites(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, bool liveTerrain = true);
+    bool loadSatellitePack(const std::string& directory);
+    void clearSatellitePack();
+    bool hasSatellitePack();
+    bool hasSatelliteTile(const Position& pos);
+    bool preloadSatelliteTile(const Position& pos, float scale);
+    size_t getSatelliteChunkCount();
+    size_t getSatelliteTextureCount();
+    size_t getSatelliteDecodeCount();
+    int getSatelliteViewLevel(const Size& viewSize, float scale);
+    int exportSatelliteBase(const std::string& directory);
+    void addSpriteView();
+    void removeSpriteView();
+    void clearSpriteCache();
+    size_t getSpriteCacheTileCount();
+    size_t getSpriteCacheItemCount();
+    uint64_t getSpriteTileLookupCount();
+    unsigned getSpriteViewCount();
+    void prepareSpriteView(const Size& viewSize, const Position& mapCenter, float scale);
+    int auditSatelliteFrame(const Size& viewSize, const Position& mapCenter, float scale, const std::string& screenshot);
+    void setSatelliteTestDecodeDelay(unsigned milliseconds) { m_satelliteTestDecodeDelay = std::min(milliseconds, 500u); }
     Point getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
     Position getTilePosition(const Point& point, const Rect& screenRect, const Position& mapCenter, float scale);
     Rect getTileRect(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
@@ -99,9 +125,64 @@ public:
     bool loadImage(const std::string& fileName, const Position& topLeft, float colorFactor);
     void saveImage(const std::string& fileName, int minX, int minY, int maxX, int maxY, short z);
     bool loadOtmm(const std::string& fileName);
+    bool mergeOtmm(const std::string& fileName);
     void saveOtmm(const std::string& fileName);
 
 private:
+    bool loadOtmmImpl(const std::string& fileName, bool preserveUnknown);
+    struct SatelliteChunk { std::string file; bool failed = false; };
+    struct SatelliteTexture {
+        TexturePtr texture;
+        std::list<uint64_t>::iterator order;
+    };
+    struct SatelliteDecode {
+        uint64_t key;
+        std::shared_future<ImagePtr> image;
+        std::shared_ptr<std::atomic<bool>> cancelled;
+    };
+    static uint64_t satelliteKey(int level, int x, int y, int z) {
+        return (uint64_t(level) << 40) | (uint64_t(z) << 32) | (uint64_t(y) << 16) | x;
+    }
+    int satelliteLevel(float scale); // Requires m_satelliteLock.
+    int satelliteViewLevel(const Rect& mapRect, float scale); // Requires m_satelliteLock.
+    static constexpr size_t SatelliteTextureLimit = 32;
+    static constexpr size_t SatelliteViewLimit = 24; // Leave room for an overview and nearby chunks.
+    static constexpr size_t SatelliteDecodeLimit = 4;
+    size_t finishSatelliteDecodes(); // Requires m_satelliteLock; returns active jobs.
+    void cancelSatelliteDecodes(); // Requires m_satelliteLock; never drops pending jobs.
+    TexturePtr satelliteTexture(uint64_t key, const std::set<uint64_t>* protectedKeys = nullptr); // Requires m_satelliteLock.
+    std::vector<uint64_t> satelliteViewKeys(const Rect& mapRect, int level, int floor);
+    bool satelliteViewReady(const std::vector<uint64_t>& keys);
+    void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale);
+    void clearSatelliteTextures();
+    std::unordered_map<uint64_t, SatelliteChunk> m_satelliteChunks;
+    std::unordered_map<uint64_t, SatelliteTexture> m_satelliteTextures;
+    std::vector<SatelliteDecode> m_satelliteDecodes; // Independent of texture LRU and pack lifetime; at most four.
+    unsigned m_satelliteTestDecodeDelay = 0; // Only bound in --test; captured by value, never read by worker.
+    int m_satelliteRenderedLevel = 0;
+    std::list<uint64_t> m_satelliteOrder;
+    std::set<int> m_satelliteLevels;
+    uint32 m_satelliteDatSignature = 0;
+    uint32 m_satelliteSprSignature = 0;
+    std::mutex m_satelliteLock;
+    struct SpriteTile {
+        std::vector<ItemPtr> items;
+        std::list<uint64_t>::iterator order;
+    };
+    static uint64_t spriteTileKey(const Position& pos) {
+        return (uint64_t(pos.z) << 32) | (uint64_t(pos.y) << 16) | pos.x;
+    }
+    void updateSpriteTile(const Position& pos, const TilePtr& tile);
+    void eraseSpriteTile(uint64_t key); // Requires m_spriteLock.
+    void clearSpriteCacheLocked();
+    std::unordered_map<uint64_t, SpriteTile> m_spriteTiles;
+    std::list<uint64_t> m_spriteOrder;
+    size_t m_spriteItemCount = 0;
+    uint64_t m_spriteTileLookupCount = 0;
+    unsigned m_spriteViews = 0;
+    std::atomic<bool> m_spriteCacheEnabled{false};
+    std::mutex m_spriteLock;
+
     Rect calcMapRect(const Rect& screenRect, const Position& mapCenter, float scale);
     bool hasBlock(const Position& pos) { return m_tileBlocks[pos.z].find(getBlockIndex(pos)) != m_tileBlocks[pos.z].end(); }
     MinimapBlock& getBlock(const Position& pos) { 

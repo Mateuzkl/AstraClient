@@ -457,6 +457,17 @@ bool ThingTypeManager::loadOtml(std::string file)
 
 void ThingTypeManager::loadOtb(const std::string& file)
 {
+    loadOtbImpl(file, false);
+}
+
+void ThingTypeManager::loadOtbForMap(const std::string& file)
+{
+    loadOtbImpl(file, true);
+}
+
+void ThingTypeManager::loadOtbImpl(const std::string& file, bool preserveServerIds)
+{
+    m_otbLoaded = false;
     try {
         FileStreamPtr fin = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
 
@@ -485,12 +496,12 @@ void ThingTypeManager::loadOtb(const std::string& file)
 
         BinaryTreeVec children = root->getChildren();
         m_reverseItemTypes.clear();
-        m_itemTypes.resize(children.size() + 1, m_nullItemType);
-        m_reverseItemTypes.resize(children.size() + 1, m_nullItemType);
+        m_itemTypes.assign(children.size() + 1, m_nullItemType);
+        m_reverseItemTypes.assign(children.size() + 1, m_nullItemType);
 
         for (const BinaryTreePtr& node : children) {
             auto itemType = std::make_shared<ItemType>();
-            itemType->unserialize(node);
+            itemType->unserialize(node, preserveServerIds);
             addItemType(itemType);
 
             uint16 clientId = itemType->getClientId();

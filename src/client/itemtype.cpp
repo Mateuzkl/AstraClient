@@ -33,7 +33,7 @@ ItemType::ItemType()
     m_category = ItemCategoryInvalid;
 }
 
-void ItemType::unserialize(const BinaryTreePtr& node)
+void ItemType::unserialize(const BinaryTreePtr& node, bool preserveServerIds)
 {
     m_null = false;
 
@@ -51,7 +51,7 @@ void ItemType::unserialize(const BinaryTreePtr& node)
         switch(attr) {
             case ItemTypeAttrServerId: {
                 uint16 serverId = node->getU16();
-                if(g_game.getClientVersion() < 960) {
+                if(!preserveServerIds && g_game.getClientVersion() < 960) {
                     if(serverId > 20000 && serverId < 20100) {
                         serverId -= 20000;
                     } else if(lastId > 99 && lastId != serverId - 1) {
@@ -61,7 +61,7 @@ void ItemType::unserialize(const BinaryTreePtr& node)
                             g_things.addItemType(tmp);
                         }
                     }
-                } else {
+                } else if (!preserveServerIds) {
                     if(serverId > 30000 && serverId < 30100) {
                         serverId -= 30000;
                     } else if(lastId > 99 && lastId != serverId - 1) {
@@ -73,7 +73,7 @@ void ItemType::unserialize(const BinaryTreePtr& node)
                     }
                 }
                 setServerId(serverId);
-                lastId = serverId;
+                if (!preserveServerIds) lastId = serverId;
                 break;
             }
             case ItemTypeAttrClientId:

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AstraClient — Auditoria PR #204</title>
+  <style>
+    :root{color-scheme:dark;--bg:#10171d;--panel:#18232c;--line:#34434e;--text:#e5edf2;--muted:#afc0cc;--accent:#78dccb;--warn:#ffd48a}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 system-ui,sans-serif}
+    a{color:var(--accent);text-underline-offset:3px}a:focus-visible{outline:3px solid var(--warn);outline-offset:3px}code{font-size:.9em;overflow-wrap:anywhere}
+    .layout{display:grid;grid-template-columns:230px minmax(0,1000px);gap:38px;max-width:1320px;margin:auto;padding:36px 28px}
+    nav{position:sticky;top:24px;align-self:start;border:1px solid var(--line);border-radius:12px;padding:22px;background:var(--panel)}nav a{display:block;margin:8px 0}nav strong{display:block;margin-bottom:18px}
+    header{border-bottom:1px solid var(--line);padding-bottom:24px}h1{font-size:clamp(28px,4vw,42px);line-height:1.2;margin:12px 0}h2{font-size:25px;margin:0 0 18px}h3{font-size:19px}
+    .eyebrow{text-transform:uppercase;letter-spacing:.15em;color:var(--accent);font-size:12px;font-weight:700}.meta{color:var(--muted);font-size:14px}
+    section{margin-top:40px;scroll-margin-top:24px}.notice{border-left:4px solid var(--warn);background:var(--panel);padding:18px 22px;border-radius:0 8px 8px 0}.notice strong{color:var(--warn)}
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:24px 0}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}.card b{display:block;font-size:28px;color:var(--accent)}.card small{color:var(--muted)}
+    .table{overflow-x:auto;border:1px solid var(--line);border-radius:9px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;vertical-align:top;padding:13px 15px;border-bottom:1px solid var(--line)}th{background:var(--panel)}tr:last-child td{border-bottom:0}
+    .pass{color:var(--accent);font-weight:700}.pending{color:var(--warn);font-weight:700}details{border:1px solid var(--line);border-radius:9px;padding:15px 18px;margin-top:14px}summary{cursor:pointer;font-weight:650}
+    footer{margin-top:44px;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:14px}ul,ol{padding-left:24px}li{margin:8px 0}
+    @media(max-width:850px){.layout{grid-template-columns:1fr;padding:22px 16px;gap:24px}nav{position:static}nav a{display:inline-block;margin-right:16px}.cards{grid-template-columns:1fr}th,td{padding:10px}h1{font-size:30px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+    @media print{nav{display:none}.layout{display:block}body{background:white;color:black}a{color:#155b52}.notice,.card,th{background:#eee}section{break-inside:avoid}.pending{color:#755000}}
+  </style>
+</head>
+<body>
+<div class="layout">
+  <nav aria-label="Seções da auditoria">
+    <strong>AstraClient / PR #204</strong>
+    <a href="#resumo">Resumo</a><a href="#achados">Achados</a><a href="#hipoteses">H1–H9</a>
+    <a href="#ownership">Ownership</a><a href="#testes">Testes</a><a href="#benchmark">Benchmark</a>
+    <a href="#checklist">Pré-merge</a><a href="#artefatos">Relatórios e evidências</a>
+  </nav>
+  <main>
+    <header>
+      <div class="eyebrow">Auditoria técnica · 10 outubro 2026</div>
+      <h1>Minimapa HD: correções e evidências</h1>
+      <p>Execução local e rastreamento da cadeia C++ / Lua / Python / PowerShell do <a href="https://github.com/Mateuzkl/AstraClient/pull/204">PR #204</a>.</p>
+      <p class="meta">Baseline: <code>1d40ea3f5fc7519a995f0bde68913187507fabc2</code><br>
+      Branch mantida: <code>feat/optional-sprite-hd-minimap</code>. Correções estão no commit que adiciona este relatório. Sem branch adicional, alteração da main ou merge.</p>
+    </header>
+    <section id="resumo">
+      <h2>Resultado executivo</h2>
+      <div class="cards"><div class="card"><b>6</b>achados corrigidos<small><br>1 P1 + 5 P2, provas estáticas</small></div><div class="card"><b>8 / 8</b>suites nativas passaram<small><br>4 modos em cada backend</small></div><div class="card"><b>2 / 2</b>builds Windows passaram<small><br>Zero warnings / errors</small></div></div>
+      <div class="notice"><strong>Não é certificação de “zero lag” ou “zero vazamento”.</strong> FPS, frametime, RAM/VRAM A/B, sanitizers e validação visual completa não foram executados. O DoD integral de performance permanece pendente.</div>
+      <p>As suites usam engine real, assets 8.60, janela oculta e perfil isolado, sem login. Os novos testes não foram executados em um binário recompilado do baseline: o diagnóstico antes/depois combina prova estática com execução corrigida.</p>
+    </section>
+    <section id="achados">
+      <h2>Achados por severidade</h2>
+      <div class="table"><table><thead><tr><th>ID</th><th>Prioridade</th><th>Causa e correção</th><th>Evidência</th></tr></thead><tbody>
+        <tr><td>HD-001</td><td>P1</td><td>Jobs esquecidos ao limpar LRU. Vetor independente e cancelamento preservam slots até conclusão.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/client/minimap.cpp#L294">Código</a>; 100 ciclos, limite ≤4 e recuperação.</td></tr>
+        <tr><td>HD-002</td><td>P2</td><td>Posições vazias consultadas repetidamente. Sentinelas no mesmo LRU, invalidadas ao receber itens.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/client/minimap.cpp#L614">Código</a>; 1008 consultas iniciais, 0 adicionais em 100 preparações.</td></tr>
+        <tr><td>HD-003</td><td>P2</td><td>View destruída ainda inscrita enquanto Lua retém objeto. Hook nativo no destroy e bloqueio de reativação.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/client/uiminimap.cpp#L47">Código</a>; 100 destroys com referências retidas.</td></tr>
+        <tr><td>HD-004</td><td>P2</td><td>Read/ENC3/APNG alocavam antes da rejeição. Limites prévios, RAII e validação estática de chunks.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/framework/core/resourcemanager.cpp#L504">Código</a>; fixtures oversized, APNG, truncado e bomb.</td></tr>
+        <tr><td>HD-005</td><td>P2</td><td>OTMM corrupto reportava sucesso, preexistente. Falha Zlib agora retorna false; sem promessa de rollback.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/client/minimap.cpp#L1037">Código</a>; primeiro bloco inválido rejeitado.</td></tr>
+        <tr><td>HD-006</td><td>P2</td><td>Seed ENC3 compartilhado sem sincronização. Atomic/CAS mantém primeiro seed e valida conflito.</td><td><a href="https://github.com/Mateuzkl/AstraClient/blob/feat/optional-sprite-hd-minimap/src/framework/core/resourcemanager.cpp#L1657">Código</a>; ENC3 válido/custom/conflitante. Sem TSan.</td></tr>
+      </tbody></table></div>
+      <p><a href="FINDINGS_PR204.md">Causas-raiz, percursos, reproduções e riscos completos</a>. Nenhum P0 identificado; nenhum P1 confirmado deixado sem fix neste escopo.</p>
+    </section>
+    <section id="hipoteses">
+      <h2>Triagem H1–H9</h2>
+      <div class="table"><table><thead><tr><th>Hipótese</th><th>Conclusão</th></tr></thead><tbody>
+        <tr><td>H1 / H2</td><td>CONFIRMADOS e corrigidos em HD-001/002. Custo em ms não medido.</td></tr>
+        <tr><td>H3</td><td>FALSO POSITIVO parcial: construtor Texture não faz GL upload. Latência no primeiro upload permanece HIPÓTESE.</td></tr>
+        <tr><td>H4</td><td>Cópias de FrameTile e sobreposição de passes existem; impacto requer profiling. Não reescrito por suposição.</td></tr>
+        <tr><td>H5</td><td>Limitação CONFIRMADA: assinaturas DAT/SPR não identificam mundo. Pacote correto é responsabilidade do operador; seleção automática ausente.</td></tr>
+        <tr><td>H6</td><td>Worker só possui path/token; join precede teardown. Seed corrigido; segurança global/contenção não certificadas.</td></tr>
+        <tr><td>H7</td><td>CONFIRMADO e corrigido em HD-003. Hot reload e 100 logins reais não executados.</td></tr>
+        <tr><td>H8</td><td>Elevação top/common JÁ CORRIGIDA no baseline, pixel regression passa. Outros assets/paridade visual pendentes.</td></tr>
+        <tr><td>H9</td><td>Index-last, count total, OTMM obrigatório e timeout JÁ CORRIGIDOS. Novos negativos passam; OTMM não transacional.</td></tr>
+      </tbody></table></div>
+    </section>
+    <section id="ownership">
+      <h2>Ownership e ciclo de vida</h2>
+      <ul>
+        <li>Cache live possui clones de Item via shared_ptr; não retém Tile/Creature. Frames podem prolongar referências além do cache.</li>
+        <li>Decodes têm future/token em vetor independente; dispatcher mantém promise/closure. Cancelamento é cooperativo, não interrompe PNG em andamento.</li>
+        <li>Worker produz Image, não objetos Map/Minimap/UI/GL. Resultado cancelado não entra em pack substituído.</li>
+        <li>Limites: 8192 entradas live, 32768 itens, 64 itens/tile; 32 entradas de textura e quatro slots de decode do minimapa. Não são teto da RAM/VRAM global.</li>
+        <li>Destroy nativo libera subscription sem esperar Lua GC. Última view limpa cache; sprite lock é liberado antes do satellite lock.</li>
+        <li>Shutdown junta worker antes de client/resources; texturas liberam GPU via graphics dispatcher enquanto contexto permanece disponível.</li>
+      </ul>
+      <p>Outros estados ResourceManager, alterações concorrentes de mounts/layout, bibliotecas e fila global não receberam certificação por sanitizers.</p>
+    </section>
+    <section id="testes">
+      <h2>Matriz executada</h2>
+      <div class="table"><table><thead><tr><th>Verificação</th><th>OpenGL x64</th><th>DirectX x64</th></tr></thead><tbody>
+        <tr><td>Build final</td><td class="pass">PASS · 0 warnings/errors</td><td class="pass">PASS · 0 warnings/errors</td></tr>
+        <tr><td>Native / Satellite / Export / Audit</td><td class="pass">4 PASS</td><td class="pass">4 PASS</td></tr>
+        <tr><td>Pixel composition Pillow</td><td class="pass">PASS</td><td class="pass">PASS</td></tr>
+      </tbody></table></div>
+      <p>Lua options/syntax, Python pyramid e diff-check: PASS. Engine usa Intel UHD; GL 4.6, DX ANGLE/D3D11. Não presumir NVIDIA. Windows 11 Pro / i5-10300H / ~15,87 GiB RAM.</p>
+      <details><summary>O que os testes negativos verificam</summary><p>Índice/signature inválidos preservam pack anterior. PNG estático e ENC3 normal/custom aceitos; oversized, APNG, truncado, ENC3 bomb, missing e seed conflitante rejeitados. OTMM com primeiro bloco Zlib inválido retorna false. Allowlist só permite erros específicos das fixtures; exit zero e marcador PASS são obrigatórios.</p></details>
+      <p><a href="TESTES_PR204.md">Comandos, hashes dos binários, diretórios e cobertura</a> · <a href="evidence/windows-2026-10-10.txt">Excertos de execução reais</a>.</p>
+      <p>CI baseline <code>1d40ea3</code>: <a href="https://github.com/Mateuzkl/AstraClient/actions/runs/38053686915">Wasm success</a>, <a href="https://github.com/Mateuzkl/AstraClient/actions/runs/38053686726">content success</a>, <a href="https://github.com/Mateuzkl/AstraClient/actions/runs/38053686761">vcpkg success</a>. Isso não é CI validado das novas correções.</p>
+    </section>
+    <section id="benchmark">
+      <h2>Performance A/B — sem resultados inventados</h2>
+      <div class="table"><table><thead><tr><th>Métrica</th><th>Clássico</th><th>Live HD</th><th>PNG HD / full map</th></tr></thead><tbody>
+        <tr><td>FPS / 1% / 0,1% low</td><td colspan="3" class="pending">NÃO MEDIDO</td></tr>
+        <tr><td>Frametime p50 / p95 / p99</td><td colspan="3" class="pending">NÃO MEDIDO</td></tr>
+        <tr><td>CPU por thread / RAM / VRAM</td><td colspan="3" class="pending">NÃO MEDIDO</td></tr>
+        <tr><td>Alocações / locks / upload</td><td colspan="3" class="pending">NÃO MEDIDO</td></tr>
+      </tbody></table></div>
+      <p>Próxima rodada: mesma rota/perfil/backend/GPU, clássico vs HD, cold vs warm pack, 1080p/1440p/4K renderizados, presents e traces reais por 10–30 minutos. <a href="BENCHMARK_PR204.md">Procedimento reproduzível e hardware</a>.</p>
+    </section>
+    <section id="checklist">
+      <h2>Decisão pré-merge</h2>
+      <p class="pass">PASS: correções específicas, cache/jobs/view invariants, clássico, opção, LOD/OTMM/export sintético, negativos e builds Windows.</p>
+      <p class="pending">NÃO VALIDADO: FPS A/B, sanitizers/leak/UAF globais, paridade visual completa, identidade automática de mundo, reconexões/hot reloads reais e Linux/Wasm local das novas mudanças.</p>
+      <div class="notice">Alterações prontas para <strong>revisão humana</strong>, não uma aprovação automática de merge. Não alegar zero lag/vazamento. Não houve merge na main.</div>
+    </section>
+    <section id="artefatos">
+      <h2>Artefatos e instruções</h2>
+      <ul><li><a href="AUDITORIA_PR204_FULL.md">Relatório completo Markdown e inventário</a></li><li><a href="FINDINGS_PR204.md">Achados detalhados</a></li><li><a href="BENCHMARK_PR204.md">Benchmark: limites e método</a></li><li><a href="TESTES_PR204.md">Testes e evidências</a></li><li><a href="../../hd-minimap.pt-BR.md">Tutorial de geração/instalação</a></li></ul>
+    </section>
+    <footer>Pacote específico do mundo: 4702 PNGs locais, ignorados no Git. Sem mudanças em servidor/protocolo. HTML sem scripts, fontes externas ou coleta de dados.</footer>
+  </main>
+</div>
+</body>
+</html>

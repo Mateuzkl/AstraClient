@@ -1047,6 +1047,20 @@ return {
         end,
 	},
 
+	minimapHD = {
+        value = false,
+        apply = function(value)
+            if value and (not UIMinimap or not UIMinimap.setSpriteMode) then
+                return false -- Requires the matching native executable.
+            end
+            local minimap = modules.game_minimap
+            if minimap and minimap.setMinimapHD then
+                return minimap.setMinimapHD(value)
+            end
+            return true -- The minimap reads the saved preference on init/login.
+        end,
+    },
+
 	showSpells = {
 		value = true,
         apply = function(value)

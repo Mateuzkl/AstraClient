@@ -360,6 +360,7 @@ public:
         mapPosition = m_queue.size();
     }
     void correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bool center);
+    void scaleTexturedRects(size_t start, const Point& origin, float scale);
 
     void setShader(const std::string& shader)
     {
