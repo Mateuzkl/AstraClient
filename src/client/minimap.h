@@ -27,6 +27,7 @@
 #include "declarations.h"
 #include <framework/graphics/declarations.h>
 #include <atomic>
+#include <algorithm>
 #include <list>
 #include <future>
 #include <set>
@@ -111,6 +112,8 @@ public:
     uint64_t getSpriteTileLookupCount();
     unsigned getSpriteViewCount();
     void prepareSpriteView(const Size& viewSize, const Position& mapCenter, float scale);
+    int auditSatelliteFrame(const Size& viewSize, const Position& mapCenter, float scale, const std::string& screenshot);
+    void setSatelliteTestDecodeDelay(unsigned milliseconds) { m_satelliteTestDecodeDelay = std::min(milliseconds, 500u); }
     Point getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
     Position getTilePosition(const Point& point, const Rect& screenRect, const Position& mapCenter, float scale);
     Rect getTileRect(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
@@ -143,15 +146,20 @@ private:
     int satelliteLevel(float scale); // Requires m_satelliteLock.
     int satelliteViewLevel(const Rect& mapRect, float scale); // Requires m_satelliteLock.
     static constexpr size_t SatelliteTextureLimit = 32;
+    static constexpr size_t SatelliteViewLimit = 24; // Leave room for an overview and nearby chunks.
     static constexpr size_t SatelliteDecodeLimit = 4;
     size_t finishSatelliteDecodes(); // Requires m_satelliteLock; returns active jobs.
     void cancelSatelliteDecodes(); // Requires m_satelliteLock; never drops pending jobs.
-    TexturePtr satelliteTexture(uint64_t key); // Requires m_satelliteLock.
+    TexturePtr satelliteTexture(uint64_t key, const std::set<uint64_t>* protectedKeys = nullptr); // Requires m_satelliteLock.
+    std::vector<uint64_t> satelliteViewKeys(const Rect& mapRect, int level, int floor);
+    bool satelliteViewReady(const std::vector<uint64_t>& keys);
     void drawSatellite(const Rect& screenRect, const Position& mapCenter, float scale);
     void clearSatelliteTextures();
     std::unordered_map<uint64_t, SatelliteChunk> m_satelliteChunks;
     std::unordered_map<uint64_t, SatelliteTexture> m_satelliteTextures;
     std::vector<SatelliteDecode> m_satelliteDecodes; // Independent of texture LRU and pack lifetime; at most four.
+    unsigned m_satelliteTestDecodeDelay = 0; // Only bound in --test; captured by value, never read by worker.
+    int m_satelliteRenderedLevel = 0;
     std::list<uint64_t> m_satelliteOrder;
     std::set<int> m_satelliteLevels;
     uint32 m_satelliteDatSignature = 0;

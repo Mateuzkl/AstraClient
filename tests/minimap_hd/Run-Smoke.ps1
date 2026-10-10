@@ -3,16 +3,17 @@ param(
   [switch]$Satellite,
   [switch]$Export,
   [switch]$Audit,
+  [switch]$Glitches,
   [switch]$Visual
 )
 $ErrorActionPreference = 'Stop'
-if ((@($Satellite, $Export, $Audit) | Where-Object { $_ }).Count -gt 1) { throw 'Choose one test mode' }
+if ((@($Satellite, $Export, $Audit, $Glitches) | Where-Object { $_ }).Count -gt 1) { throw 'Choose one test mode' }
 $repoPath = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $binary = (Resolve-Path -LiteralPath $BinaryPath).Path
 $testDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('astra-hd-minimap-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testDirectory | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bootstrap.lua') -Destination (Join-Path $testDirectory 'init.lua')
-$testFile = if ($Audit) { 'audit_test.lua' } elseif ($Export) { 'export_test.lua' } elseif ($Satellite) { 'satellite_test.lua' } else { 'native_test.lua' }
+$testFile = if ($Glitches) { 'glitch_test.lua' } elseif ($Audit) { 'audit_test.lua' } elseif ($Export) { 'export_test.lua' } elseif ($Satellite) { 'satellite_test.lua' } else { 'native_test.lua' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot $testFile) -Destination (Join-Path $testDirectory 'test.lua')
 Copy-Item -LiteralPath (Join-Path $repoPath 'init.lua') -Destination (Join-Path $testDirectory 'production-init.lua')
 foreach ($resourceName in @('data', 'modules', 'mods', 'layouts')) {
@@ -25,6 +26,10 @@ if ($Satellite) {
 if ($Audit) {
   & python (Join-Path $PSScriptRoot 'negative_fixture.py') (Join-Path $repoPath 'data/minimap_hd/source.json') $testDirectory
   if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare negative fixtures' }
+}
+if ($Glitches) {
+  & python -B (Join-Path $PSScriptRoot 'glitch_fixture.py') (Join-Path $repoPath 'data/minimap_hd/source.json') $testDirectory
+  if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare glitch fixtures' }
 }
 $stdout = Join-Path $testDirectory 'stdout.log'
 $stderr = Join-Path $testDirectory 'stderr.log'
@@ -55,4 +60,9 @@ if ($Export) {
   if ($result -notmatch '\[HD MINIMAP TEST\] EXPORT FIXTURE: ([^\r\n]+)') { throw 'Export fixture path missing' }
   & python (Join-Path $PSScriptRoot 'export_pixels_test.py') $Matches[1].Trim()
   if ($LASTEXITCODE -ne 0) { throw "Export pixel comparison failed; logs kept at $testDirectory" }
+}
+if ($Glitches) {
+  if ($result -notmatch '\[HD MINIMAP TEST\] GLITCH FIXTURE: ([^\r\n]+)') { throw 'Glitch fixture path missing' }
+  & python -B (Join-Path $PSScriptRoot 'glitch_pixels_test.py') $Matches[1].Trim()
+  if ($LASTEXITCODE -ne 0) { throw "GPU transition pixel comparison failed; logs kept at $testDirectory" }
 }

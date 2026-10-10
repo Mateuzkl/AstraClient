@@ -24,6 +24,21 @@ grandes escolhem imagens de zoom mais distante para caber nesse limite; se nenhu
 nível couber, usam o mapa clássico. Arrastar para outra região não deixa as
 decodificações já concluídas bloqueando o carregamento de novas imagens.
 
+Ao mudar o zoom ou abrir o mapa completo, o cliente mantém um nível HD já
+completo até que todos os chunks necessários do novo nível estejam prontos.
+A visão geral da região e as imagens da transição ficam protegidas no cache,
+evitando retângulos coloridos temporários do mapa clássico. O nível desejado
+reserva até 24 posições do cache; a visão geral e a transição continuam dentro
+do limite total de 32. Depois de atender a área visível, podem ser antecipados
+até quatro chunks vizinhos, sem carregar o mapa inteiro na RAM.
+
+Ao abrir um cache vazio, o clássico pode aparecer inicialmente enquanto a
+visão geral carrega. Regiões sem PNG ou com transparência continuam usando o
+OTMM como fundo. Esses limites não são uma promessa de FPS ou memória total.
+O teste `Run-Smoke.ps1 -Glitches` compara pixels reais em OpenGL e DirectX,
+inclusive com carregamento lento e zoom fracionário. Detalhes e evidências:
+[correção visual do PR #204](audits/pr204/VISUAL_GLITCHES_PR204.md).
+
 ## 1. Separe os arquivos corretos
 
 Você precisa de:

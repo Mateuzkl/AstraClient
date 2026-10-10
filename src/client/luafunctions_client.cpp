@@ -55,6 +55,7 @@
 #include "uigrid.h"
 
 #include <framework/luaengine/luainterface.h>
+#include <framework/core/application.h>
 
 void Client::registerLuaFunctions()
 {
@@ -238,8 +239,11 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteDecodeCount", &Minimap::getSatelliteDecodeCount, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSpriteTileLookupCount", &Minimap::getSpriteTileLookupCount, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "getSpriteViewCount", &Minimap::getSpriteViewCount, &g_minimap);
-    if (g_app.getStartupOptions().find("--test") != std::string::npos)
+    if (g_app.getStartupOptions().find("--test") != std::string::npos) {
         g_lua.bindSingletonFunction("g_minimap", "auditPrepareSpriteView", &Minimap::prepareSpriteView, &g_minimap);
+        g_lua.bindSingletonFunction("g_minimap", "auditSatelliteFrame", &Minimap::auditSatelliteFrame, &g_minimap);
+        g_lua.bindSingletonFunction("g_minimap", "setSatelliteTestDecodeDelay", &Minimap::setSatelliteTestDecodeDelay, &g_minimap);
+    }
     g_lua.bindSingletonFunction("g_minimap", "getSatelliteViewLevel", &Minimap::getSatelliteViewLevel, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "exportSatelliteBase", &Minimap::exportSatelliteBase, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "loadImage", &Minimap::loadImage, &g_minimap);

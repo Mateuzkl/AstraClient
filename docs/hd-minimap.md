@@ -39,13 +39,23 @@ enable upscaling, change the interface layout, or require server/protocol change
 
 The persistent pack in `data/minimap_hd` is rendered from the selected server's
 OTBM/items.otb with this client's DAT/SPR. Reopening the client loads the same
-coverage, including areas never received from the server. Only visible PNGs are
-requested: four asynchronous decode jobs and 32 cached textures maximum. Eleven
+coverage, including areas never received from the server. Visible PNGs have
+priority: four asynchronous decode jobs and 32 cached textures maximum. Eleven
 LOD levels (1–1024) keep distant/full-map views bounded; the index does not eagerly
-decode images. Wide views select a coarser level to fit the same 32-texture
-budget; if no level fits, they use classic colors. Completed off-screen decode
+decode images. Wide views reserve at most 24 slots for the desired LOD, leaving
+headroom for a covering overview and transitions within the 32-texture budget;
+if no level fits, they use classic colors. Completed off-screen decode
 jobs release their slots even after panning away. HD off releases images/live
 snapshots, retaining the small index.
+During zoom or full-map changes, the finest complete cached LOD covering the
+visible indexed region remains displayed until every required target chunk is
+ready. The covering overview and transition chunks are protected from LRU
+eviction. This prevents partial new imagery from exposing colored OTMM
+rectangles. A cold cache may initially show the classic map until the visible
+overview is ready. Unindexed areas and transparent PNG pixels still use OTMM.
+Only after visible demand is satisfied are up to four nearby chunks prefetched
+within a one-chunk halo; the same cache/job bounds apply. The entire map/floor
+is never loaded into RAM for prefetch.
 Runtime checks asset header signatures and static 512×512 PNGs with bounded
 encoded size. Missing/corrupt chunks fall back to OTMM; PNGs do not alter movement
 or pathfinding flags. Budgets are not a measured FPS guarantee.
@@ -183,10 +193,12 @@ From the repository root:
 ```powershell
 luajit tests/minimap_hd/options_test.lua
 python tests/minimap_hd/pyramid_test.py
+./tests/minimap_hd/Check-TranslationUnits.ps1
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Satellite
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Export
 ./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Audit
+./tests/minimap_hd/Run-Smoke.ps1 -BinaryPath ./build/hd-minimap/bin/otclient_gl_x64.exe -Glitches
 ```
 
 The standalone Lua test covers opt-in defaults, persistence, live toggling,
@@ -226,6 +238,17 @@ isolated malformed index/PNG/ENC3/OTMM fixtures. Valid plain/encrypted PNGs and
 custom-seed discovery remain supported; a conflicting seed is rejected. Only
 fixture-specific error messages are allowed by the runner. Normal `--test`
 remains fail-fast. These tests do not replace FPS profiling or sanitizers.
+
+`-Glitches` also requires Python/Pillow and local DAT/SPR. It creates an isolated
+opaque HD pack over deliberately contrasting OTMM, injects slow PNG decodes,
+and captures the production minimap draw queue in real offscreen framebuffers.
+Pixel comparisons cover partial-decode retention, coherent LOD promotion,
+fractional zoom/shared edges, full-map return, another floor and classic-only
+fallback. A 100-view pan sequence checks the cache/job caps under LRU pressure.
+Repeat with the DirectX binary to exercise ANGLE/D3D11; no login or visible
+window is needed. This is GPU pixel validation, not an FPS benchmark.
+See [the visual-glitch follow-up](audits/pr204/VISUAL_GLITCHES_PR204.md) for the
+video diagnosis, CI include fix and evidence.
 
 Decode admission is independent of the texture LRU: canceled jobs keep their
 slots until completion, including after cache eviction, HD-off and pack resets.
