@@ -5,6 +5,8 @@ local LogColors = { [LogDebug] = 'pink',
                     [LogError] = 'red' }
 local MaxLogLines = 128
 local MaxHistory = 1000
+local FlushInterval = 50 -- Batch display work, not game/bot callbacks.
+local DisplayColors = {pink = '#ff80ff', white = '#eeeeee', yellow = '#ffff66', red = '#ff4444'}
 
 local oldenv = getfenv(0)
 setfenv(0, _G)
@@ -27,6 +29,8 @@ local flushEvent
 local cachedLines = {}
 local disabled = false
 local allLines = {}
+local renderedLines = {}
+local renderLines
 local rebindHotkeyEvents = {}
 
 local function bindTerminalHotkey()
@@ -145,6 +149,10 @@ end
 
 -- public functions
 function init()
+  disabled = false
+  cachedLines = {}
+  allLines = {}
+  renderedLines = {}
   terminalWindow = g_ui.displayUI('terminal')
   terminalWindow:hide()
 
@@ -199,6 +207,9 @@ function terminate()
   g_settings.setList('terminal-history', commandHistory)
 
   removeEvent(flushEvent)
+  flushEvent = nil
+  cachedLines = {}
+  disabled = true
   for _, event in ipairs(rebindHotkeyEvents) do
     removeEvent(event)
   end
@@ -227,6 +238,10 @@ function terminate()
   end
   commandEnv = nil
   _G.terminalLines = allLines
+  commandTextEdit = nil
+  terminalBuffer = nil
+  terminalSelectText = nil
+  renderedLines = {}
 end
 
 function hideButton()
@@ -285,6 +300,7 @@ end
 function show()
   if not terminalWindow then return end
   terminalWindow:show()
+  renderLines()
   terminalWindow:raise()
   terminalWindow:focus()
   if terminalButton then
@@ -310,57 +326,72 @@ function bindHotkey()
   bindTerminalHotkey()
 end
 
-function flushLines()
-  local numLines = terminalBuffer:getChildCount() + #cachedLines
-  local fulltext = terminalSelectText:getText()
-
-  for _,line in pairs(cachedLines) do
-    -- delete old lines if needed
-    if numLines > MaxLogLines then
-      local firstChild = terminalBuffer:getChildByIndex(1)
-      if firstChild then
-        local len = #firstChild:getText()
-        firstChild:destroy()
-        table.remove(allLines, 1)
-        fulltext = string.sub(fulltext, len)
+renderLines = function()
+  if not terminalBuffer or terminalBuffer:isDestroyed() then return end
+  -- Logs are retained while hidden, but wrapping text and laying out invisible
+  -- rows is unnecessary. Render the bounded latest history once on show().
+  if terminalWindow and not terminalWindow:isVisible() then return end
+  if #allLines == #renderedLines and allLines[#allLines] == renderedLines[#renderedLines] then return end
+  local layout = terminalBuffer:getLayout()
+  if layout then layout:disableUpdates() end
+  local retained, labels, spare, ordered = {}, {}, {}, {}
+  for _, line in ipairs(allLines) do retained[line] = true end
+  for i, line in ipairs(renderedLines) do
+    local label = terminalBuffer:getChildByIndex(i)
+    if retained[line] then labels[line] = label else spare[#spare + 1] = label end
+  end
+  local spareIndex, reordered = 1, false
+  for i, line in ipairs(allLines) do
+    local label = labels[line]
+    if not label then
+      label = spare[spareIndex]
+      spareIndex = spareIndex + 1
+      if not label then
+        label = g_ui.createWidget('TerminalLabel', terminalBuffer)
+        label:setId('terminalLabel' .. i)
       end
+      label:setText(line.text)
+      local color = DisplayColors[line.color] or line.color
+      label:setColor(color)
     end
-
-    local label = g_ui.createWidget('TerminalLabel', terminalBuffer)
-    label:setId('terminalLabel' .. numLines)
-    label:setText(line.text)
-
-  if line.color == 'pink' then
-    label:setColor('#ff80ff')
-  elseif line.color == 'white' then
-    label:setColor('#eeeeee')
-  elseif line.color == 'yellow' then
-    label:setColor('#ffff66')
-  elseif line.color == 'red' then
-    label:setColor('#ff4444')
-  else
-    label:setColor(line.color) -- fallback
+    ordered[i] = label
+    if label ~= terminalBuffer:getChildByIndex(i) then reordered = true end
   end
+  -- Rotate recycled rows in one native call, rather than restyling all sibling
+  -- index states once for every new log in a batch.
+  if reordered then terminalBuffer:reorderChildren(ordered) end
+  renderedLines = {}
+  -- Derive the copy buffer from the bounded log, avoiding accumulating stale
+  -- characters/newlines when old rows are evicted.
+  local texts = {}
+  for i, line in ipairs(allLines) do texts[i] = line.text; renderedLines[i] = line end
+  terminalSelectText:setText(#texts > 0 and ('\n' .. table.concat(texts, '\n')) or '')
+  if layout then layout:enableUpdates(); layout:update() end
+end
 
-    table.insert(allLines, {text=line.text,color=line.color})
-
-    fulltext = fulltext .. '\n' .. line.text
-  end
-
-  terminalSelectText:setText(fulltext)
-
+function flushLines()
+  if not terminalBuffer or terminalBuffer:isDestroyed() then return end
+  local batch = cachedLines
   cachedLines = {}
   removeEvent(flushEvent)
   flushEvent = nil
+  if #batch == 0 then return end
+  local retained = {}
+  for i = math.max(1, #allLines + #batch - MaxLogLines + 1), #allLines do retained[#retained + 1] = allLines[i] end
+  for _, line in ipairs(batch) do retained[#retained + 1] = line end
+  allLines = retained
+  renderLines()
 end
 
 function addLine(text, color)
+  if disabled then return end
   if not flushEvent then
-    flushEvent = scheduleEvent(flushLines, 10)
+    flushEvent = scheduleEvent(flushLines, FlushInterval)
   end
 
   text = string.gsub(text, '\t', '    ')
   table.insert(cachedLines, {text=text, color=color})
+  if #cachedLines > MaxLogLines then table.remove(cachedLines, 1) end
 end
 
 function terminalPrint(value)
@@ -437,8 +468,11 @@ function executeCommand(command)
 end
 
 function clear()
+  removeEvent(flushEvent)
+  flushEvent = nil
   terminalBuffer:destroyChildren()
   terminalSelectText:setText('')
   cachedLines = {}
   allLines = {}
+  renderedLines = {}
 end
