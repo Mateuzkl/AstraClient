@@ -72,7 +72,8 @@ enum ItemAttr : uint8
 };
 
 // @bindclass
-#pragma pack(push,1) // disable memory alignment
+// Item is a runtime object, not a wire record. Its STL members must retain
+// their natural alignment; byte packing causes UB when constructing them.
 class Item : public Thing
 {
 public:
@@ -252,6 +253,6 @@ private:
     stdext::packed_storage<uint16> m_customAttribs;
 };
 
-#pragma pack(pop)
+static_assert(alignof(Item) >= alignof(ItemVector));
 
 #endif

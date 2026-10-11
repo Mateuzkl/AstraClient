@@ -112,7 +112,7 @@ bool AnimatedText::merge(const AnimatedTextPtr& other)
     if(other->getCachedText().getFont() != m_cachedText.getFont())
         return false;
 
-    if(m_animationTimer.ticksElapsed() > Otc::ANIMATED_TEXT_DURATION / 2.5)
+    if(m_animationTimer.ticksElapsed() > static_cast<double>(Otc::ANIMATED_TEXT_DURATION) / 2.5)
         return false;
 
     try {

@@ -187,7 +187,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -195,7 +195,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>true</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4834</DisableSpecificWarnings>
@@ -229,7 +229,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -237,7 +237,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>true</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4834</DisableSpecificWarnings>
@@ -270,7 +270,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -278,7 +278,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>true</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4326</DisableSpecificWarnings>
@@ -317,7 +317,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>false</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -325,7 +325,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4326</DisableSpecificWarnings>
@@ -363,7 +363,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>true</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -371,7 +371,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4326</DisableSpecificWarnings>
@@ -419,7 +419,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <ConformanceMode>true</ConformanceMode>
       <RemoveUnreferencedCodeData>true</RemoveUnreferencedCodeData>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <EnableModules>false</EnableModules>
       <StringPooling>true</StringPooling>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -427,7 +427,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <OmitFramePointers>false</OmitFramePointers>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <DisableSpecificWarnings>4326</DisableSpecificWarnings>

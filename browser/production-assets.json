@@ -5012,6 +5012,7 @@
     "modules/game_walking/walking.lua",
     "modules/game_walking/walking.otmod",
     "modules/gamelib/const.lua",
+    "modules/gamelib/core/mapmarkers.lua",
     "modules/gamelib/core/markers.lua",
     "modules/gamelib/core/monster.lua",
     "modules/gamelib/core/party.lua",

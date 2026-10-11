@@ -30,8 +30,8 @@
 
 namespace stdext {
 
-// disable memory alignment
-#pragma pack(push,1)
+// Runtime values (including polymorphic holders and STL objects) require
+// natural alignment. This is not a serialized binary record.
 
 template<typename T>
 struct can_pack_in_any : std::integral_constant<bool,
@@ -108,9 +108,6 @@ packed_any_cast(const packed_any& operand) {
 }
 
 template<typename T> T packed_any::cast() const { return packed_any_cast<T>(*this); }
-
-// restore memory alignment
-#pragma pack(pop)
 
 }
 

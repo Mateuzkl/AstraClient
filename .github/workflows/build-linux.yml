@@ -1,0 +1,68 @@
+name: Build Linux C++23
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'feat/**', 'fix/**']
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tools/check_cpp23.py', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+  pull_request:
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tools/check_cpp23.py', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+
+permissions:
+  contents: read
+concurrency:
+  group: linux-cpp23-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      matrix:
+        include:
+          - {type: Release, cc: gcc, cxx: g++, sanitizer: ''}
+          - {type: Debug, cc: clang, cxx: clang++, sanitizer: '-fsanitize=address,undefined -fno-omit-frame-pointer'}
+    env:
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-cache,readwrite
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkg-config autoconf automake libtool libx11-dev libxext-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev
+          mkdir -p vcpkg-cache build/diagnostics
+          echo "commit=$(tr -d '\r\n' < cmake/ci/vcpkg-tool.sha)" >> "$GITHUB_ENV"
+          ${{ matrix.cxx }} --version | tee build/diagnostics/compiler.txt
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: vcpkg-cache
+          key: linux-vcpkg-cpp23-${{ matrix.cxx }}-${{ hashFiles('vcpkg.json', 'cmake/ci/vcpkg-tool.sha') }}
+          restore-keys: linux-vcpkg-cpp23-${{ matrix.cxx }}-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.commit }}
+          path: vcpkg
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Configure and build actual desktop client
+        run: |
+          set -euo pipefail
+          vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_CXX_FLAGS="${{ matrix.sanitizer }}" -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-linux -DFRAMEWORK_SOUND=ON 2>&1 | tee build/diagnostics/configure.log
+          cmake --build build --parallel 2 2>&1 | tee build/diagnostics/build.log
+          python3 tools/check_cpp23.py --compile-commands build/compile_commands.json
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 ASAN_OPTIONS=detect_leaks=1 ctest --test-dir build --output-on-failure
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: linux-cpp23-${{ matrix.type }}-${{ github.sha }}
+          path: |
+            build/diagnostics/
+            build/compile_commands.json
+            build/CMakeFiles/CMakeConfigureLog.yaml
+            build/Testing/Temporary/
+          retention-days: 7

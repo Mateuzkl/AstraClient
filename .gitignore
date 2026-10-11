@@ -141,3 +141,6 @@ _ReSharper*/
 
 # JetBrain tools
 /.idea
+
+# Python build/test tools
+__pycache__/

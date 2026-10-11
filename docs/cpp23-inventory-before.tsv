@@ -1,0 +1,50 @@
+category	file:line	configuration
+test	.github/workflows/build-vcpkg.yml:144	cl /nologo /O2 /MT /Gy /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\utilities.exe /Fo:build\network-test\ .github\tests\standalone_util.cpp src\framework\stdext\string.cpp /link /OPT:REF ws2_32.lib
+test	.github/workflows/build-vcpkg.yml:148	cl /nologo /O2 /MT /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\network.exe /Fo:build\network-test\ .github\tests\native_network.cpp src\framework\http\session.cpp src\framework\http\websocket.cpp /link /LIBPATH:build\vcpkg_installed\x64-windows-static\lib libcurl.lib zlib.lib libssl.lib libcrypto.lib ws2_32.lib crypt32.lib bcrypt.lib user32.lib advapi32.lib secur32.lib iphlpapi.lib
+test	.github/workflows/build-vcpkg.yml:163	cl /nologo /O2 /MT /utf-8 /std:c++17 /EHsc /DNDEBUG /DWIN32 /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\native-splash-test\native-splash-test.exe /Fo:build\native-splash-test\ .github\tests\native_splash.cpp src\framework\platform\nativesplash.cpp src\framework\graphics\apngloader.cpp /link gdiplus.lib user32.lib gdi32.lib build\vcpkg_installed\x64-windows-static\lib\zlib.lib
+test	.github/workflows/build-wasm.yml:145	em++ -std=c++17 -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:156	em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp \
+test	.github/workflows/build-wasm.yml:160	em++ -std=c++17 -DNDEBUG -I src browser/tests/uuid.cpp \
+test	.github/workflows/build-wasm.yml:164	em++ -std=c++17 -DNDEBUG -I src browser/tests/credentials.cpp \
+test	.github/workflows/build-wasm.yml:174	em++ -std=c++17 -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+test	.github/workflows/build-wasm.yml:184	em++ -std=c++17 -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:195	em++ -std=c++17 -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:206	g++ -std=c++17 -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
+test	.github/workflows/build-wasm.yml:212	gcc -std=gnu99 -DNDEBUG -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+test	.github/workflows/build-wasm.yml:222	em++ -std=c++17 -DNDEBUG -I src browser/tests/cursor_images.cpp \
+test	.github/workflows/content-validation.yml:150	c++ -std=c++17 -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:157	c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:167	c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:184	c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:187	c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic -pthread \
+test	.github/workflows/content-validation.yml:199	c++ -std=c++17 -Wall -Wextra -pedantic \
+build	CMakeLists.txt:10	set(CMAKE_CXX_STANDARD 17)
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:51	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:56	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:61	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:66	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:71	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:76	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:82	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:88	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:161	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:162	<CppLanguageStandard>c++1z</CppLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:181	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:182	<CppLanguageStandard>c++1z</CppLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:203	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:204	<CppLanguageStandard>c++1z</CppLanguageStandard>
+test	browser/tests/run-security.sh:7	em++ -std=c++17 -DNDEBUG -I src "browser/tests/${test}.cpp" \
+test	browser/tests/run-security.sh:11	em++ -std=c++17 -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
+test	browser/tests/run-security.sh:15	em++ -std=c++17 -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
+test	browser/tests/run-security.sh:19	em++ -std=c++17 -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
+test	browser/tests/run-security.sh:24	em++ -std=c++17 -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+test	browser/tests/run-security.sh:28	g++ -std=c++17 -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
+test	browser/tests/run-security.sh:33	gcc -std=gnu99 -DNDEBUG -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+build	src/framework/CMakeLists.txt:180	set (CMAKE_CXX_STANDARD 17)
+test	tests/minimap_hd/Check-TranslationUnits.ps1:20	$flags = @('/nologo', '/Zs', '/std:c++17', '/EHsc', '/DNDEBUG', '/DWIN32',
+build	vc23/otclient.vcxproj:190	<LanguageStandard>stdcpp17</LanguageStandard>
+build	vc23/otclient.vcxproj:232	<LanguageStandard>stdcpp17</LanguageStandard>
+build	vc23/otclient.vcxproj:273	<LanguageStandard>stdcpp17</LanguageStandard>
+build	vc23/otclient.vcxproj:320	<LanguageStandard>stdcpp17</LanguageStandard>
+build	vc23/otclient.vcxproj:366	<LanguageStandard>stdcpp17</LanguageStandard>
+build	vc23/otclient.vcxproj:422	<LanguageStandard>stdcpp17</LanguageStandard>

@@ -5,7 +5,9 @@ param(
   [switch]$Audit,
   [switch]$Glitches,
   [switch]$Cyclopedia,
-  [switch]$Visual
+  [switch]$Visual,
+  [string]$MetricsPath = '',
+  [ValidateRange(10, 300)][int]$TimeoutSeconds = 60
 )
 $ErrorActionPreference = 'Stop'
 if ((@($Satellite, $Export, $Audit, $Glitches, $Cyclopedia) | Where-Object { $_ }).Count -gt 1) { throw 'Choose one test mode' }
@@ -43,11 +45,27 @@ if ($Audit) { $testArguments += '--test-expected-errors' }
 if ($Visual) { $testArguments += '--hd-minimap-visual' }
 $windowStyle = if ($Visual) { 'Normal' } else { 'Hidden' }
 $process = Start-Process -FilePath $binary -ArgumentList $testArguments -WorkingDirectory $testDirectory -WindowStyle $windowStyle -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-if (-not $process.WaitForExit(60000)) {
+$elapsed = [Diagnostics.Stopwatch]::StartNew()
+$privatePeak = 0L
+$workingPeak = 0L
+do {
+  if ($MetricsPath -and -not $process.HasExited) {
+    $process.Refresh()
+    $privatePeak = [math]::Max($privatePeak, $process.PrivateMemorySize64)
+    $workingPeak = [math]::Max($workingPeak, $process.PeakWorkingSet64)
+  }
+} while (-not $process.WaitForExit(50) -and $elapsed.Elapsed.TotalSeconds -lt $TimeoutSeconds)
+if (-not $process.HasExited) {
   Stop-Process -Id $process.Id
   throw "Smoke test timed out. Logs kept at $testDirectory"
 }
 $process.Refresh()
+if ($MetricsPath) {
+  @{ binary = $binary; sha256 = (Get-FileHash -LiteralPath $binary).Hash;
+     elapsedSeconds = $elapsed.Elapsed.TotalSeconds; peakPrivateBytesSampled = $privatePeak;
+     peakWorkingSetBytes = $workingPeak; artifacts = $testDirectory; exitCode = $process.ExitCode
+  } | ConvertTo-Json | Set-Content -LiteralPath $MetricsPath -Encoding utf8
+}
 $result = Get-Content -LiteralPath $stdout -Raw
 Write-Output $result
 Write-Output "Smoke-test artifacts: $testDirectory"

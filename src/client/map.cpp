@@ -162,7 +162,7 @@ void Map::addThing(const ThingPtr& thing, const Position& pos, int stackPos)
                 if(other->getPosition() != pos)
                     continue;
 
-                if(other->getTimer().ticksElapsed() >= Otc::ANIMATED_TEXT_DURATION * 0.7f)
+                if(other->getTimer().ticksElapsed() >= static_cast<float>(Otc::ANIMATED_TEXT_DURATION) * 0.7f)
                     continue;
 
                 if(!merged && !g_game.getFeature(Otc::GameDontMergeAnimatedText)) {

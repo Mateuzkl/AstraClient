@@ -59,6 +59,9 @@ set(ASTRA_LUA51_SOURCES
     ${lua51_source_SOURCE_DIR}/src/linit.c
 )
 add_library(astra-lua51 STATIC ${ASTRA_LUA51_SOURCES})
+# Lua's internal C macros are translation-unit scoped (for example getline).
+# Do not merge this vendor target when an application build enables unity.
+set_target_properties(astra-lua51 PROPERTIES UNITY_BUILD OFF)
 target_include_directories(astra-lua51 PUBLIC ${lua51_source_SOURCE_DIR}/src)
 target_include_directories(astra-lua51 PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lua51)
 target_compile_definitions(astra-lua51 PRIVATE LUA_ANSI)
