@@ -200,6 +200,26 @@ void traversal()
                 CHECK(actual == g_map.getSpectatorsInRangeEx(center, multi, ranges[0], ranges[1], ranges[2], ranges[3]));
             }
     }
+    // Multi-floor bounds belong to the map's aware range, even when the query
+    // center is above or below it. Unsigned margins would wrap negative gaps.
+    for (int floor : {0, 7, 8, 14, 15}) {
+        reset(floor);
+        std::vector<CreaturePtr> perFloor;
+        for (int z = 0; z <= 15; ++z) {
+            const auto c = creature(z + 1);
+            g_map.getOrCreateTile(Position(1000, 1000, z))->addThing(c, -1);
+            g_map.addCreature(c);
+            perFloor.push_back(c);
+        }
+        const std::vector<CreaturePtr> expected(perFloor.begin() + g_map.getFirstAwareFloor(),
+                                                perFloor.begin() + g_map.getLastAwareFloor() + 1);
+        for (int z = 0; z <= 15; ++z) {
+            const Position center(1000, 1000, z);
+            CHECK(g_map.getSpectatorsInRangeEx(center, true, 0,0,0,0) == expected);
+            CHECK(g_map.getSpectatorsInRangeEx(center, true, 0,0,0,0) == oldSpectators(center, true, 0,0,0,0));
+            CHECK(g_map.getSpectatorsInRangeEx(center, false, 0,0,0,0) == std::vector<CreaturePtr>({perFloor[z]}));
+        }
+    }
     reset();
     CHECK(g_map.getSpectatorsInRangeEx(Position(0,0,7), false, 1,1,1,1).empty());
     CHECK(g_map.getSpectatorsInRangeEx(Position(65535,65535,15), false, 1,1,1,1).empty());

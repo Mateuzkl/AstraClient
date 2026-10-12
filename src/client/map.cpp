@@ -652,8 +652,8 @@ std::vector<CreaturePtr> Map::getSpectatorsInRange(const Position& centerPos, bo
 
 std::vector<CreaturePtr> Map::getSpectatorsInRangeEx(const Position& centerPos, bool multiFloor, int minXRange, int maxXRange, int minYRange, int maxYRange)
 {
-    uint8_t minZRange = 0;
-    uint8_t maxZRange = 0;
+    int minZRange = 0;
+    int maxZRange = 0;
     std::vector<CreaturePtr> creatures;
     creatures.reserve(m_knownCreatures.size());
     std::unordered_set<uint32_t> seenIds;

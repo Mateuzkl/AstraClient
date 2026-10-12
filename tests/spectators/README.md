@@ -29,6 +29,9 @@ remain separate. All other tile mutation sites were checked.
    recalculation. Insertion shifts/extends the span before any stack trimming.
 4. Existing scanning `getCreatures()` and `hasCreature()` implementations stay
    untouched, preserving their forward order and existing Lua/caller behavior.
+5. Vertical margins retain Astra's signed `int` type. A query center outside
+   the map's aware floors can produce negative differences; upstream's
+   `uint8_t` margins wrap those differences and scan unintended floors.
 
 Deduplication by ID is intentional: distinct objects sharing an ID and a single
 object referenced by multiple tiles produce only the first traversal occurrence.
@@ -66,14 +69,15 @@ account, server connection, window or game assets are needed by the harness.
 
 ## Executed results and explicit pending work
 
-- Latest OpenGL native harness: **4 groups, 37,903 ordered/state checks passed**.
+- Latest OpenGL native harness: **4 groups, 38,143 ordered/state checks passed**.
 - DirectX harness before the final extra effect/853-order checks:
   **4 groups, 37,858 checks passed**. Its final rebuild was stopped on request;
   the final expanded DirectX suite is **pending**, not claimed as passed.
 - Ordinary OpenGL and DirectX client executables both compiled and linked.
   They were not opened, installed or used for live login testing.
 - Regression coverage: missing/empty tiles; asymmetric/symmetric ranges;
-  floors 0/7/8/14/15; pointer order versus the old algorithm; duplicate IDs and
+  map floors 0/7/8/14/15 and query floors 0 through 15 (including outside the
+  aware range); pointer order versus the old algorithm; duplicate IDs and
   pointers; null cleanup; 5,000 deterministic mixed mutations; span endpoints;
   legacy stack trimming; 853/860 automatic order; effects; walking-only tiles;
   corpse-highlight state; actual negative-displacement lookup; collision and
@@ -148,3 +152,24 @@ The requested upstream strategy is kept exactly rather than silently capped or
 cached. A separately reviewed follow-up could investigate reservation policy.
 No FPS improvement or universal speedup is claimed. Re-run the final expanded
 harness/benchmark and live gameplay before deciding to merge.
+
+## Review follow-up
+
+- The new floor regression failed against the unsigned margins before the fix.
+  It checks query floors 0 through 15 against map centers 0/7/8/14/15, including
+  centers above/below the aware range, with ordered multi-floor results and
+  unchanged single-floor behavior. Only the two margin types change. The
+  corrected focused OpenGL harness passed all 38,143 checks; complete client,
+  DirectX and sanitizer builds were not restarted during this follow-up.
+- The CMake include finding is already satisfied internally:
+  `src/framework/CMakeLists.txt` initializes `framework_INCLUDE_DIRS` with
+  `src/framework/..` and calls `include_directories` before the root file
+  creates `astra_spectator_tests`. The target inherits `src` and dependency
+  includes from that directory; external include configuration is not needed.
+- The known-count reservation risk and the 3-visible/10,000-known regression
+  are already tracked in the benchmark table above. Reservation policy stays
+  unchanged in this fix.
+- No runtime ASan allocation-mismatch report was produced; the conditional
+  aligned-allocation change is not applied. Sanitizer execution remains pending
+  as described above, not validated by the ordinary native run.
+- The optional CodeRabbit CLI review was not run: `coderabbit` is not installed.
