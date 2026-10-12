@@ -103,6 +103,8 @@ public:
     int getDrawElevation() { return m_drawElevation; }
     std::vector<ItemPtr> getItems();
     std::vector<CreaturePtr> getCreatures();
+    bool hasCreatures() const { return m_firstCreatureIndex != -1; }
+    void appendSpectators(std::vector<CreaturePtr>& out) const;
     std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
     bool hasNegativeDisplacementCreature() const;
     std::vector<ThingPtr> getThings() { return m_things; }
@@ -177,10 +179,15 @@ public:
 private:
     void checkTranslucentLight();
     void updateLootHighlightItemFlag();
+    void updateCreatureRangeForInsert(int stackPos, const ThingPtr& thing);
+    void rebuildCreatureRange();
 
     std::vector<CreaturePtr> m_walkingCreatures;
     std::vector<EffectPtr> m_effects; // leave this outside m_things because it has no stackpos.
     std::vector<ThingPtr> m_things;
+    // Stack creatures only; walking creatures are deliberately not spectators.
+    int m_firstCreatureIndex{ -1 };
+    int m_lastCreatureIndex{ -1 };
     Position m_position;
     uint8 m_drawElevation;
     uint8 m_minimapColor;

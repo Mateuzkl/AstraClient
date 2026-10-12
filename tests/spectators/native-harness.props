@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Import before Microsoft.Cpp.targets: build real engine code, replacing
+       only the entry point. The test TU includes map.cpp to test its private
+       cleanup helper without adding a public production API. -->
+  <ItemGroup>
+    <ClCompile Remove="..\src\main.cpp;..\src\client\map.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)spectator_tests.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)spectator_tests.obj</ObjectFileName>
+    </ClCompile>
+  </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

@@ -55,6 +55,16 @@ endif()
 add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
 
+option(ASTRA_BUILD_SPECTATOR_TESTS "Build focused native spectator regression/benchmark harness" OFF)
+if(ASTRA_BUILD_SPECTATOR_TESTS AND NOT WASM)
+    enable_testing()
+    set(spectator_test_SOURCES ${client_SOURCES})
+    list(REMOVE_ITEM spectator_test_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/client/map.cpp")
+    add_executable(astra_spectator_tests ${framework_SOURCES} ${spectator_test_SOURCES} tests/spectators/spectator_tests.cpp)
+    target_link_libraries(astra_spectator_tests ${framework_LIBRARIES})
+    add_test(NAME spectators COMMAND astra_spectator_tests)
+endif()
+
 if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/data/images/splash.png")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/images"

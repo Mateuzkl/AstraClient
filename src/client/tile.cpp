@@ -519,6 +519,7 @@ void Tile::addThing(const ThingPtr& thing, int stackPos)
             stackPos = m_things.size();
 
         m_things.insert(m_things.begin() + stackPos, thing);
+        updateCreatureRangeForInsert(stackPos, thing);
 
         if(!g_game.getFeature(Otc::GameNewCreatureStacking) && m_things.size() > MAX_THINGS)
             removeThing(m_things[MAX_THINGS]);
@@ -566,6 +567,7 @@ bool Tile::removeThing(ThingPtr thing)
         auto it = std::find(m_things.begin(), m_things.end(), thing);
         if(it != m_things.end()) {
             m_things.erase(it);
+            rebuildCreatureRange();
             removed = true;
         }
     }
@@ -647,6 +649,47 @@ std::vector<CreaturePtr> Tile::getCreatures()
             creatures.push_back(thing->static_self_cast<Creature>());
     }
     return creatures;
+}
+
+void Tile::updateCreatureRangeForInsert(const int stackPos, const ThingPtr& thing)
+{
+    if (m_firstCreatureIndex != -1 && stackPos <= m_firstCreatureIndex)
+        ++m_firstCreatureIndex;
+    if (m_lastCreatureIndex != -1 && stackPos <= m_lastCreatureIndex)
+        ++m_lastCreatureIndex;
+    if (!thing->isCreature())
+        return;
+    if (m_firstCreatureIndex == -1 || stackPos < m_firstCreatureIndex)
+        m_firstCreatureIndex = stackPos;
+    if (stackPos > m_lastCreatureIndex)
+        m_lastCreatureIndex = stackPos;
+}
+
+void Tile::rebuildCreatureRange()
+{
+    m_firstCreatureIndex = -1;
+    m_lastCreatureIndex = -1;
+    for (int i = 0; i < static_cast<int>(m_things.size()); ++i) {
+        if (!m_things[i]->isCreature())
+            continue;
+        if (m_firstCreatureIndex == -1)
+            m_firstCreatureIndex = i;
+        m_lastCreatureIndex = i;
+    }
+}
+
+void Tile::appendSpectators(std::vector<CreaturePtr>& out) const
+{
+    if (!hasCreatures())
+        return;
+
+    const auto size = static_cast<int>(m_things.size());
+    auto it = m_things.rbegin() + (size - 1 - m_lastCreatureIndex);
+    const auto end = m_things.rbegin() + (size - m_firstCreatureIndex);
+    for (; it != end; ++it) {
+        if ((*it)->isCreature())
+            out.emplace_back((*it)->static_self_cast<Creature>());
+    }
 }
 
 bool Tile::hasNegativeDisplacementCreature() const
