@@ -122,7 +122,8 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
     Rect mapRect = calcMapRect(screenRect, mapCenter, scale);
     g_drawQueue->addFilledRect(screenRect, color);
 
-    if(MMBLOCK_SIZE*scale <= 1 || !mapCenter.isMapPosition() || mapCenter.z > g_gameConfig.getMapMaxZ()) {
+    const float blockPixels = static_cast<float>(MMBLOCK_SIZE) * scale;
+    if(blockPixels <= 1 || !mapCenter.isMapPosition() || mapCenter.z > g_gameConfig.getMapMaxZ()) {
         return;
     }
 
@@ -131,11 +132,11 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
     Point off = Point((mapRect.size() * scale).toPoint() - screenRect.size().toPoint())/2;
     Point start = screenRect.topLeft() -(mapRect.topLeft() - blockOff)*scale - off;
 
-    for(int y = blockOff.y, ys = start.y;ys<screenRect.bottom();y += MMBLOCK_SIZE, ys += MMBLOCK_SIZE*scale) {
+    for(int y = blockOff.y, ys = start.y;ys<screenRect.bottom();y += MMBLOCK_SIZE, ys += blockPixels) {
         if(y < 0 || y >= 65536)
             continue;
 
-        for(int x = blockOff.x, xs = start.x;xs<screenRect.right();x += MMBLOCK_SIZE, xs += MMBLOCK_SIZE*scale) {
+        for(int x = blockOff.x, xs = start.x;xs<screenRect.right();x += MMBLOCK_SIZE, xs += blockPixels) {
             if(x < 0 || x >= 65536)
                 continue;
 
@@ -149,7 +150,7 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
             const TexturePtr& tex = block.getTexture();
             if(tex) {
                 Rect src(0, 0, MMBLOCK_SIZE, MMBLOCK_SIZE);
-                Rect dest(xs, ys, MMBLOCK_SIZE * scale, MMBLOCK_SIZE * scale);
+                Rect dest(xs, ys, blockPixels, blockPixels);
 
                 g_drawQueue->addTexturedRect(dest, tex, src);
             }
@@ -629,8 +630,9 @@ int Minimap::exportSatelliteBase(const std::string& directory)
         for (const auto& item : tile->getItems()) {
             if (!item->getId()) stdext::throw_exception("invalid item in offline map");
             const auto disp = item->getDisplacement() * g_sprites.getOffsetFactor();
-            const int itemLeft = (item->getWidth() - 1) * pixels + disp.x + std::ceil(Otc::MAX_ELEVATION * g_sprites.getOffsetFactor());
-            const int itemTop = (item->getHeight() - 1) * pixels + disp.y + std::ceil(Otc::MAX_ELEVATION * g_sprites.getOffsetFactor());
+            const auto elevation = std::ceil(static_cast<float>(Otc::MAX_ELEVATION) * g_sprites.getOffsetFactor());
+            const int itemLeft = (item->getWidth() - 1) * pixels + disp.x + elevation;
+            const int itemTop = (item->getHeight() - 1) * pixels + disp.y + elevation;
             leftExtent = std::max(leftExtent, itemLeft);
             topExtent = std::max(topExtent, itemTop);
             rightExtent = std::max(rightExtent, -disp.x);

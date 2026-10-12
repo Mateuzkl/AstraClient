@@ -23,6 +23,8 @@
 #ifndef STDEXT_COMPILER_H
 #define STDEXT_COMPILER_H
 
+#include "cxx23.h"
+
 #ifdef WIN32
 #include <winsock2.h>
 #endif
@@ -31,13 +33,10 @@
     // clang is supported
     #define BUILD_COMPILER "clang " __VERSION__
 #elif defined(__GNUC__)
-    #if !(__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6))
-    #error "Sorry, you need gcc 4.6 or greater to compile."
-    #endif
     #define BUILD_COMPILER "gcc " __VERSION__
 #elif defined(_MSC_VER)
-    #if _MSC_VER < 1800
-    #error "You need Visual Studio 2013 or greater to compile."
+    #if _MSC_VER < 1943
+    #error "AstraClient requires MSVC 19.43+ with C++23 preview enabled."
     #endif
     #pragma warning(disable:4244) // conversion from 'A' to 'B', possible loss of data
     #pragma warning(disable:4267) // '?' : conversion from 'A' to 'B', possible loss of data
@@ -70,10 +69,6 @@
 #else
 #define likely(x)    (x)
 #define unlikely(x)    (x)
-#endif
-
-#if !defined(_MSC_VER) && !defined(__GXX_EXPERIMENTAL_CXX0X__)
-#error "C++0x is required to compile this application.  Try updating your compiler."
 #endif
 
 #endif

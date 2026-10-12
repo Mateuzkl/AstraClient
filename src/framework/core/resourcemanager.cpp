@@ -29,6 +29,7 @@
 #include <framework/platform/platform.h>
 #include <framework/util/crypt.h>
 #include <framework/http/http.h>
+#include <framework/stdext/filesystem.h>
 #include <queue>
 #include <regex>
 #include <fstream>
@@ -1182,7 +1183,7 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
 #ifndef ANDROID
     } else if (!m_diskDataPath.empty()) {
         int errorCode = 0;
-        const auto archivePath = m_diskDataPath.u8string();
+        const auto archivePath = stdext::path_to_utf8(m_diskDataPath);
         za = zip_open(archivePath.c_str(), ZIP_RDONLY, &errorCode);
         if (!za) {
             zip_error_t openError;

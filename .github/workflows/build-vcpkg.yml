@@ -17,6 +17,8 @@ on:
       - refactor/**
     paths:
       - .github/workflows/build-vcpkg.yml
+      - tests/cpp23/**
+      - tools/check_cpp23.py
       - cmake/**
       - src/**
       - CMakeLists.txt
@@ -31,6 +33,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-vcpkg.yml
+      - tests/cpp23/**
+      - tools/check_cpp23.py
       - cmake/**
       - src/**
       - CMakeLists.txt
@@ -72,6 +76,12 @@ jobs:
           "SCCACHE_DIR=$env:SCCACHE_DIR" >> $env:GITHUB_ENV
           & ./cmake/ci/ReadBuildContext.ps1
         id: vcpkg-baseline
+
+      - name: Verify owned C++23 configuration
+        shell: pwsh
+        run: |
+          python tools/check_cpp23.py
+          python tests/cpp23/guard_test.py
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -148,6 +158,10 @@ jobs:
           $commands = @'
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
           if errorlevel 1 exit /b 1
+          python tools/check_cpp23.py --compile-commands build/compile_commands.json
+          if errorlevel 1 exit /b 1
+          ctest --test-dir build --output-on-failure
+          if errorlevel 1 exit /b 1
           '@
           & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-Release' -CmdScript $commands
 
@@ -157,11 +171,11 @@ jobs:
           $commands = @'
           if errorlevel 1 exit /b 1
           mkdir build\network-test
-          cl /nologo /O2 /MT /Gy /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\utilities.exe /Fo:build\network-test\ .github\tests\standalone_util.cpp src\framework\stdext\string.cpp /link /OPT:REF ws2_32.lib
+          cl /nologo /O2 /MT /Gy /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\utilities.exe /Fo:build\network-test\ .github\tests\standalone_util.cpp src\framework\stdext\string.cpp /link /OPT:REF ws2_32.lib
           if errorlevel 1 exit /b 1
           build\network-test\utilities.exe
           if errorlevel 1 exit /b 1
-          cl /nologo /O2 /MT /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\network.exe /Fo:build\network-test\ .github\tests\native_network.cpp src\framework\http\session.cpp src\framework\http\websocket.cpp /link /LIBPATH:build\vcpkg_installed\x64-windows-static\lib libcurl.lib zlib.lib libssl.lib libcrypto.lib ws2_32.lib crypt32.lib bcrypt.lib user32.lib advapi32.lib secur32.lib iphlpapi.lib
+          cl /nologo /O2 /MT /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\network.exe /Fo:build\network-test\ .github\tests\native_network.cpp src\framework\http\session.cpp src\framework\http\websocket.cpp /link /LIBPATH:build\vcpkg_installed\x64-windows-static\lib libcurl.lib zlib.lib libssl.lib libcrypto.lib ws2_32.lib crypt32.lib bcrypt.lib user32.lib advapi32.lib secur32.lib iphlpapi.lib
           if errorlevel 1 exit /b 1
           node .github\tests\native_network_fixture.cjs build\network-test\network.exe build\network-test
           if errorlevel 1 exit /b 1
@@ -176,7 +190,7 @@ jobs:
           mkdir build\native-splash-test\data\images
           copy /y data\images\splash.png build\native-splash-test\data\images\splash.png
           if errorlevel 1 exit /b 1
-          cl /nologo /O2 /MT /utf-8 /std:c++17 /EHsc /DNDEBUG /DWIN32 /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\native-splash-test\native-splash-test.exe /Fo:build\native-splash-test\ .github\tests\native_splash.cpp src\framework\platform\nativesplash.cpp src\framework\graphics\apngloader.cpp /link gdiplus.lib user32.lib gdi32.lib build\vcpkg_installed\x64-windows-static\lib\zlib.lib
+          cl /nologo /O2 /MT /utf-8 /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\native-splash-test\native-splash-test.exe /Fo:build\native-splash-test\ .github\tests\native_splash.cpp src\framework\platform\nativesplash.cpp src\framework\graphics\apngloader.cpp /link gdiplus.lib user32.lib gdi32.lib build\vcpkg_installed\x64-windows-static\lib\zlib.lib
           if errorlevel 1 exit /b 1
           build\native-splash-test\native-splash-test.exe "%GITHUB_WORKSPACE%\data\cursors"
           if errorlevel 1 exit /b 1
@@ -232,6 +246,7 @@ jobs:
           path: |
             build/diagnostics/
             build/CMakeCache.txt
+            build/compile_commands.json
             build/CMakeFiles/CMakeConfigureLog.yaml
             build/Testing/Temporary/
             build/vcpkg-manifest-install.log

@@ -17,7 +17,7 @@ foreach ($line in $compilerEnvironment) {
     [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
   }
 }
-$flags = @('/nologo', '/Zs', '/std:c++17', '/EHsc', '/DNDEBUG', '/DWIN32',
+$flags = @('/nologo', '/Zs', '/std:c++23preview', '/EHsc', '/DNDEBUG', '/DWIN32',
   '/DNOMINMAX', '/DASIO_STANDALONE', '/DCURL_STATICLIB', '/DFW_GRAPHICS',
   '/DFW_NET', '/DFW_XML', '/DFW_SOUND', '/DFW_CAM', '/DWITH_ENCRYPTION',
   '/D_WIN32_WINNT=0x0601', "/I$includePath", "/I$(Join-Path $repoPath 'src')")

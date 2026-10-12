@@ -30,8 +30,8 @@
 
 namespace stdext {
 
-// disable memory alignment
-#pragma pack(push,1)
+// Keep sparse storage, but do not byte-pack objects passed by reference to
+// STL algorithms: their pointers and packed_any values must be aligned.
 
 // this class was designed to use less memory as possible
 template<typename Key, typename SizeType = uint8>
@@ -131,9 +131,6 @@ private:
     value_pair *m_values;
     SizeType m_size;
 };
-
-// restore memory alignment
-#pragma pack(pop)
 
 }
 

@@ -1,0 +1,71 @@
+category	file:line	configuration
+test	.github/workflows/build-vcpkg.yml:158	cl /nologo /O2 /MT /Gy /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\utilities.exe /Fo:build\network-test\ .github\tests\standalone_util.cpp src\framework\stdext\string.cpp /link /OPT:REF ws2_32.lib
+test	.github/workflows/build-vcpkg.yml:162	cl /nologo /O2 /MT /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\network.exe /Fo:build\network-test\ .github\tests\native_network.cpp src\framework\http\session.cpp src\framework\http\websocket.cpp /link /LIBPATH:build\vcpkg_installed\x64-windows-static\lib libcurl.lib zlib.lib libssl.lib libcrypto.lib ws2_32.lib crypt32.lib bcrypt.lib user32.lib advapi32.lib secur32.lib iphlpapi.lib
+test	.github/workflows/build-vcpkg.yml:177	cl /nologo /O2 /MT /utf-8 /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\native-splash-test\native-splash-test.exe /Fo:build\native-splash-test\ .github\tests\native_splash.cpp src\framework\platform\nativesplash.cpp src\framework\graphics\apngloader.cpp /link gdiplus.lib user32.lib gdi32.lib build\vcpkg_installed\x64-windows-static\lib\zlib.lib
+test	.github/workflows/build-wasm.yml:131	em++ -std=c++23 -Isrc tests/cpp23/standard.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-cxx23.js"
+test	.github/workflows/build-wasm.yml:133	em++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-utf8.js"
+test	.github/workflows/build-wasm.yml:162	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:173	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/rsa.cpp \
+test	.github/workflows/build-wasm.yml:177	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/uuid.cpp \
+test	.github/workflows/build-wasm.yml:181	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/credentials.cpp \
+test	.github/workflows/build-wasm.yml:191	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+test	.github/workflows/build-wasm.yml:201	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:212	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
+test	.github/workflows/build-wasm.yml:223	g++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
+test	.github/workflows/build-wasm.yml:229	gcc -std=gnu99 -DNDEBUG -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+test	.github/workflows/build-wasm.yml:239	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/cursor_images.cpp \
+test	.github/workflows/content-validation.yml:103	c++ -std=c++23 -Isrc tests/cpp23/standard.cpp -o /tmp/astra-cxx23-probe
+test	.github/workflows/content-validation.yml:105	c++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -o /tmp/astra-utf8-path
+test	.github/workflows/content-validation.yml:163	c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:170	c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:180	c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:197	c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
+test	.github/workflows/content-validation.yml:200	c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic -pthread \
+test	.github/workflows/content-validation.yml:212	c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
+build	CMakeLists.txt:57	CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:51	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:56	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:61	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:66	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:71	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:76	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:82	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:88	<PlatformToolset>Clang_5_0</PlatformToolset>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:161	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:162	<CppLanguageStandard>c++1z</CppLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:181	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:182	<CppLanguageStandard>c++1z</CppLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:203	<CLanguageStandard>c11</CLanguageStandard>
+blocked Android legacy (not certified C++23)	android/otclientv8_lib/otclientv8_lib.vcxproj:204	<CppLanguageStandard>c++1z</CppLanguageStandard>
+test	browser/tests/run-security.sh:7	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src "browser/tests/${test}.cpp" \
+test	browser/tests/run-security.sh:11	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
+test	browser/tests/run-security.sh:15	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
+test	browser/tests/run-security.sh:19	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
+test	browser/tests/run-security.sh:24	em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+test	browser/tests/run-security.sh:28	g++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
+test	browser/tests/run-security.sh:33	gcc -std=gnu99 -DNDEBUG -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+build	cmake/AstraCxx23.cmake:3	set(CMAKE_CXX_STANDARD 23)
+build	cmake/AstraCxx23.cmake:4	set(CMAKE_CXX_STANDARD_REQUIRED ON)
+build	cmake/AstraCxx23.cmake:5	set(CMAKE_CXX_EXTENSIONS OFF)
+build	cmake/AstraCxx23.cmake:10	message(FATAL_ERROR "C++23 requires MSVC 19.43+ (/std:c++23preview); update Visual Studio. No latest/20/17 fallback is allowed.")
+documentation	docs/cpp23-migration.md:15	MSVC 19.43+ uses `/std:c++23preview`. The recognized MSBuild enum is `stdcpp23`,
+documentation	docs/cpp23-migration.md:26	[CMake required standard](https://cmake.org/cmake/help/latest/prop_tgt/CXX_STANDARD_REQUIRED.html).
+documentation	docs/cpp23-migration.md:45	| Build: `vc23/otclient.vcxproj:190,232,273,320,366,422` | Six `stdcpp17` settings | Six recognized `stdcpp23` settings, `/Zc:__cplusplus` |
+documentation	docs/cpp23-migration.md:51	| Blocked: `android/otclientv8_lib/otclientv8_lib.vcxproj` | `Clang_5_0`, three `c++1z` entries | Retained legacy, explicitly unsupported |
+documentation	docs/cpp23-migration.md:57	such as Lua 5.1's `-std=gnu99` remain visible in the inventory and unchanged.
+documentation	docs/cpp23-migration.md:190	selects `Clang_5_0` / `c++1z` and old Android API/Ant infrastructure; it cannot
+documentation	docs/cpp23-validation.md:19	| Windows `vc23` OpenGL x64 | Full build + real login/logout/reconnect + GPU tests passed | MSVC 19.51, `/std:c++23preview /Zc:__cplusplus`; 16 MSBuild command entries |
+documentation	docs/cpp23-validation.md:25	| Linux GCC Release | Full desktop build; CTest 3/3; real Xvfb/Mesa GPU smoke passed | GCC 13.3, `-std=c++23`, `__cplusplus=202100`; 167 commands |
+documentation	docs/cpp23-validation.md:26	| Linux Clang Debug | Full desktop build; CTest 3/3; instrumented production UI/GPU smoke and normal shutdown passed | Clang 18.1, `-std=c++23`, `__cplusplus=202302`; 24 commands; ASan + UBSan |
+documentation	docs/cpp23-validation.md:27	| Web Release | Full production bundle + three Node probes passed | Emscripten 6.0.8 / Clang 24, `-std=c++23`, `__cplusplus=202302`; 158 commands |
+documentation	readme.md:215	MSVC requires 19.43+ with `/std:c++23preview` (not `c++latest`); the six `vc23`
+documentation	readme.md:216	configurations use the recognized `stdcpp23` property. Tested compilers are
+documentation	readme.md:247	`Clang_5_0` / `c++1z` and uses the old Visual Studio Android/Ant integration.
+test	tests/cpp23/Run-WindowsUnits.ps1:13	$flags = "/nologo /O2 /MT /std:c++23preview /Zc:__cplusplus /FIframework/stdext/cxx23.h /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /I`"$VcpkgTriplet/include`""
+test	tests/minimap_hd/Check-TranslationUnits.ps1:20	$flags = @('/nologo', '/Zs', '/std:c++23preview', '/EHsc', '/DNDEBUG', '/DWIN32',
+build	vc23/otclient.vcxproj:190	<LanguageStandard>stdcpp23</LanguageStandard>
+build	vc23/otclient.vcxproj:232	<LanguageStandard>stdcpp23</LanguageStandard>
+build	vc23/otclient.vcxproj:273	<LanguageStandard>stdcpp23</LanguageStandard>
+build	vc23/otclient.vcxproj:320	<LanguageStandard>stdcpp23</LanguageStandard>
+build	vc23/otclient.vcxproj:366	<LanguageStandard>stdcpp23</LanguageStandard>
+build	vc23/otclient.vcxproj:422	<LanguageStandard>stdcpp23</LanguageStandard>

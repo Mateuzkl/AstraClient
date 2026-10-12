@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-wasm.yml
+      - tests/cpp23/**
+      - tools/check_cpp23.py
       - browser/**
       - data/**
       - layouts/**
@@ -26,6 +28,8 @@ on:
       - fix/**
     paths:
       - .github/workflows/build-wasm.yml
+      - tests/cpp23/**
+      - tools/check_cpp23.py
       - browser/**
       - data/**
       - layouts/**
@@ -65,6 +69,11 @@ jobs:
           mkdir -p build-wasm-release/diagnostics
           printf "### WebAssembly build stages\n| Stage | Exit code | Seconds |\n| --- | --- | --- |\n" >> "$GITHUB_STEP_SUMMARY"
           git rev-parse HEAD > build-wasm-release/diagnostics/commit.txt
+
+      - name: Verify owned C++23 configuration
+        run: |
+          python3 tools/check_cpp23.py
+          python3 tests/cpp23/guard_test.py
 
       - name: Extract bundled 8.60 assets
         run: |
@@ -116,6 +125,14 @@ jobs:
         run: |
           bash cmake/ci/run-stage.sh build bash browser/build-wasm.sh Release
 
+      - name: Verify actual Emscripten C++23 commands and features
+        run: |
+          python3 tools/check_cpp23.py --compile-commands build-wasm-release/compile_commands.json
+          em++ -std=c++23 -Isrc tests/cpp23/standard.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-cxx23.js"
+          node "${RUNNER_TEMP}/astra-cxx23.js"
+          em++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-utf8.js"
+          node "${RUNNER_TEMP}/astra-utf8.js"
+
       - name: Validate browser endpoint, cursor and persistence behavior
         run: |
           bash cmake/ci/run-stage.sh validate-browser-endpoint-cursor-and-persistence-behavior bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
@@ -142,7 +159,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-websocket-teardown-with-the-pinned-sdk bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
             -lwebsocket.js --pre-js browser/tests/mock-websocket.js \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-websocket-test.js"
@@ -153,15 +170,15 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-browser-rsa-login-encryption-and-settings-compatibility bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/rsa.cpp \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-rsa-test.js"
           node "${RUNNER_TEMP}/astra-rsa-test.js"
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/uuid.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/uuid.cpp \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-uuid-test.js"
           node "${RUNNER_TEMP}/astra-uuid-test.js"
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/credentials.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/credentials.cpp \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-credentials-test.js"
           node "${RUNNER_TEMP}/astra-credentials-test.js"
@@ -171,7 +188,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-independent-logic-timer-on-the-application-pthread bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread browser/tests/logic_timer.cpp \
             -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 -sEXIT_RUNTIME=1 \
             -sENVIRONMENT=node -sASSERTIONS=1 -o "${RUNNER_TEMP}/astra-logic-timer.js"
           timeout 15 node "${RUNNER_TEMP}/astra-logic-timer.js"
@@ -181,7 +198,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-fetch-callback-lifetimes-with-the-pinned-sdk bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/fetch_callbacks.cpp \
             --pre-js browser/tests/mock-fetch.js -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \
             -o "${RUNNER_TEMP}/astra-fetch-test.js"
@@ -192,7 +209,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-synchronous-keyboard-cancellation-on-the-browser-thread bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -pthread -I src browser/tests/keyboard_callbacks.cpp \
             --pre-js browser/tests/mock-keyboard.js --pre-js browser/runtime.js \
             -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 -sEXIT_RUNTIME=1 \
             -sENVIRONMENT=node -sASSERTIONS=1 -o "${RUNNER_TEMP}/astra-keyboard-test.js"
@@ -203,7 +220,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-queue-and-lua-parser-ownership-with-sanitizers bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          g++ -std=c++17 -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
+          g++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src -O1 -g -pthread -fsanitize=address,undefined \
             -fno-omit-frame-pointer browser/tests/message_budget.cpp \
             -o "${RUNNER_TEMP}/astra-message-budget-test"
           "${RUNNER_TEMP}/astra-message-budget-test"
@@ -219,7 +236,7 @@ jobs:
         shell: bash
         run: |
           bash cmake/ci/run-stage.sh validate-shipped-static-and-animated-cursor-images bash -eo pipefail <<'CI_DIAGNOSTIC_STAGE'
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/cursor_images.cpp \
+          em++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -I src browser/tests/cursor_images.cpp \
             src/framework/graphics/apngloader.cpp -sUSE_ZLIB=1 \
             --embed-file data/cursors@/data/cursors \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \

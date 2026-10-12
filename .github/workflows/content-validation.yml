@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
+      - 'tests/cpp23/**'
+      - 'tools/check_cpp23.py'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -41,6 +43,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
+      - 'tests/cpp23/**'
+      - 'tools/check_cpp23.py'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -91,6 +95,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends luajit
+
+      - name: Verify C++23 build policy and compiler features
+        run: |
+          python3 tools/check_cpp23.py
+          python3 tests/cpp23/guard_test.py
+          c++ -std=c++23 -Isrc tests/cpp23/standard.cpp -o /tmp/astra-cxx23-probe
+          /tmp/astra-cxx23-probe
+          c++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -o /tmp/astra-utf8-path
+          /tmp/astra-utf8-path
 
       - name: Validate Lua syntax
         run: |
@@ -147,14 +160,14 @@ jobs:
 
       - name: Test spell cooldown packets
         run: |
-          c++ -std=c++17 -Wall -Wextra -pedantic \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
             .github/tests/spell_cooldown.cpp -I. \
             -o /tmp/spell_cooldown_test
           /tmp/spell_cooldown_test
 
       - name: Test streaming sprite decoder
         run: |
-          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/sprite_decoder.cpp -I. \
             -o /tmp/sprite_decoder_test
           /tmp/sprite_decoder_test
@@ -164,7 +177,7 @@ jobs:
 
       - name: Test indexed sprite selection and lifecycle
         run: |
-          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/indexed_spr.cpp -I. -o /tmp/indexed_spr_test
           /tmp/indexed_spr_test
           luajit .github/tests/indexed_spr_lifecycle.lua
@@ -181,10 +194,10 @@ jobs:
       - name: Test optional memory monitor history and lifecycle
         run: |
           luajit .github/tests/memleak_lifecycle.lua
-          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/memleak_history.cpp -o /tmp/memleak_history_test
           /tmp/memleak_history_test
-          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic -pthread \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic -pthread \
             .github/tests/memleak_metrics.cpp -o /tmp/memleak_metrics_test
           /tmp/memleak_metrics_test
 
@@ -196,7 +209,7 @@ jobs:
 
       - name: Test negative DAT offsets
         run: |
-          c++ -std=c++17 -Wall -Wextra -pedantic \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
             .github/tests/negative_offset.cpp -I. \
             -o /tmp/negative_offset_test
           /tmp/negative_offset_test

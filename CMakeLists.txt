@@ -7,7 +7,7 @@ if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
     message(STATUS "Browser/WebAssembly target: ON")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+include(cmake/AstraCxx23.cmake)
 
 # default build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -53,7 +53,42 @@ endif()
 
 # add client executable
 add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(astra_cxx23_probe tests/cpp23/standard.cpp)
+    target_include_directories(astra_cxx23_probe PRIVATE src)
+    add_executable(astra_utf8_path_test tests/cpp23/utf8_path.cpp)
+    target_include_directories(astra_utf8_path_test PRIVATE src)
+    if(FRAMEWORK_XML)
+        add_executable(astra_cpp23_compatibility tests/cpp23/compatibility.cpp
+            src/framework/xml/tinyxml.cpp src/framework/xml/tinyxmlparser.cpp
+            src/framework/xml/tinyxmlerror.cpp src/framework/xml/tinystr.cpp)
+        target_include_directories(astra_cpp23_compatibility PRIVATE src)
+        if(WASM)
+            # TinyXML includes the framework's ASIO/thread declarations too.
+            target_compile_options(astra_cpp23_compatibility PRIVATE -pthread)
+            target_link_options(astra_cpp23_compatibility PRIVATE -pthread)
+        endif()
+        if(NOT WASM)
+            add_test(NAME cxx23-tinyxml COMMAND astra_cpp23_compatibility)
+        endif()
+    endif()
+    if(MSVC)
+        target_compile_options(astra_cxx23_probe PRIVATE /Zc:__cplusplus)
+        target_compile_options(astra_utf8_path_test PRIVATE /Zc:__cplusplus /utf-8)
+    endif()
+    if(NOT WASM)
+        add_test(NAME cxx23-standard COMMAND astra_cxx23_probe)
+        add_test(NAME cxx23-utf8-path COMMAND astra_utf8_path_test)
+    endif()
+endif()
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /Zc:__cplusplus)
+endif()
 
 if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/data/images/splash.png")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
