@@ -1,41 +1,44 @@
 {
-    "name": "astraclient",
-    "version-string": "1.0.0",
-    "dependencies": [
-        "asio",
-        {
-            "name": "curl",
-            "version>=": "8.21.0",
-            "default-features": false,
-            "features": ["ssl", "websockets"],
-            "platform": "!wasm32"
-        },
-        "physfs",
-        "libogg",
-        "libvorbis",
-        "zlib",
-        "libzip",
-        "openssl",
-        "openal-soft",
-        "glew",
-        {
-            "name": "luajit",
-            "platform": "!wasm32"
-        },
-        {
-            "name": "opengl",
-            "platform": "windows | linux"
-        },
-        {
-            "name": "angle",
-            "platform": "windows"
-        }
-    ],
-    "overrides": [
-        {
-            "name": "openal-soft",
-            "version": "1.23.1#2"
-        }
-    ],
-    "builtin-baseline": "389e18e8380daab3884e7dc0710ad7f4a264def6"
+  "name": "astraclient",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "asio",
+    {
+      "name": "curl",
+      "version>=": "8.22.0#1",
+      "default-features": false,
+      "features": [
+        "ssl",
+        "websockets"
+      ],
+      "platform": "!wasm32"
+    },
+    "physfs",
+    "libogg",
+    "libvorbis",
+    "zlib",
+    "libzip",
+    "openssl",
+    "openal-soft",
+    "glew",
+    {
+      "name": "luajit",
+      "platform": "!wasm32"
+    },
+    {
+      "name": "opengl",
+      "platform": "windows | linux"
+    },
+    {
+      "name": "angle",
+      "platform": "windows"
+    }
+  ],
+  "overrides": [
+    {
+      "name": "openal-soft",
+      "version": "1.23.1#2"
+    }
+  ],
+  "builtin-baseline": "389e18e8380daab3884e7dc0710ad7f4a264def6"
 }
