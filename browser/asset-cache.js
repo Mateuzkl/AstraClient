@@ -19,6 +19,8 @@
         !/^sha256-[a-f0-9]{64}$/.test(m.uuid) || !Number.isSafeInteger(m.size) || m.size <= 0 ||
         m.size > 2147483648 || !Array.isArray(m.chunks) || m.chunks.length !== Math.ceil(m.size / CHUNK_SIZE))
       throw new Error('Invalid game data manifest. Rebuild or refresh the deployment.');
+    if (m.engineVersion !== undefined && !/^[a-f0-9]{64}$/.test(m.engineVersion))
+      throw new Error('Invalid browser engine version. Rebuild or refresh the deployment.');
     let total = 0;
     for (let i = 0; i < m.chunks.length; ++i) {
       const c = m.chunks[i];

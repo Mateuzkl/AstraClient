@@ -24,6 +24,7 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
   const hostListeners = {};
   const data = new Uint8Array([1, 2, 3]).buffer;
   const manifest = { version: '8.60', packageName: 'dist/astraclient.data', file: 'astraclient.data', size: 3,
+    engineVersion: 'a'.repeat(64),
     chunks: [{ size: 3 }] };
   let closes = 0, reloads = 0, lastRead, engine, suppliedPackage;
   const store = { close() { closes++; }, remove: async () => {}, getChunk: async i => i === 0 ? data : undefined };
@@ -148,6 +149,15 @@ test('Play hands verified data to the SDK exactly once and waits for a real clie
   element('astra-launcher').dispatchEvent({ type: 'transitionend', propertyName: 'opacity' });
   assert.equal(element('astra-launcher').hidden, true);
   assert.equal(context.Module.getPreloadedPackage, null);
+});
+
+test('Play pins the engine script to the manifest build version', async () => {
+  const run = launcher();
+  await tick();
+  await run.element('launcher-play').listeners.click();
+  assert.equal(run.engine().src,
+    `http://localhost/client/astraclient.js?v=${run.manifest.engineVersion}`);
+  assert.equal(run.context.ASTRA_ENGINE_VERSION, run.manifest.engineVersion);
 });
 
 test('engine failure releases the preload handoff and requires an explicit reload', async () => {

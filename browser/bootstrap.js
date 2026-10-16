@@ -20,7 +20,12 @@ var Module = {
   astraCredentials: credentialVault,
   canvas: document.getElementById('canvas'),
   arguments: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? ['-mobile'] : [],
-  locateFile: (path) => new URL(path, self.location.href).href,
+  locateFile: (path) => {
+    const url = new URL(path, self.location.href);
+    if (window.ASTRA_ENGINE_VERSION && /\.(?:js|wasm)$/.test(url.pathname))
+      url.searchParams.set('v', window.ASTRA_ENGINE_VERSION);
+    return url.href;
+  },
   print: (...values) => console.log(...values),
   printErr: (...values) => console.error(...values),
   setStatus: setAstraStatus,
