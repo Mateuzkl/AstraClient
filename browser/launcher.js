@@ -232,7 +232,12 @@
     if (!source) throw new Error('Browser engine script is missing. Rebuild the bundle.');
     const script = document.createElement('script');
     engineScript = script;
-    script.src = source.src;
+    const engineUrl = new URL(source.src, document.baseURI);
+    if (manifest.engineVersion) {
+      engineUrl.searchParams.set('v', manifest.engineVersion);
+      window.ASTRA_ENGINE_VERSION = manifest.engineVersion;
+    }
+    script.src = engineUrl.href;
     script.onload = () => {
       clearEngineCallbacks();
       if (!startupFailed) window.AstraLauncher.phase('engineScriptFetchLoad', performance.now() - engineStart);

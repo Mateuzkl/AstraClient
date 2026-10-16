@@ -53,6 +53,10 @@ def create_manifest(dist):
     return {
         'schema': 1, 'version': '8.60', 'packageName': json.loads(match.group(1)),
         'uuid': uuid, 'file': 'astraclient.data', 'size': size, 'chunks': chunks,
+        # Pin the generated engine pair independently of the game-data cache.
+        'engineVersion': hashlib.sha256(
+            hashlib.sha256((dist / 'astraclient.js').read_bytes()).digest() +
+            hashlib.sha256((dist / 'astraclient.wasm').read_bytes()).digest()).hexdigest(),
         'groups': groups,
         'largestFiles': sorted(largest, key=lambda entry: entry['size'], reverse=True)[:20],
         # All bytes still in this SDK package are on the boot path. Do not label

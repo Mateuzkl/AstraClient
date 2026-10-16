@@ -18,8 +18,14 @@ class ManifestTest(unittest.TestCase):
             metadata = {'files': [{'filename': '/data/things/860/Tibia.dat', 'start': 0, 'end': len(data)}],
                         'remote_package_size': len(data), 'package_uuid': 'sha256-' + hashlib.sha256(data).hexdigest()}
             (dist / 'astraclient.data').write_bytes(data)
+            (dist / 'astraclient.wasm').write_bytes(b'wasm-v1')
             (dist / 'astraclient.js').write_text('var PACKAGE_NAME = "dist/astraclient.data"; loadPackage(' + json.dumps(metadata) + ');')
             result = module.create_manifest(dist)
+            first_engine_version = result['engineVersion']
+            self.assertEqual(len(first_engine_version), 64)
+            (dist / 'astraclient.wasm').write_bytes(b'wasm-v2')
+            self.assertNotEqual(module.create_manifest(dist)['engineVersion'], first_engine_version)
+            (dist / 'astraclient.wasm').write_bytes(b'wasm-v1')
             self.assertEqual(result['groups'], {'things': len(data)})
             self.assertEqual(result['bootPackageBytes'], len(data))
             self.assertEqual(result['deferredPackageBytes'], 0)
@@ -52,6 +58,7 @@ class ManifestTest(unittest.TestCase):
             files = [{'filename': '/' + name, 'start': index, 'end': index + 1}
                      for index, name in enumerate(names)]
             (dist / 'astraclient.data').write_bytes(b'x' * len(files))
+            (dist / 'astraclient.wasm').write_bytes(b'wasm')
             (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage(' +
                                                json.dumps({'files': files, 'remote_package_size': len(files)}) + ');')
             result = module.create_manifest(dist)
