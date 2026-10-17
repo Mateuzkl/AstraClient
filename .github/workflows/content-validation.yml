@@ -24,6 +24,7 @@ on:
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
+      - '.github/tests/elfbot_integration.lua'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
       - 'src/framework/core/module.cpp'
@@ -60,6 +61,7 @@ on:
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
+      - '.github/tests/elfbot_integration.lua'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
       - 'src/framework/core/module.cpp'
@@ -116,6 +118,9 @@ jobs:
         run: |
           luajit .github/tests/store_catalog_chunks.lua \
             mods/game_store/storeprotocol.lua
+
+      - name: Test ElfBot integration and lifecycle
+        run: luajit .github/tests/elfbot_integration.lua
 
       - name: Test NPC travel dialog lifecycle
         run: |

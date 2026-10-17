@@ -20,6 +20,37 @@ local consoleToggleChat
 local chatToggleLocked
 local gameChannelInitEvent
 local temporaryChatEnableEvent
+local messageFilters = {}
+
+-- Owned, removable filters for client-side commands (never sent to the server).
+function addFilter(callback)
+  assert(type(callback) == 'function', 'Invalid console message filter')
+  for _, filter in ipairs(messageFilters) do if filter == callback then return end end
+  messageFilters[#messageFilters + 1] = callback
+end
+
+function removeFilter(callback)
+  for i, filter in ipairs(messageFilters) do
+    if filter == callback then table.remove(messageFilters, i);return true end
+  end
+  return false
+end
+
+function filterMessage(message)
+  if #messageFilters == 0 then return false end
+  local pending = {}
+  for i, filter in ipairs(messageFilters) do pending[i] = filter end
+  for _, filter in ipairs(pending) do
+    local registered = false
+    for _, current in ipairs(messageFilters) do if current == filter then registered = true;break end end
+    if registered then
+      local ok, handled = pcall(filter, message)
+      if not ok then g_logger.warning('Console message filter: ' .. tostring(handled))
+      elseif handled then return true end
+    end
+  end
+  return false
+end
 
 GameChannelInialized = false
 
@@ -97,6 +128,7 @@ function init()
 end
 
 function terminate()
+  messageFilters = {}
   removeEvent(gameChannelInitEvent)
   removeEvent(temporaryChatEnableEvent)
   gameChannelInitEvent = nil

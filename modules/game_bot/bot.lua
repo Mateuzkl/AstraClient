@@ -11,6 +11,36 @@ local callbacksConnected = false
 local botCreatedLeftPanel = false
 local callbackConnections = nil
 local nextMessageCleanup = 0
+local tileCallbackOwners = setmetatable({}, {__mode = "k"})
+local tileCallbacksEnabled = false
+
+function setTileCallbacksOwner(owner, enabled)
+  tileCallbackOwners[owner] = enabled and true or nil
+  local active = next(tileCallbackOwners) ~= nil
+  if active ~= tileCallbacksEnabled then
+    tileCallbacksEnabled = active
+    g_game.enableTileThingLuaCallback(active)
+  end
+end
+
+function updateElfBotControls()
+  if not contentsPanel or not contentsPanel.elfbotControls then return end
+  local available = g_modules.getModule('game_elfbot') ~= nil
+  contentsPanel.elfbotControls:setVisible(available)
+  contentsPanel.elfbotControls:setHeight(available and 22 or 0)
+  local elfbot = modules.game_elfbot
+  contentsPanel.elfbotControls.elfbotEnableButton:setOn(available and elfbot and elfbot.isEnabled and elfbot.isEnabled() or false)
+end
+
+function openElfBot()
+  local module = g_modules.getModule('game_elfbot')
+  if module then module:load();modules.game_elfbot.toggle() end
+end
+
+function toggleElfBot()
+  local module = g_modules.getModule('game_elfbot')
+  if module then module:load();modules.game_elfbot.setEnabled(not modules.game_elfbot.isEnabled()) end
+end
 
 local botStorage = {}
 local botStorageFile = nil
@@ -96,6 +126,18 @@ local function applyPendingSettings()
 
   g_settings.setNode('bot', pendingSettings)
   pendingSettings = nil
+end
+
+function disableCommunityBot()
+  removeEvent(refreshEvent);refreshEvent = nil
+  applyPendingSettings()
+  save()
+  local settings = g_settings.getNode('bot') or {}
+  local index = g_game.getCharacterName() .. "_" .. g_game.getClientVersion()
+  if settings[index] then settings[index].enabled = false;g_settings.setNode('bot', settings) end
+  clear()
+  if enableButton then enableButton:setOn(false) end
+  if statusLabel then statusLabel:setOn(true);statusLabel:setText('Status: disabled (ElfBot selected)') end
 end
 
 local function queueRefresh(settings, delay)
@@ -187,6 +229,7 @@ function init()
   botMessages = contentsPanel.messages
   botTabs = contentsPanel.botTabs
   botTabs:setContentWidget(contentsPanel.botPanel)
+  updateElfBotControls()
 
   editWindow = g_ui.displayUI('edit')
   editWindow:hide()
@@ -229,6 +272,7 @@ end
 
 function clear()
   terminateCallbacks()
+  if botExecutor and botExecutor.dispose then botExecutor.dispose() end
   botExecutor = nil
   removeEvent(checkEvent)
   checkEvent = nil
@@ -237,7 +281,7 @@ function clear()
   nextMessageCleanup = 0
 
   -- optimization, callback is not used when not needed
-  g_game.enableTileThingLuaCallback(false)
+  -- Each executor releases only its own Tile callback subscription.
 
   if botTabs then
     botTabs:clearTabs()
@@ -344,6 +388,9 @@ function refresh()
 
   enableButton.onClick = function(widget)
     settings[index].enabled = not settings[index].enabled
+    if settings[index].enabled and modules.game_elfbot and modules.game_elfbot.setEnabled then
+      modules.game_elfbot.setEnabled(false)
+    end
     queueRefresh(settings)
   end
 
@@ -695,7 +742,7 @@ function check()
     removeEvent(checkEvent)
     checkEvent = nil
     terminateCallbacks()
-    g_game.enableTileThingLuaCallback(false)
+    if botExecutor.dispose then botExecutor.dispose() end
     botExecutor = nil -- critical
     return onError(result)
   end

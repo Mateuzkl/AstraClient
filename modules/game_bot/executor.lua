@@ -1,4 +1,5 @@
-function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, reloadCallback, websockets, applyBotFontsCallback)
+function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, reloadCallback, websockets, applyBotFontsCallback, options)
+  options = options or {}
   local function compileInContext(source, name, environment)
     local chunk, compileError = loadstring(source, name)
     if chunk then
@@ -8,7 +9,7 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
   end
 
   -- load lua and otui files
-  local configFiles = g_resources.listDirectoryFiles("/bot/" .. config, true, false)
+  local configFiles = options.standalone and {} or g_resources.listDirectoryFiles("/bot/" .. config, true, false)
   local luaFiles = {}
   local uiFiles = {}
   for i, file in ipairs(configFiles) do
@@ -21,15 +22,21 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
     end
   end
 
-  if #luaFiles == 0 then
+  if #luaFiles == 0 and not options.standalone then
     return error("Config (/bot/" .. config .. ") doesn't have lua files")
   end
 
   -- init bot variables
   local context = {}
-  context.configDir = "/bot/".. config
+  context.standalone = options.standalone
+  context.configDir = options.standalone and "/elfbot" or "/bot/".. config
   context.tabs = tabs
-  context.mainTab = context.tabs:addTab("Main", g_ui.createWidget('BotPanel')).tabPanel.content
+  if options.standalone then
+    context.mainTab = g_ui.createWidget('UIWidget')
+    context.mainTab:hide()
+  else
+    context.mainTab = context.tabs:addTab("Main", g_ui.createWidget('BotPanel')).tabPanel.content
+  end
   context.panel = context.mainTab
   context.saveConfig = saveConfigCallback
   context.reload = reloadCallback
@@ -84,6 +91,10 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
     onRemoveItem = {},
     onInventoryChange = {}
   }
+  context.updateTileCallbacks = function()
+    setTileCallbacksOwner(context, not context._disposed and
+      (#context._callbacks.onAddThing > 0 or #context._callbacks.onRemoveThing > 0))
+  end
 
   -- basic functions & classes
   context.print = print
@@ -108,7 +119,7 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
   context.load = function(str, name) return assert(compileInContext(str, name, context)) end
   context.loadstring = context.load
   context.assert = assert
-  context.dofile = function(file) context.load(g_resources.readFileContents("/bot/" .. config .. "/" .. file), file)() end
+  context.dofile = function(file) context.load(g_resources.readFileContents(context.configDir .. "/" .. file), file)() end
   context.gcinfo = gcinfo
   context.tr = tr
   context.json = json
@@ -161,25 +172,58 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
   context.player = g_game.getLocalPlayer()
 
   -- init functions
+  local previousContext = G.botContext
   G.botContext = context
-  dofiles("functions")
-  context.Panels = {}
-  dofiles("panels")
-  G.botContext = nil
-
-  -- run ui scripts
-  for i, file in ipairs(uiFiles) do
-    g_ui.importStyle(file)
+  local initialized, initError = pcall(function()
+    dofiles("functions")
+    context.Panels = {}
+    dofiles("panels")
+  end)
+  G.botContext = previousContext
+  if not initialized then
+    context._disposed = true
+    context.updateTileCallbacks()
+    if options.standalone then context.mainTab:destroy() end
+    error(initError)
   end
 
-  -- run lua script
-  for i, file in ipairs(luaFiles) do
-    context.load(g_resources.readFileContents(file), file)()
-    context.panel = context.mainTab -- reset default tab
+  local attached, extension = pcall(function()
+    if options.prepare then options.prepare(context) end
+    for _, file in ipairs(uiFiles) do g_ui.importStyle(file) end
+    for _, file in ipairs(luaFiles) do
+      context.load(g_resources.readFileContents(file), file)()
+      context.panel = context.mainTab -- reset default tab
+    end
+    return options.attach and options.attach(context)
+  end)
+  if not attached then
+    context._disposed = true
+    context.updateTileCallbacks()
+    for id, socket in pairs(context._websockets) do g_http.cancel(socket);context._websockets[id] = nil end
+    error(extension)
   end
-
+  local function dispatchCallbacks(name, ...)
+    if context._disposed then return end
+    local pending = {}
+    for _, callback in ipairs(context._callbacks[name]) do pending[#pending + 1] = callback end
+    for _, callback in ipairs(pending) do callback(...) end
+  end
   return {
+    context = context,
+    ui = extension,
+    dispose = function()
+      if context._disposed then return end
+      context._disposed = true
+      context.updateTileCallbacks()
+      context._scheduler = {}
+      for id, socket in pairs(context._websockets) do g_http.cancel(socket);context._websockets[id] = nil end
+      local ok, err = true, nil
+      if extension then ok, err = pcall(extension.dispose) end
+      if options.standalone then context.mainTab:destroy() end
+      if not ok then context.warning(tostring(err)) end
+    end,
     script = function()
+      if context._disposed then return end
       local now = g_clock.millis()
       context.now = now
       context.time = now
@@ -196,6 +240,8 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
         end
       end
 
+      if extension then extension.tick() end
+
       while #context._scheduler > 0 and context._scheduler[1].execution <= g_clock.millis() do
         local task = table.remove(context._scheduler, 1)
         local status, result = pcall(task.callback)
@@ -211,6 +257,7 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
     callbacks = {
       onKeyDown = function(keyCode, keyboardModifiers)
         local keyDesc = determineKeyComboDesc(keyCode, keyboardModifiers)
+        if extension and extension.keyDown(keyDesc) then return true end
         for i, macro in ipairs(context._macros) do
           if macro.switch and macro.hotkey == keyDesc then
             macro.switch:onClick()
@@ -227,9 +274,7 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
             hotkey.switch:setOn(true)
           end
         end
-        for i, callback in ipairs(context._callbacks.onKeyDown) do
-          callback(keyDesc)
-        end
+        dispatchCallbacks("onKeyDown", keyDesc)
       end,
       onKeyUp = function(keyCode, keyboardModifiers)
         local keyDesc = determineKeyComboDesc(keyCode, keyboardModifiers)
@@ -239,191 +284,120 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
             hotkey.switch:setOn(false)
           end
         end
-        for i, callback in ipairs(context._callbacks.onKeyUp) do
-          callback(keyDesc)
-        end
+        dispatchCallbacks("onKeyUp", keyDesc)
       end,
       onKeyPress = function(keyCode, keyboardModifiers, autoRepeatTicks)
         local keyDesc = determineKeyComboDesc(keyCode, keyboardModifiers)
+        if extension and extension.keyPress(keyDesc) then return true end
         local hotkey = context._hotkeys[keyDesc]
         if hotkey and not hotkey.single then
           if hotkey.callback() then
             hotkey.lastExecution = context.now
           end
         end
-        for i, callback in ipairs(context._callbacks.onKeyPress) do
-          callback(keyDesc, autoRepeatTicks)
-        end
+        dispatchCallbacks("onKeyPress", keyDesc, autoRepeatTicks)
       end,
       onTalk = function(name, level, mode, text, channelId, pos)
-        for i, callback in ipairs(context._callbacks.onTalk) do
-          callback(name, level, mode, text, channelId, pos)
-        end
+        dispatchCallbacks("onTalk", name, level, mode, text, channelId, pos)
       end,
       onImbuementWindow = function(itemId, slots, activeSlots, imbuements, needItems)
-        for i, callback in ipairs(context._callbacks.onImbuementWindow) do
-          callback(itemId, slots, activeSlots, imbuements, needItems)
-        end
+        dispatchCallbacks("onImbuementWindow", itemId, slots, activeSlots, imbuements, needItems)
       end,
       onTextMessage = function(mode, text)
-        for i, callback in ipairs(context._callbacks.onTextMessage) do
-          callback(mode, text)
-        end
+        dispatchCallbacks("onTextMessage", mode, text)
       end,
       onLoginAdvice = function(message)
-        for i, callback in ipairs(context._callbacks.onLoginAdvice) do
-          callback(message)
-        end
+        dispatchCallbacks("onLoginAdvice", message)
       end,
       onAddThing = function(tile, thing)
-        for i, callback in ipairs(context._callbacks.onAddThing) do
-          callback(tile, thing)
-        end
+        dispatchCallbacks("onAddThing", tile, thing)
       end,
       onRemoveThing = function(tile, thing)
-        for i, callback in ipairs(context._callbacks.onRemoveThing) do
-          callback(tile, thing)
-        end
+        dispatchCallbacks("onRemoveThing", tile, thing)
       end,
       onCreatureAppear = function(creature)
-        for i, callback in ipairs(context._callbacks.onCreatureAppear) do
-          callback(creature)
-        end
+        dispatchCallbacks("onCreatureAppear", creature)
       end,
       onCreatureDisappear = function(creature)
-        for i, callback in ipairs(context._callbacks.onCreatureDisappear) do
-          callback(creature)
-        end
+        dispatchCallbacks("onCreatureDisappear", creature)
       end,
       onCreaturePositionChange = function(creature, newPos, oldPos)
-        for i, callback in ipairs(context._callbacks.onCreaturePositionChange) do
-          callback(creature, newPos, oldPos)
-        end
+        dispatchCallbacks("onCreaturePositionChange", creature, newPos, oldPos)
       end,
       onCreatureHealthPercentChange = function(creature, healthPercent)
-        for i, callback in ipairs(context._callbacks.onCreatureHealthPercentChange) do
-          callback(creature, healthPercent)
-        end
+        dispatchCallbacks("onCreatureHealthPercentChange", creature, healthPercent)
       end,
       onUse = function(pos, itemId, stackPos, subType)
-        for i, callback in ipairs(context._callbacks.onUse) do
-          callback(pos, itemId, stackPos, subType)
-        end
+        dispatchCallbacks("onUse", pos, itemId, stackPos, subType)
       end,
       onUseWith = function(pos, itemId, target, subType)
-        for i, callback in ipairs(context._callbacks.onUseWith) do
-          callback(pos, itemId, target, subType)
-        end
+        dispatchCallbacks("onUseWith", pos, itemId, target, subType)
       end,
       onContainerOpen = function(container, previousContainer)
-        for i, callback in ipairs(context._callbacks.onContainerOpen) do
-          callback(container, previousContainer)
-        end
+        dispatchCallbacks("onContainerOpen", container, previousContainer)
       end,
       onContainerClose = function(container)
-        for i, callback in ipairs(context._callbacks.onContainerClose) do
-          callback(container)
-        end
+        dispatchCallbacks("onContainerClose", container)
       end,
       onContainerUpdateItem = function(container, slot, item, oldItem)
-        for i, callback in ipairs(context._callbacks.onContainerUpdateItem) do
-          callback(container, slot, item, oldItem)
-        end
+        dispatchCallbacks("onContainerUpdateItem", container, slot, item, oldItem)
       end,
       onMissle = function(missle)
-        for i, callback in ipairs(context._callbacks.onMissle) do
-          callback(missle)
-        end
+        dispatchCallbacks("onMissle", missle)
       end,
       onAnimatedText = function(thing, text)
-        for i, callback in ipairs(context._callbacks.onAnimatedText) do
-          callback(thing, text)
-        end
+        dispatchCallbacks("onAnimatedText", thing, text)
       end,
       onStaticText = function(thing, text)
-        for i, callback in ipairs(context._callbacks.onStaticText) do
-          callback(thing, text)
-        end
+        dispatchCallbacks("onStaticText", thing, text)
       end,
       onChannelList = function(channels)
-        for i, callback in ipairs(context._callbacks.onChannelList) do
-          callback(channels)
-        end
+        dispatchCallbacks("onChannelList", channels)
       end,
       onOpenChannel = function(channelId, channelName)
-        for i, callback in ipairs(context._callbacks.onOpenChannel) do
-          callback(channelId, channelName)
-        end
+        dispatchCallbacks("onOpenChannel", channelId, channelName)
       end,
       onCloseChannel = function(channelId)
-        for i, callback in ipairs(context._callbacks.onCloseChannel) do
-          callback(channelId)
-        end
+        dispatchCallbacks("onCloseChannel", channelId)
       end,
       onChannelEvent = function(channelId, name, event)
-        for i, callback in ipairs(context._callbacks.onChannelEvent) do
-          callback(channelId, name, event)
-        end
+        dispatchCallbacks("onChannelEvent", channelId, name, event)
       end,
       onTurn = function(creature, direction)
-        for i, callback in ipairs(context._callbacks.onTurn) do
-          callback(creature, direction)
-        end
+        dispatchCallbacks("onTurn", creature, direction)
       end,
       onWalk = function(creature, oldPos, newPos)
-        for i, callback in ipairs(context._callbacks.onWalk) do
-          callback(creature, oldPos, newPos)
-        end
+        dispatchCallbacks("onWalk", creature, oldPos, newPos)
       end,
       onModalDialog = function(id, title, message, buttons, enterButton, escapeButton, choices, priority)
-        for i, callback in ipairs(context._callbacks.onModalDialog) do
-          callback(id, title, message, buttons, enterButton, escapeButton, choices, priority)
-        end
+        dispatchCallbacks("onModalDialog", id, title, message, buttons, enterButton, escapeButton, choices, priority)
       end,
       onGameEditText = function(id, itemId, maxLength, text, writer, time)
-        for i, callback in ipairs(context._callbacks.onGameEditText) do
-          callback(id, itemId, maxLength, text, writer, time)
-        end
+        dispatchCallbacks("onGameEditText", id, itemId, maxLength, text, writer, time)
       end,
       onAttackingCreatureChange = function(creature, oldCreature)
-        for i, callback in ipairs(context._callbacks.onAttackingCreatureChange) do
-          callback(creature, oldCreature)
-        end
+        dispatchCallbacks("onAttackingCreatureChange", creature, oldCreature)
       end,
       onManaChange = function(player, mana, maxMana, oldMana, oldMaxMana)
-        for i, callback in ipairs(context._callbacks.onManaChange) do
-          callback(player, mana, maxMana, oldMana, oldMaxMana)
-        end
+        dispatchCallbacks("onManaChange", player, mana, maxMana, oldMana, oldMaxMana)
       end,
       onAddItem = function(container, slot, item)
-        for i, callback in ipairs(context._callbacks.onAddItem) do
-          callback(container, slot, item)
-        end
+        dispatchCallbacks("onAddItem", container, slot, item)
       end,
       onRemoveItem = function(container, slot, item)
-        for i, callback in ipairs(context._callbacks.onRemoveItem) do
-          callback(container, slot, item)
-        end
+        dispatchCallbacks("onRemoveItem", container, slot, item)
       end,
       onStatesChange = function(player, states, oldStates)
-        for i, callback in ipairs(context._callbacks.onStatesChange) do
-          callback(player, states, oldStates)
-        end
+        dispatchCallbacks("onStatesChange", player, states, oldStates)
       end,
       onGroupSpellCooldown = function(iconId, duration)
-        for i, callback in ipairs(context._callbacks.onGroupSpellCooldown) do
-          callback(iconId, duration)
-        end
+        dispatchCallbacks("onGroupSpellCooldown", iconId, duration)
       end,
       onSpellCooldown = function(iconId, duration)
-        for i, callback in ipairs(context._callbacks.onSpellCooldown) do
-          callback(iconId, duration)
-        end
+        dispatchCallbacks("onSpellCooldown", iconId, duration)
       end,
       onInventoryChange = function(player, slot, item, oldItem)
-        for i, callback in ipairs(context._callbacks.onInventoryChange) do
-          callback(player, slot, item, oldItem)
-        end
+        dispatchCallbacks("onInventoryChange", player, slot, item, oldItem)
       end
     }
   }

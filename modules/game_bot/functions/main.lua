@@ -112,14 +112,19 @@ context.macro = function(timeout, name, hotkey, callback, parent)
 
   macro.callback = function(macro)
     if not macro.delay or macro.delay < context.now then
+      local previous = context._currentExecution
       context._currentExecution = macro
       local start = g_clock.realMillis()
-      callback(macro)
+      local ok, result = pcall(callback, macro)
+      context._currentExecution = previous
+      if not ok then
+        macro.delay = context.now + math.max(1000, macro.timeout)
+        error(result)
+      end
       local executionTime = g_clock.realMillis() - start
       if executionTime > 100 then
         context.warning("Slow macro (" .. executionTime .. "ms): " .. macro.name .. " - " .. desc)
       end
-      context._currentExecution = nil
       return true
     end
   end
@@ -166,14 +171,20 @@ context.hotkey = function(keys, name, callback, parent, single)
   local hotkeyData = context._hotkeys[keys]
   hotkeyData.callback = function()
     if not hotkeyData.delay or hotkeyData.delay < context.now then
+      local previous = context._currentExecution
       context._currentExecution = hotkeyData
       local start = g_clock.realMillis()
-      callback()
+      local ok, result = pcall(callback)
+      context._currentExecution = previous
+      if not ok then
+        hotkeyData.delay = context.now + 1000
+        context.warning('Hotkey ' .. hotkeyData.name .. ' execution error: ' .. tostring(result))
+        return false
+      end
       local executionTime = g_clock.realMillis() - start
       if executionTime > 100 then
         context.warning("Slow hotkey (" .. executionTime .. "ms): " .. hotkeyData.name .. " - " .. desc)
       end
-      context._currentExecution = nil
       return true
     end
   end

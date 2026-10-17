@@ -1,0 +1,11 @@
+Module
+  name: game_elfbot
+  description: Standalone ElfBot OTC for client
+  author: ElfBot OTC
+  sandboxed: true
+  autoload: true
+  autoload-priority: 1001
+  dependencies: [game_bot, client_topmenu, game_interface, game_console]
+  scripts: [language, session, history, icon_import, settings_import, telemetry, legacy, engine, autonomous, original_dialogs, hud, interface, runtime]
+  @onLoad: init()
+  @onUnload: terminate()
