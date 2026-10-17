@@ -9,9 +9,11 @@ scheduleEvent = function(callback)
 end
 removeEvent = function(event) if event then event.cancelled = true end end
 GOLD_COINS, ThingCategoryItem = 2148, 0
+GameDoubleShopSellAmount, GameAstraShopBuyAmountU16 = 39, 153
 tr = function(text, ...) return string.format(text, ...) end
 short_text = function(text, length) return text:sub(1, length) end
 displayInfoBox = function(_, text) warnings[#warnings + 1] = text end
+local enabledFeatures = {}
 local player = {
   getFreeCapacity = function() return 1000 end,
   getInventoryItem = function() return nil end
@@ -19,6 +21,7 @@ local player = {
 g_game = {
   isOnline = function() return true end,
   getLocalPlayer = function() return player end,
+  getFeature = function(feature) return enabledFeatures[feature] == true end,
   sellItem = function(item, amount) sent[#sent + 1] = { id = item:getId(), amount = amount } end
 }
 local types = {}
