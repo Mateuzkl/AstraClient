@@ -54,7 +54,7 @@ test('migration errors stop startup rather than loading legacy secrets', () => {
 
 test('bootstrap reports asynchronous restoration errors without releasing startup', () => {
   const source = fs.readFileSync(path.join(__dirname, '../bootstrap.js'), 'utf8');
-  const fixture = () => {
+  const fixture = (deniedStorage = false) => {
     const calls = { failed: [], phases: 0, removed: 0 };
     let restored;
     const canvas = { addEventListener() {} };
@@ -63,12 +63,14 @@ test('bootstrap reports asynchronous restoration errors without releasing startu
       document: { getElementById: () => canvas, createElement: () => ({ getContext: () => ({}) }) },
       navigator: { userAgent: 'desktop' }, self: { crossOriginIsolated: true },
       window: { AstraLauncher: launcher }, AstraLauncher: launcher,
+      AstraCredentials: { create: () => ({ restore: async () => {}, forget: async () => {} }) },
       AstraBrowser: { assertSecurePage() {}, restorePersistence: (_, callback) => { restored = callback; } },
       FS: { analyzePath: () => ({ exists: true }), mount() {} }, IDBFS: {},
-      addRunDependency: name => assert.equal(name, 'astra-idbfs'),
-      removeRunDependency: name => { assert.equal(name, 'astra-idbfs'); calls.removed++; },
+      addRunDependency: name => assert.ok(['astra-idbfs', 'astra-credentials'].includes(name)),
+      removeRunDependency: name => { if (name === 'astra-idbfs') calls.removed++; },
       performance: { now: () => 1 }, console
     };
+    if (deniedStorage) Object.defineProperty(context.window, 'indexedDB', { get() { throw new Error('denied'); } });
     vm.runInNewContext(source, context);
     context.Module.preRun[0]();
     return { calls, restore: error => restored(error) };
@@ -80,6 +82,8 @@ test('bootstrap reports asynchronous restoration errors without releasing startu
   const success = fixture(); success.restore(null);
   assert.equal(success.calls.failed.length, 0);
   assert.equal(success.calls.phases, 1); assert.equal(success.calls.removed, 1);
+  const unavailable = fixture(true); unavailable.restore(null);
+  assert.equal(unavailable.calls.failed.length, 0, 'denied credential storage cannot block the game');
 });
 
 test('production requires HTTPS and rejects remote plaintext even on a local page', () => {

@@ -23,13 +23,14 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
   const session = new Map(repair ? [['astra-full-verify:/client/astraclient.html', 'on']] : []);
   const hostListeners = {};
   const data = new Uint8Array([1, 2, 3]).buffer;
-  const manifest = { version: '8.60', packageName: 'dist/astraclient.data', file: 'astraclient.data', size: 3 };
+  const manifest = { version: '8.60', packageName: 'dist/astraclient.data', file: 'astraclient.data', size: 3,
+    chunks: [{ size: 3 }] };
   let closes = 0, reloads = 0, lastRead, engine, suppliedPackage;
-  const store = { close() { closes++; }, remove: async () => {} };
+  const store = { close() { closes++; }, remove: async () => {}, getChunk: async i => i === 0 ? data : undefined };
   const timers = new Map();
   let timerId = 0;
   let releaseRead, scripts = 0;
-  const context = { console, URL, Event, performance: { now: () => 100 },
+  const context = { console, URL, Event, ArrayBuffer, performance: { now: () => 100 },
     location: new URL('http://localhost/client/astraclient.html'),
     ASTRA_CONFIG: { performance: initial }, navigator: { locks }, crossOriginIsolated: true,
     matchMedia: query => { assert.equal(query, '(prefers-reduced-motion: reduce)'); return { matches: reducedMotion }; },
@@ -67,7 +68,7 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
   context.window = context; context.self = context;
   element('astra-launcher').hidden = false; // Visible in the production HTML.
   vm.runInNewContext(source, context);
-  return { context, element, storage, timers, session, hostListeners, closes: () => closes,
+  return { context, element, storage, timers, session, hostListeners, store, manifest, closes: () => closes,
     readOptions: () => lastRead, reloads: () => reloads, engine: () => engine, suppliedPackage: () => suppliedPackage,
     releaseRead: () => releaseRead(), scripts: () => scripts };
 }
@@ -98,6 +99,44 @@ test('saved Off overrides a deployment default and denied storage is harmless', 
   const toggle = unavailable.element('launcher-performance-toggle');
   toggle.checked = true;
   assert.doesNotThrow(() => toggle.dispatchEvent(new Event('change')));
+});
+
+test('Update reuses an unchanged installation instead of downloading the same package', async () => {
+  const run = launcher();
+  run.context.AstraAssetCache.install = async () => { throw new Error('unexpected download'); };
+  await tick();
+  await run.element('launcher-update').listeners.click();
+  assert.equal(run.element('launcher-state').textContent, 'Ready to Play');
+  assert.match(run.element('launcher-message').textContent, /already up to date/);
+  assert.equal(run.reloads(), 0);
+});
+
+test('Update downloads when matching metadata points to missing, wrong-sized or non-buffer chunks', async () => {
+  for (const badIndex of [0, 1]) {
+    for (const invalid of [undefined, new ArrayBuffer(4), new Uint8Array(1)]) {
+      const run = launcher();
+      run.manifest.chunks = [{ size: 2 }, { size: 1 }];
+      run.store.getChunk = async i => i === badIndex ? invalid : new ArrayBuffer(run.manifest.chunks[i].size);
+      let downloads = 0;
+      run.context.AstraAssetCache.install = async () => { downloads++; };
+      await tick();
+      await run.element('launcher-update').listeners.click();
+      assert.equal(downloads, 1);
+      assert.equal(run.element('launcher-state').textContent, 'Ready to Play');
+      assert.doesNotMatch(run.element('launcher-message').textContent, /No download needed/);
+    }
+  }
+});
+
+test('Update checks every manifest chunk before skipping a download', async () => {
+  const run = launcher(), reads = [];
+  run.manifest.chunks = [{ size: 2 }, { size: 1 }];
+  run.store.getChunk = async i => { reads.push(i); return new ArrayBuffer(run.manifest.chunks[i].size); };
+  run.context.AstraAssetCache.install = async () => { throw new Error('unexpected download'); };
+  await tick();
+  await run.element('launcher-update').listeners.click();
+  assert.deepEqual(reads, [0, 1]);
+  assert.match(run.element('launcher-message').textContent, /No download needed/);
 });
 
 test('Play hands verified data to the SDK exactly once and waits for a real client frame', async () => {

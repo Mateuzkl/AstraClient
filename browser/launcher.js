@@ -123,7 +123,7 @@
       // Serialize install/remove/Play across this deployment's launcher tabs.
       // Hold the Play lock until the SDK has consumed its preload package.
       if (navigator.locks && manifest) {
-        const name = `astra-preload:${location.pathname}:${manifest.packageName}`;
+        const name = `astra-preload:${new URL('.', location.href).pathname}:astraclient.data`;
         await navigator.locks.request(name, { ifAvailable: true }, async lock => {
           if (lock) return callback();
           message('Waiting for another Astra tab to finish preparing game data…');
@@ -147,7 +147,19 @@
     if (manifest.packageName !== previous) {
       closeStore(); store = await api.openStore(window.indexedDB, location.pathname, manifest.packageName);
     }
-    await download();
+    let complete = await api.state(store, manifest) === 'installed';
+    if (complete) {
+      for (let i = 0; i < manifest.chunks.length; i++) {
+        const chunk = await store.getChunk(i);
+        if (!(chunk instanceof ArrayBuffer) || chunk.byteLength !== manifest.chunks[i].size) {
+          complete = false; break;
+        }
+      }
+    }
+    if (complete) {
+      current = 'installed';
+      message('Game data is already up to date. No download needed.');
+    } else await download();
   }));
   el('launcher-uninstall').addEventListener('click', () => {
     if (!running && !engineStarted) el('launcher-confirm').hidden = false;
@@ -172,7 +184,7 @@
         telemetry.cacheReadBytes = bytes;
         if (telemetry.cacheIntegrityMode === 'full-verify') telemetry.cacheVerifiedBytes = bytes;
         const bar = el('splash-progress'); bar.max = total; bar.value = bytes;
-        message(`Preparing game data · ${(bytes / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MiB`);
+        message(`Loading cached game data · ${(bytes / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MiB`);
       }, { fullVerify, diagnostics: performanceEnabled ? telemetry : null }); } catch (_) { closeStore(); }
     }
     telemetry.cacheReadMs = Math.round(performance.now() - readStarted);
@@ -209,7 +221,13 @@
     running = true; current = 'starting'; update();
     el('launcher-progress').hidden = true;
     el('splash-progress').removeAttribute('value');
-    message(store ? 'Opening Astra Web…' : 'Loading without persistent storage. Game data will be downloaded for this session.');
+    const persistent = store && !telemetry.persistentCacheUnavailable;
+    message(persistent ? 'Opening Astra Web…' : 'Loading without persistent storage. Game data will be downloaded for this session.');
+    if (!persistent) {
+      el('astra-storage-status').textContent = 'Game data could not be saved on this browser. Allow site storage and avoid private browsing to keep it between visits.';
+      el('astra-web-options-panel').hidden = false;
+      el('astra-web-options-button').setAttribute('aria-expanded', 'true');
+    }
     const source = el('astra-engine').content.querySelector('script[src]');
     if (!source) throw new Error('Browser engine script is missing. Rebuild the bundle.');
     const script = document.createElement('script');

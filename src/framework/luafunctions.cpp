@@ -122,6 +122,11 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_platform", "getMacAddresses", &Platform::getMacAddresses, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getUserName", &Platform::getUserName, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "isBrowser", &Platform::isBrowser, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "canRememberWebPassword", &Platform::canRememberWebPassword, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "getWebCredentials", &Platform::getWebCredentials, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "saveWebCredentials", &Platform::saveWebCredentials, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "forgetWebCredentials", &Platform::forgetWebCredentials, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "allowWebPasswordStorage", &Platform::allowWebPasswordStorage, &g_platform);
 #ifdef UNSAFE_LUA_FUNCTIONS
     g_lua.bindSingletonFunction("g_platform", "getDlls", &Platform::getDlls, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getProcesses", &Platform::getProcesses, &g_platform);

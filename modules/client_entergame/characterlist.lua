@@ -22,6 +22,9 @@ local updateWaitEvent
 local resendWaitEvent
 local autoReconnectEvent
 local autoReconnectButton
+local webConnectionReturnEvent
+local webConnectionGeneration = 0
+local returnToLoginAfterDisconnect = false
 -- Explicit cancellation stays blocked even if the engine reports game end late.
 local autoReconnectBlocked = false
 local lastWidget
@@ -451,6 +454,27 @@ function onGameLoginToken(unknown)
   end
 end
 
+local function returnFromConnectionError()
+  if not (ClientSecurity and ClientSecurity.isBrowser()) then
+    CharacterList.showAgain()
+    return
+  end
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
+  removeEvent(webConnectionReturnEvent)
+  webConnectionGeneration = webConnectionGeneration + 1
+  local generation = webConnectionGeneration
+  -- The engine releases the failed protocol after its Lua error callback.
+  -- Return inside the running client, never restart the WASM/page/downloader.
+  webConnectionReturnEvent = addEvent(function()
+    if generation ~= webConnectionGeneration or not CharacterList then return end
+    webConnectionReturnEvent = nil
+    returnToLoginAfterDisconnect = false
+    if not g_game.isOnline() then CharacterList.hide(true) end
+  end)
+end
+
 function onGameConnectionError(message, code)
   if modules.client_background and modules.client_background.handleCastLoginError
      and modules.client_background.handleCastLoginError(message, code) then
@@ -487,10 +511,13 @@ function onGameConnectionError(message, code)
   end
 
   errorBox = displayErrorBox(title, text)
+  returnToLoginAfterDisconnect = ClientSecurity and ClientSecurity.isBrowser() or false
   errorBox.onOk = function()
     if errorBox then errorBox:destroy() end
     errorBox = nil
-    if code == 16655 then
+    if ClientSecurity and ClientSecurity.isBrowser() then
+      returnFromConnectionError()
+    elseif code == 16655 then
       CharacterList.hide(true)
     else
       CharacterList.showAgain()
@@ -499,7 +526,7 @@ function onGameConnectionError(message, code)
 
   -- Online connection errors are followed by onGameEnd in the engine.
   if not g_game.isOnline() then
-    CharacterList.showAgain()
+    returnFromConnectionError()
   end
 end
 
@@ -526,6 +553,7 @@ local function onGameEnd()
   end
   CharacterList.destroyLoadBox()
   removeAutoReconnectEvent()
+  if returnToLoginAfterDisconnect then returnFromConnectionError(); return end
   CharacterList.showAgain()
 end
 
@@ -590,6 +618,10 @@ end
 
 function CharacterList.terminate()
  if USE_NEW_ENERGAME then return end
+  removeEvent(webConnectionReturnEvent)
+  webConnectionReturnEvent = nil
+  webConnectionGeneration = webConnectionGeneration + 1
+  returnToLoginAfterDisconnect = false
   autoReconnectBlocked = true
   removeAutoReconnectEvent()
   removeLoginWaitEvents()
@@ -841,6 +873,10 @@ function CharacterList.destroyLoadBox()
 end
 
 function CharacterList.onGameStart()
+  removeEvent(webConnectionReturnEvent)
+  webConnectionReturnEvent = nil
+  webConnectionGeneration = webConnectionGeneration + 1
+  returnToLoginAfterDisconnect = false
   autoReconnectBlocked = false
   removeAutoReconnectEvent()
   CharacterList.destroyLoadBox()

@@ -162,6 +162,9 @@ jobs:
       - name: Test startup module lifecycle
         run: luajit .github/tests/startup_lifecycle.lua
 
+      - name: Test mobile style inheritance and TopMenu lifecycle
+        run: luajit .github/tests/mobile_styles.lua
+
       - name: Test indexed sprite selection and lifecycle
         run: |
           c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
@@ -173,7 +176,9 @@ jobs:
         run: luajit .github/tests/native_splash_config.lua
 
       - name: Test Web credentials and native login preferences
-        run: luajit .github/tests/web_credentials.lua
+        run: |
+          luajit .github/tests/web_credentials.lua
+          luajit .github/tests/web_disconnect.lua
 
       - name: Test Cam Viewer Web filesystem and native shell lifecycle
         run: luajit .github/tests/camviewer_files.lua

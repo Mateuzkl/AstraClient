@@ -231,7 +231,7 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: rememberEmailBox.bottom
     margin-top: 5
-    @onCheckChange: chooseButtonVisibility()
+    @onCheckChange: chooseButtonVisibility() EnterGame.onRememberPasswordChange()
 
     Label
       !text: tr('Remember Password')

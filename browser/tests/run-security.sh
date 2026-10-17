@@ -8,6 +8,12 @@ for test in credentials rsa uuid; do
     -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -o "${validation_dir}/${test}.js"
   "$test_node" "${validation_dir}/${test}.js"
 done
+em++ -std=c++17 -pthread -I src browser/tests/vault_bridge.cpp \
+  --pre-js browser/tests/mock-vault.js -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 \
+  -sEXIT_RUNTIME=1 -sENVIRONMENT=node -sASSERTIONS=1 -sSAFE_HEAP=1 \
+  -sEXPORTED_FUNCTIONS='["_main","_malloc","_free"]' \
+  -o "${validation_dir}/vault.js"
+timeout 15 "$test_node" "${validation_dir}/vault.js"
 em++ -std=c++17 -DNDEBUG -I src browser/tests/websocket_callbacks.cpp \
   -lwebsocket.js --pre-js browser/tests/mock-websocket.js \
   -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -o "${validation_dir}/websocket.js"

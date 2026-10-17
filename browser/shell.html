@@ -64,12 +64,16 @@
     <div id="astra-web-options-panel" hidden>
       <label><input type="checkbox" id="launcher-performance-toggle"> Performance diagnostics</label>
       <p>Local measurements only. No data is sent.</p>
+      <button class="secondary" id="astra-forget-login">Forget saved login</button>
+      <p id="astra-credentials-status" role="status">Remember Password is optional. Only use it on a trusted device.</p>
+      <p id="astra-storage-status" role="status"></p>
     </div>
   </div>
   <details id="astra-performance" hidden><summary>Local performance diagnostics</summary><button id="astra-performance-close" aria-label="Turn off performance diagnostics">×</button><pre id="astra-performance-values"></pre></details>
   <script src="config.js"></script>
   <script src="security.js"></script>
   <script src="runtime.js"></script>
+  <script src="credentials.js"></script>
   <script src="bootstrap.js"></script>
   <script src="asset-cache.js"></script>
   <script src="launcher.js"></script>
