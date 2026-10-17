@@ -73,10 +73,18 @@ void EventDispatcher::poll()
     AutoStat s(this == &g_dispatcher ? STATS_MAIN : STATS_RENDER, "PollDispatcher");
     std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
+    m_scheduledEventList.compactCanceled(g_clock.millis());
+
     int events = 0;
     int loops = 0;
     for(int count = 0, max = m_scheduledEventList.size(); count < max && !m_scheduledEventList.empty(); ++count) {
         ScheduledEventPtr scheduledEvent = m_scheduledEventList.top();
+        // A canceled timer must not wait for its original deadline, run through
+        // the profiler, or keep an otherwise dead queue entry alive.
+        if(scheduledEvent->isCanceled()) {
+            m_scheduledEventList.pop();
+            continue;
+        }
         if(scheduledEvent->remainingTicks() > 0)
             break;
         m_scheduledEventList.pop();
@@ -134,6 +142,21 @@ void EventDispatcher::poll()
 
     m_botSafe = false;
 }
+
+std::string EventDispatcher::getScheduledEventDiagnostics(size_t limit)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    const auto info = m_scheduledEventList.diagnostics(g_clock.millis(), limit);
+    std::ostringstream out;
+    out << "Scheduled queue entries (includes canceled, awaiting removal): " << (info.active + info.canceled)
+        << "\nActive: " << info.active << " | Canceled: " << info.canceled << " | Due now: " << info.due;
+    if (!info.sources.empty())
+        out << "\nTop scheduled sources (active / canceled / due now):";
+    for (const auto& source : info.sources)
+        out << '\n' << source.function << ": " << source.active << " / " << source.canceled << " / " << source.due;
+    return out.str();
+}
+
 ScheduledEventPtr EventDispatcher::scheduleEventEx(const std::string& function, const std::function<void()>& callback, int delay)
 {
     if(m_disabled)

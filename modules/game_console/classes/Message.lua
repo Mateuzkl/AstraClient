@@ -33,9 +33,16 @@ function Message:clear()
     self.statement = 0
     self.name = ''
     self.tab = nil
-    if self.label and self.label:getChildCount() > 0 then
-        self.label:destroyChildren()
+    -- Shared labels may already have been rebound to a different tab/message.
+    -- Release only the label still owned by this record.
+    if self.label and not self.label:isDestroyed() and self.label.message == self then
+        if self.label:getChildCount() > 0 then self.label:destroyChildren() end
+        self.label.message = nil
+        self.label.keywords = {}
+        self.label:removeEventListener(EVENT_TEXT_CLICK)
+        self.label:removeEventListener(EVENT_TEXT_HOVER)
     end
+    self.groupId = 1
     self.label = nil
 end
 

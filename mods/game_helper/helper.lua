@@ -158,12 +158,36 @@ local helperProfile = nil
 local helperVocationEvent = nil
 local helperInitRetryEvent = nil
 local helperGameStateMonitorEvent = nil
+local helperLogoutGcEvent = nil
+local helperSessionEvents = {}
+local helperSessionGeneration = 0
+local helperTerminating = false
 local activeOnlinePlayerName = nil
+local lastPlayerName = nil
 local hotkeyHelperStatus = false
 local afkTime = 180
 local helperAutomaticFunctionsEnabled = true
 local lastActiveMenu = 'healingMenu'
 local isTransitioningPlayer = false
+
+local function cancelHelperSessionEvents()
+  helperSessionGeneration = helperSessionGeneration + 1
+  for event in pairs(helperSessionEvents) do removeEvent(event) end
+  helperSessionEvents = {}
+end
+
+local function scheduleHelperSession(callback, delay)
+  local generation = helperSessionGeneration
+  local owner = g_game.getLocalPlayer()
+  local event
+  event = scheduleEvent(function()
+    helperSessionEvents[event] = nil
+    if helperTerminating or generation ~= helperSessionGeneration or not g_game.isOnline() or g_game.getLocalPlayer() ~= owner then return end
+    callback()
+  end, delay)
+  helperSessionEvents[event] = true
+  return event
+end
 
 -- fallback for LoadedPlayer when not provided by server-side module
 if not LoadedPlayer then
@@ -949,6 +973,7 @@ function onHelperVocationChange(changedPlayer)
 end
 
 function init()
+  helperTerminating = false
   -- Carregar dados de spells do JSON (uma única vez)
   if not HelperSpellData.load() then
     g_logger.warning("[game_helper] Failed to load spell data from JSON, using fallback")
@@ -1141,6 +1166,7 @@ function init()
     local maxAttempts = 10
 
     local function tryInitialize()
+      if helperTerminating then return false end
       attempts = attempts + 1
       -- Verificar diretamente se o player existe (mais confiável que isOnline())
       if g_game and g_game.getLocalPlayer then
@@ -1166,6 +1192,7 @@ function init()
       if _G.scheduleEvent then
         safeLog("debug", "Helper: init() - Scheduling initialization retry attempts")
         local function retryAttempt()
+          if helperTerminating then return end
           if helperEvents and helperEvents.helperCycleEvent then
             safeLog("info", "Helper: init() - CycleEvent already registered, stopping retries")
             return
@@ -1190,6 +1217,7 @@ function init()
 
     -- Monitor contínuo para detectar login de novo player quando o ciclo não está rodando
     local function monitorGameState()
+      if helperTerminating then return end
       if g_game and g_game.isOnline and g_game.isOnline() then
         if not helperEvents or not helperEvents.helperCycleEvent then
           local currentPlayer = g_game.getLocalPlayer()
@@ -1215,6 +1243,13 @@ function init()
 end
 
 function terminate()
+  helperTerminating = true
+  cancelHelperSessionEvents()
+  if helperLogoutGcEvent then removeEvent(helperLogoutGcEvent); helperLogoutGcEvent = nil end
+  if helperEvents.helperCycleEvent then
+    removeEvent(helperEvents.helperCycleEvent)
+    helperEvents.helperCycleEvent = nil
+  end
   if helperInitRetryEvent then
     removeEvent(helperInitRetryEvent)
     helperInitRetryEvent = nil
@@ -1229,6 +1264,17 @@ function terminate()
   end
   -- Persist while the cached character path and UI-backed configs still exist.
   saveSettings()
+  skipSaveUntilLoaded = true
+  isTransitioningPlayer = true
+  unregisterAllHelperHotkeys()
+  for _, name in ipairs({'AutoHaste', 'ExerciseTraining', 'Timer'}) do
+    local component = _Helper[name]
+    if component and component.onLogout then component.onLogout() end
+  end
+  lastEngineSpectators = {}
+  player = nil
+  lastPlayerName = nil
+  activeOnlinePlayerName = nil
 
   if modules.game_helper and modules.game_helper.scripting then
     modules.game_helper.scripting.terminate()
@@ -1767,8 +1813,6 @@ function onEloriaBotClick()
   toggle()
 end
 
-local lastPlayerName = nil
-
 -- Detector de "freeze" do servidor (ex.: server save).
 -- Usa g_game.getElapsedTicksSinceLastRead() como heartbeat (ms desde o último
 -- byte recebido do server). Se passar do threshold, pausamos o helper para
@@ -1802,6 +1846,7 @@ local function isServerFrozen()
 end
 
 function helperCycleEvent()
+  if helperTerminating or not g_game.isOnline() then return end
   -- Pausa o helper enquanto o servidor não responder (ex.: server save).
   -- Sem isso, comandos enfileirados derrubam o player por excesso de pacotes ao retomar.
   if isServerFrozen() then
@@ -1845,13 +1890,14 @@ function helperCycleEvent()
       lastPlayerName = currentName
       player = currentPlayer
       -- Recarregar configurações do novo player
-      scheduleEvent(function()
+      cancelHelperSessionEvents()
+      scheduleHelperSession(function()
         if g_game.isOnline() then
           loadSettings()
           -- Registrar hotkeys salvas APÓS loadSettings() carregar os dados
           unregisterAllHelperHotkeys()
           registerSavedHotkeys()
-          scheduleEvent(function()
+          scheduleHelperSession(function()
             if healingPanel and toolsPanel and shooterPanel then
               _Helper._suppressMessages = true
               onLoadHelperData()
@@ -1902,6 +1948,7 @@ function isValidAutoTargetCreature(creature)
 end
 
 function online()
+  if helperTerminating then return end
   local benchmark = g_clock.millis()
   player = g_game.getLocalPlayer()
   if not player then return end
@@ -1910,6 +1957,8 @@ function online()
     refreshHelperProfile(player)
     return
   end
+  cancelHelperSessionEvents()
+  if helperLogoutGcEvent then removeEvent(helperLogoutGcEvent); helperLogoutGcEvent = nil end
   activeOnlinePlayerName = onlinePlayerName
   refreshHelperProfile()
 
@@ -1925,7 +1974,7 @@ function online()
   -- Carrega UI e configurações
 
   -- Carregar settings se houver arquivo salvo
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if g_game.isOnline() then
       loadSettings()
 
@@ -1934,7 +1983,7 @@ function online()
       registerSavedHotkeys()
 
       -- Aplica dados salvos na UI (depois que painéis existem)
-      scheduleEvent(function()
+      scheduleHelperSession(function()
         if healingPanel and toolsPanel and shooterPanel then
           _Helper._suppressMessages = true
           onLoadHelperData()
@@ -1949,7 +1998,7 @@ function online()
   end, 500)
 
   -- Atualiza o status visual do helper após carregar config
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if helper then
       botStatus()
     end
@@ -1985,7 +2034,7 @@ function online()
   end
 
   -- Criar o painel de atalhos do helper (shortcut panel) se estiver habilitado
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if g_game.isOnline() and _Helper.Shortcut.isVisible() then
       _Helper.Shortcut.createPanel()
     end
@@ -2000,21 +2049,21 @@ function online()
   end, 1000)
 
   -- Iniciar Auto Haste se necessario (verifica se player nao tem haste no login)
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if g_game.isOnline() and _Helper.AutoHaste and _Helper.AutoHaste.onLogin then
       _Helper.AutoHaste.onLogin()
     end
   end, 1500)
 
   -- Iniciar Exercise Training se necessario
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if g_game.isOnline() and _Helper.ExerciseTraining and _Helper.ExerciseTraining.onLogin then
       _Helper.ExerciseTraining.onLogin()
     end
   end, 1600)
 
   -- Iniciar Timer se necessario
-  scheduleEvent(function()
+  scheduleHelperSession(function()
     if g_game.isOnline() and _Helper.Timer and _Helper.Timer.onLogin then
       _Helper.Timer.onLogin()
     end
@@ -2022,6 +2071,7 @@ function online()
 end
 
 function offline()
+  cancelHelperSessionEvents()
   activeOnlinePlayerName = nil
   clearHelperProfile()
   if helperVocationEvent then
@@ -2131,8 +2181,10 @@ function offline()
   _Helper.Shortcut.destroyPanel()
 
   -- Forçar coleta de lixo ao deslogar
-  scheduleEvent(function()
-    collectgarbage("collect")
+  if helperLogoutGcEvent then removeEvent(helperLogoutGcEvent) end
+  helperLogoutGcEvent = scheduleEvent(function()
+    helperLogoutGcEvent = nil
+    if not helperTerminating and not g_game.isOnline() then collectgarbage("collect") end
   end, 500)
 end
 
