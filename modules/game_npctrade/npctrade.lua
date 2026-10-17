@@ -658,7 +658,7 @@ function refreshItem(item)
   end
   local finalCount
   if getCurrentTradeType() == BUY then
-    local capacityMaxCount = item.weight > 0 and math.floor(playerFreeCapacity / item.weight) or MAX_TRADE_AMOUNT
+    local capacityMaxCount = item.weight > 0 and math.floor(playerFreeCapacity / item.weight) or getMaxAmount()
     if ignoreCapacity then
       capacityMaxCount = uint32Max
     end
@@ -991,6 +991,12 @@ function formatCurrency(amount)
 end
 
 function getMaxAmount(item)
+  if getCurrentTradeType() == BUY and g_game.getFeature(GameAstraShopBuyAmountU16) then
+    return 10000
+  end
+  if getCurrentTradeType() == SELL and g_game.getFeature(GameDoubleShopSellAmount) then
+    return 10000
+  end
   return MAX_TRADE_AMOUNT
 end
 

@@ -730,13 +730,25 @@ function tryHandleNpcDialogMessage(name, _, mode, text)
     return false
   end
 
+  local serverStartedConversation = mode == MessageModes.NpcFromStartBlock
+  if not npcConversationActive and not serverStartedConversation then
+    return false
+  end
+
   if modules.client_settings and modules.client_settings.getOption and
       modules.client_settings.getOption('disableNpcDialogWindow') then
     return false
   end
 
-  if npcDialogSuppressed or not name or name == '' or not text or text == '' then
+  if (npcDialogSuppressed and not serverStartedConversation) or not name or name == '' or not text or text == '' then
     return false
+  end
+
+  if serverStartedConversation then
+    npcConversationActive = true
+    npcConversationClosing = false
+    npcFarewellSent = false
+    npcDialogSuppressed = false
   end
 
   if not showNpcDialog(name) then

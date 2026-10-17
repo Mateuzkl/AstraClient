@@ -42,13 +42,15 @@ constexpr uint8 ASTRA_CAPABILITY_STORE_BASE_PRICE = 1U << 3;
 constexpr uint8 ASTRA_CAPABILITY_STORE_CATALOG_CHUNKS = 1U << 4;
 constexpr uint8 ASTRA_CAPABILITY_BESTIARY_BANNER_CREATURE_DATA = 1U << 5;
 constexpr uint8 ASTRA_CAPABILITY_EXTENDED_SPELL_IDS = 1U << 6;
+constexpr uint8 ASTRA_CAPABILITY_SHOP_BUY_AMOUNT_U16 = 1U << 7;
 constexpr uint8 ASTRA_CAPABILITIES = ASTRA_CAPABILITY_STORE_HIGHLIGHTS |
                                      ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS |
                                      ASTRA_CAPABILITY_ECHO_RAID_VISUALS |
                                      ASTRA_CAPABILITY_STORE_BASE_PRICE |
                                      ASTRA_CAPABILITY_STORE_CATALOG_CHUNKS |
                                      ASTRA_CAPABILITY_BESTIARY_BANNER_CREATURE_DATA |
-                                     ASTRA_CAPABILITY_EXTENDED_SPELL_IDS;
+                                     ASTRA_CAPABILITY_EXTENDED_SPELL_IDS |
+                                     ASTRA_CAPABILITY_SHOP_BUY_AMOUNT_U16;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -195,6 +197,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
     g_game.disableFeature(Otc::GameAstraStoreBasePrice);
     g_game.disableFeature(Otc::GameAstraBestiaryBannerCreatureData);
     g_game.disableFeature(Otc::GameAstraExtendedSpellIds);
+    g_game.disableFeature(Otc::GameAstraShopBuyAmountU16);
 
     std::string extended = callLuaField<std::string>("getLoginExtendedData");
     if (!extended.empty()) {
@@ -485,11 +488,20 @@ void ProtocolGame::sendInspectNpcTrade(int itemId, int count)
 
 void ProtocolGame::sendBuyItem(int itemId, int subType, int amount, bool ignoreCapacity, bool buyWithBackpack)
 {
+
+    const bool useExtendedAmount = g_game.getFeature(Otc::GameAstraShopBuyAmountU16);
+    const int maxAmount = useExtendedAmount ? 10000 : std::numeric_limits<uint8>::max();
+    if (amount < 1 || amount > maxAmount)
+        return;
+
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientBuyItem);
     msg->addU16(itemId);
     msg->addU8(subType);
-    msg->addU8(amount);
+    if (useExtendedAmount)
+        msg->addU16(amount);
+    else
+        msg->addU8(amount);
     msg->addU8(ignoreCapacity ? 0x01 : 0x00);
     msg->addU8(buyWithBackpack ? 0x01 : 0x00);
     send(msg);
@@ -497,11 +509,16 @@ void ProtocolGame::sendBuyItem(int itemId, int subType, int amount, bool ignoreC
 
 void ProtocolGame::sendSellItem(int itemId, int subType, int amount, bool ignoreEquipped)
 {
+    const bool useExtendedAmount = g_game.getFeature(Otc::GameDoubleShopSellAmount);
+    const int maxAmount = useExtendedAmount ? 10000 : std::numeric_limits<uint8>::max();
+    if (amount < 1 || amount > maxAmount)
+        return;
+
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientSellItem);
     msg->addU16(itemId);
     msg->addU8(subType);
-    if(g_game.getFeature(Otc::GameDoubleShopSellAmount))
+    if (useExtendedAmount)
         msg->addU16(amount);
     else
         msg->addU8(amount);
