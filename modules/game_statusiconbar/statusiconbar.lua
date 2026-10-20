@@ -35,34 +35,6 @@ local function safeCall(obj, method, ...)
     return nil
 end
 
-local emblemIcons = {
-    [EmblemGreen or 1] = '/images/game/emblems/emblem_green',
-    [EmblemRed or 2] = '/images/game/emblems/emblem_red',
-    [EmblemBlue or 3] = '/images/game/emblems/emblem_blue',
-    [EmblemMember or 4] = '/images/game/emblems/emblem_member',
-    [EmblemOther or 5] = '/images/game/emblems/emblem_other'
-}
-
-local emblemTooltips = {
-    [EmblemGreen or 1] = 'Green Emblem',
-    [EmblemRed or 2] = 'Red Emblem',
-    [EmblemBlue or 3] = 'Blue Emblem',
-    [EmblemMember or 4] = 'Member Emblem',
-    [EmblemOther or 5] = 'Other Emblem'
-}
-
-local function getEmblemIconPath(emblem)
-    if type(getEmblemImagePath) == 'function' then
-        local path = getEmblemImagePath(emblem)
-        if path then return path end
-    end
-    return emblemIcons[emblem]
-end
-
-local function getPlayerEmblem()
-    return safeCall(g_game.getLocalPlayer(), 'getEmblem') or (EmblemNone or 0)
-end
-
 local function isEmblemActive(emblem)
     if emblem == nil then
         return false

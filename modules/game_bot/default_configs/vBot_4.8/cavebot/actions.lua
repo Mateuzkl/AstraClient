@@ -101,22 +101,6 @@ local function breakFurniture(destPos)
   return false
 end
 
-local function pushPlayer(creature)
-  local cpos = creature:getPosition()
-  local tiles = getNearTiles(cpos)
-
-  for i, tile in ipairs(tiles) do
-    local pos = tile:getPosition()
-    local minimapColor = g_map.getMinimapColor(pos)
-    local stairs = (minimapColor >= 210 and minimapColor <= 213)
-
-    if not stairs and tile:isWalkable() then
-      g_game.move(creature, pos)
-    end
-  end
-
-end
-
 local function pathfinder()
   if not storage.extras.pathfinding then return end
   if noPath < 10 then return end

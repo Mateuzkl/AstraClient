@@ -1,4 +1,11 @@
 -- Run from the repository root with LuaJIT; no client/assets/server required.
+local sourceFiles = assert(io.popen('git ls-files -- modules mods data init.lua'))
+local syntaxCount = 0
+for path in sourceFiles:lines() do
+  if path:match('%.lua$') then assert(loadfile(path)); syntaxCount = syntaxCount + 1 end
+end
+assert(sourceFiles:close())
+print(string.format('LuaJIT syntax: %d tracked source files passed.', syntaxCount))
 local tests = {
   'item_details_opcode_framing.lua modules/game_protocol/protocol.lua src/client/protocolgameparse.cpp',
   'topmenu_lifecycle.lua', 'prey_lifecycle.lua', 'extended_json_lifecycle.lua',
