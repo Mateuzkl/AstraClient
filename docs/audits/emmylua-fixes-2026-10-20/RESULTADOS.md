@@ -62,3 +62,9 @@ O teardown de Hunting libera explicitamente o bloqueio de entrada antes de destr
 Toda movimentação de container cancela o `containerLock` anterior, incluindo uma nova movimentação com `locked=false`. O teste executa o callback antigo após essa troca, valida substituições locked→locked e preserva o cancelamento por destruição.
 
 O teste de TextWindow carrega o módulo inteiro e chama `onGameEditText`/`onGameEditList`. O fechamento usa os callbacks reais do botão Cancel e Escape, chegando ao helper privado que agenda o foco. São verificados foco normal, substituição, logout, destruição do painel e painel ausente; não é mais um evento de foco criado artificialmente pelo teste.
+
+### Identidade dos proxies de widget
+
+Confirmado no binding: `LuaInterface::pushObject` cria um novo userdata por exposição, enquanto `LuaObject::luaGetField`/`luaSetField` acessam a tabela de campos do objeto C++. A tabela fraca de eventos por userdata não encontrava o grupo quando cancelamento ou `onDestroy` recebia outro proxy. O grupo agora fica no campo privado `_coreWidgetEventGroup`, compartilhado pelos proxies; cancelamento, substituição por chave e destruição usam esse mesmo estado. A destruição cancela os eventos e limpa o campo antes de `UIWidget::internalDestroy` liberar os campos Lua.
+
+O teste de regressão usa dois userdata distintos (`newproxy`) com igualdade nativa simulada e campos compartilhados. Ele falhou antes da correção no cancelamento por outro proxy. Depois da correção, verifica cancelamento individual/em lote, substituição por chave, um único hook mesmo após recarregar o helper e destruição recebida pelo segundo proxy. Callbacks antigos também são invocados manualmente para confirmar que não executam. Esse double reproduz a identidade dos proxies; não substitui um teste interativo de janelas no executável.

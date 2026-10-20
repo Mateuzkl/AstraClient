@@ -1,6 +1,12 @@
 -- @docclass UIWidget
 
-local widgetEvents = setmetatable({}, {__mode = 'k'})
+local function getWidgetEventGroup(widget)
+  if widget == nil then return nil end
+  -- pushObject can create a new userdata for the same native widget. LuaObject
+  -- fields are shared by those proxies, unlike keys in a Lua table.
+  local ok, group = pcall(function() return widget._coreWidgetEventGroup end)
+  if ok then return group end
+end
 
 function g_ui.isWidgetAlive(widget)
   -- Even a method lookup on a stale native userdata may fail.
@@ -9,7 +15,7 @@ function g_ui.isWidgetAlive(widget)
 end
 
 function g_ui.cancelWidgetEvent(widget, key)
-  local group = widgetEvents[widget]
+  local group = getWidgetEventGroup(widget)
   local event = group and group.keys[key]
   if event then
     group.keys[key], group.events[event] = nil, nil
@@ -18,7 +24,7 @@ function g_ui.cancelWidgetEvent(widget, key)
 end
 
 local function cancelWidgetEvents(widget)
-  local group = widgetEvents[widget]
+  local group = getWidgetEventGroup(widget)
   if group then
     for event in pairs(group.events) do removeEvent(event) end
     group.events, group.keys = {}, {}
@@ -28,21 +34,21 @@ g_ui.cancelWidgetEvents = cancelWidgetEvents
 
 local function onWidgetEventsDestroy(widget)
   cancelWidgetEvents(widget)
-  widgetEvents[widget] = nil
+  widget._coreWidgetEventGroup = nil
 end
 
 function g_ui.scheduleWidgetEvent(widget, callback, delay, key)
   if not g_ui.isWidgetAlive(widget) then return nil end
-  local group = widgetEvents[widget]
+  local group = getWidgetEventGroup(widget)
   if not group then
     group = {events = {}, keys = {}}
-    widgetEvents[widget] = group
+    widget._coreWidgetEventGroup = group
     connect(widget, {onDestroy = onWidgetEventsDestroy})
   end
   if key then g_ui.cancelWidgetEvent(widget, key) end
   local event
   local function run()
-    if widgetEvents[widget] ~= group or not group.events[event] then return end
+    if not group.events[event] or getWidgetEventGroup(widget) ~= group then return end
     group.events[event] = nil
     if key and group.keys[key] == event then group.keys[key] = nil end
     if g_ui.isWidgetAlive(widget) then callback(widget) end

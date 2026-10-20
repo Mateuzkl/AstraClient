@@ -1,9 +1,9 @@
 local env = setmetatable({}, {__index = _G})
-local events, hooks, connections = {}, {}, 0
+local events, connections = {}, 0
 env.g_ui, env.UIWidget, env.g_client = {}, {}, {}
 env.connect = function(widget, callbacks)
-  assert(not hooks[widget], 'duplicate destroy hook')
-  hooks[widget] = callbacks.onDestroy; connections = connections + 1
+  assert(not widget.onDestroy, 'duplicate destroy hook')
+  widget.onDestroy = callbacks.onDestroy; connections = connections + 1
 end
 env.scheduleEvent = function(f, delay)
   local e = {f = f, delay = delay}; events[#events + 1] = e; return e
@@ -18,7 +18,7 @@ local ui = env.g_ui
 local function widget()
   local w = {touches = 0}
   function w:isDestroyed() return self.destroyed or false end
-  function w:destroy() self.destroyed = true; if hooks[self] then hooks[self](self) end end
+  function w:destroy() self.destroyed = true; if self.onDestroy then self.onDestroy(self) end end
   function w:setParent(parent) assert(not self.destroyed); self.parent = parent; self.touches = self.touches + 1 end
   function w:open() assert(not self.destroyed) end
   return w
@@ -34,11 +34,61 @@ w:destroy(); assert(pending.cancelled); pending.f()
 assert(ui.scheduleWidgetEvent(w, function() end) == nil)
 local stale = setmetatable({}, {__index = function() error('stale native lookup') end})
 assert(not ui.isWidgetAlive(stale))
+ui.cancelWidgetEvent(nil, 'move'); ui.cancelWidgetEvents(nil)
+ui.cancelWidgetEvent(stale, 'move'); ui.cancelWidgetEvents(stale)
 local live = widget()
 local cancelled = ui.scheduleWidgetEvent(live, function() error('old generation') end)
 ui.cancelWidgetEvents(live); cancelled.f()
 local new = ui.scheduleWidgetEvent(live, function() n = n + 1 end)
 new.f(); assert(n == 11 and connections == 2, 'cancel/reschedule duplicated the hook')
+
+-- pushObject creates distinct userdata proxies; LuaObject fields and onDestroy
+-- are shared by the native owner, but table keys still use userdata identity.
+local fields, native = {}, {destroyed = false}
+local methods = {}
+function methods:isDestroyed() return native.destroyed end
+function methods:destroy()
+  native.destroyed = true
+  if fields.onDestroy then fields.onDestroy(self) end
+  assert(fields._coreWidgetEventGroup == nil, 'destroy hook did not detach its event group')
+  -- UIWidget releases its Lua fields only after dispatching onDestroy.
+  for key in pairs(fields) do fields[key] = nil end
+end
+local proxyA = newproxy(true)
+local proxyMt = getmetatable(proxyA)
+proxyMt.__index = function(_, key)
+  if fields[key] ~= nil then return fields[key] end
+  return methods[key]
+end
+proxyMt.__newindex = function(_, key, value) fields[key] = value end
+proxyMt.__eq = function() return true end
+local proxyB = newproxy(proxyA)
+assert(not rawequal(proxyA, proxyB) and proxyA == proxyB)
+assert(({[proxyA] = true})[proxyB] == nil, 'fixture must not coalesce proxy table keys')
+local proxyConnections = connections
+local proxyCancelled = ui.scheduleWidgetEvent(proxyA, function() error('cross-proxy cancel failed') end, 10, 'move')
+ui.cancelWidgetEvent(proxyB, 'move')
+assert(proxyCancelled.cancelled, 'another proxy could not cancel the widget event')
+proxyCancelled.f()
+local proxyFirst = ui.scheduleWidgetEvent(proxyA, function() error('cross-proxy replacement failed') end, 10, 'move')
+local proxyCalls = 0
+local proxyLatest = ui.scheduleWidgetEvent(proxyB, function(owner)
+  assert(rawequal(owner, proxyB)); proxyCalls = proxyCalls + 1
+end, 10, 'move')
+proxyFirst.f(); proxyLatest.f()
+assert(proxyFirst.cancelled and proxyCalls == 1)
+local proxyAll = ui.scheduleWidgetEvent(proxyA, function() error('cross-proxy cancel-all failed') end)
+ui.cancelWidgetEvents(proxyB); proxyAll.f(); assert(proxyAll.cancelled)
+-- Reloading the Lua helper must reuse the shared group and its one destroy hook.
+load('modules/corelib/ui/uiwidget.lua')
+local proxyPendingA = ui.scheduleWidgetEvent(proxyA, function() error('event survived native destroy') end)
+local proxyPendingB = ui.scheduleWidgetEvent(proxyB, function() error('event survived native destroy') end)
+assert(connections == proxyConnections + 1, 'proxies/reload registered duplicate destroy hooks')
+proxyB:destroy()
+assert(proxyPendingA.cancelled and proxyPendingB.cancelled, 'destroy through another proxy left timers pending')
+proxyPendingA.f(); proxyPendingB.f()
+assert(next(fields) == nil and ui.scheduleWidgetEvent(proxyA, function() end) == nil)
+ui.cancelWidgetEvents(proxyA); ui.cancelWidgetEvent(proxyB, 'move')
 
 -- Exercise the actual deferred inventory move with a destroyed destination.
 local source = assert(io.open('modules/game_inventory/inventory.lua', 'rb'))
