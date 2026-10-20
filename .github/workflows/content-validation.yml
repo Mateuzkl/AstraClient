@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - '.github/tests/**'
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
@@ -40,6 +41,7 @@ on:
       - 'init.lua'
   pull_request:
     paths:
+      - '.github/tests/**'
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
@@ -112,6 +114,9 @@ jobs:
           c++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined \
             .github/tests/item_details_framing.cpp -I. -o /tmp/item_details_framing_test
           /tmp/item_details_framing_test
+
+      - name: Test TopMenu lifecycle
+        run: luajit .github/tests/topmenu_lifecycle.lua
 
       - name: Test GameBot auto recording
         run: |
