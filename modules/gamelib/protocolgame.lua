@@ -41,11 +41,10 @@ if g_game and connect then
 end
 
 function ProtocolGame:onOpcode(opcode, msg)
-  for i, callback in pairs(opcodeCallbacks) do
-    if i == opcode then
-      callback(self, msg)
-      return true
-    end
+  local callback = opcodeCallbacks[opcode]
+  if callback then
+    callback(self, msg)
+    return true
   end
   return false
 end

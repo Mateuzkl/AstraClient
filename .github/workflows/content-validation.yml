@@ -130,6 +130,9 @@ jobs:
       - name: Test deferred widget lifecycle
         run: luajit .github/tests/widget_event_lifecycle.lua
 
+      - name: Test opcode dispatch compatibility
+        run: luajit .github/tests/protocol_dispatch.lua
+
       - name: Test GameBot auto recording
         run: |
           luajit .github/tests/game_bot_auto_recording.lua \

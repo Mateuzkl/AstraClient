@@ -3,6 +3,7 @@ local tests = {
   'item_details_opcode_framing.lua modules/game_protocol/protocol.lua src/client/protocolgameparse.cpp',
   'topmenu_lifecycle.lua', 'prey_lifecycle.lua', 'extended_json_lifecycle.lua',
   'follow_friend_lifecycle.lua', 'widget_event_lifecycle.lua',
+  'protocol_dispatch.lua',
   'game_bot_auto_recording.lua modules/game_bot/bot.lua modules/game_bot/panels/waypoints.lua',
   'store_catalog_chunks.lua mods/game_store/storeprotocol.lua',
   'npc_dialog_travel.lua modules/game_npctrade/npcdialog.lua',
