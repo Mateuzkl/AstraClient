@@ -1,5 +1,58 @@
 -- @docclass UIWidget
 
+local widgetEvents = setmetatable({}, {__mode = 'k'})
+
+function g_ui.isWidgetAlive(widget)
+  -- Even a method lookup on a stale native userdata may fail.
+  local ok, alive = pcall(function() return widget ~= nil and not widget:isDestroyed() end)
+  return ok and alive
+end
+
+function g_ui.cancelWidgetEvent(widget, key)
+  local group = widgetEvents[widget]
+  local event = group and group.keys[key]
+  if event then
+    group.keys[key], group.events[event] = nil, nil
+    removeEvent(event)
+  end
+end
+
+local function cancelWidgetEvents(widget)
+  local group = widgetEvents[widget]
+  if group then
+    for event in pairs(group.events) do removeEvent(event) end
+    group.events, group.keys = {}, {}
+  end
+end
+g_ui.cancelWidgetEvents = cancelWidgetEvents
+
+local function onWidgetEventsDestroy(widget)
+  cancelWidgetEvents(widget)
+  widgetEvents[widget] = nil
+end
+
+function g_ui.scheduleWidgetEvent(widget, callback, delay, key)
+  if not g_ui.isWidgetAlive(widget) then return nil end
+  local group = widgetEvents[widget]
+  if not group then
+    group = {events = {}, keys = {}}
+    widgetEvents[widget] = group
+    connect(widget, {onDestroy = onWidgetEventsDestroy})
+  end
+  if key then g_ui.cancelWidgetEvent(widget, key) end
+  local event
+  local function run()
+    if widgetEvents[widget] ~= group or not group.events[event] then return end
+    group.events[event] = nil
+    if key and group.keys[key] == event then group.keys[key] = nil end
+    if g_ui.isWidgetAlive(widget) then callback(widget) end
+  end
+  event = delay ~= nil and scheduleEvent(run, delay) or addEvent(run)
+  group.events[event] = true
+  if key then group.keys[key] = event end
+  return event
+end
+
 function UIWidget:setMargin(...)
   local params = {...}
   if #params == 1 then

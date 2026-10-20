@@ -121,11 +121,12 @@ end
 
 function online()
   local benchmark = g_clock.millis()
-  scheduleEvent(onStartGame, 100)
+  g_ui.scheduleWidgetEvent(healthInfoWindow, onStartGame, 100, 'healthInfoStartup')
   consoleln("HealthInfo loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
+  g_ui.cancelWidgetEvents(healthInfoWindow)
   healthInfoWindow:hide()
 end
 
@@ -338,13 +339,14 @@ function move(panel, index)
     return
   end
 
-  addEvent(function()
-    if not healthInfoWindow:isVisible() then
-      healthInfoWindow:show()
+  g_ui.scheduleWidgetEvent(healthInfoWindow, function(window)
+    if not g_ui.isWidgetAlive(panel) then return end
+    if not window:isVisible() then
+      window:show()
     end
 
-    healthInfoWindow:setParent(panel)
-  end)
+    window:setParent(panel)
+  end, nil, 'healthInfoMove')
 
   return healthInfoWindow
 end

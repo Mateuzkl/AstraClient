@@ -1,5 +1,12 @@
 windows = {}
 
+local function queueGameFocus()
+  local panel = rootWidget:getChildById('gameRootPanel')
+  g_ui.scheduleWidgetEvent(panel, function(widget)
+    if g_game.isOnline() then widget:focus() end
+  end, 50, 'textWindowFocus')
+end
+
 function init()
   g_ui.importStyle('textwindow')
 
@@ -17,6 +24,8 @@ function terminate()
 end
 
 function destroyWindows()
+  local panel = rootWidget and rootWidget:getChildById('gameRootPanel')
+  g_ui.cancelWidgetEvent(panel, 'textWindowFocus')
   for _,window in pairs(windows) do
     window:destroy()
     g_client.setInputLockWidget(nil)
@@ -103,7 +112,7 @@ function onGameEditText(id, itemId, maxLength, text, writer, time)
     table.removevalue(windows, textWindow)
   
     -- Bring back focus to main panel
-    scheduleEvent(function() rootWidget:getChildById("gameRootPanel"):focus() end, 50)
+    queueGameFocus()
   end
 
   local doneFunc = function()
@@ -163,7 +172,7 @@ function onGameEditList(id, doorId, text)
     g_client.setInputLockWidget(nil)
     table.removevalue(windows, textWindow)
     -- Bring back focus to main panel
-    scheduleEvent(function() rootWidget:getChildById("gameRootPanel"):focus() end, 50)
+    queueGameFocus()
   end
 
   local doneFunc = function()

@@ -136,6 +136,7 @@ function ensureMarketHiddenForCyclopedia()
 end
 
 local function onMarketSessionChange()
+  g_ui.cancelWidgetEvents(marketWindow)
 	resetMarketCatalog()
 	cachedCyclopediaMarketItems = nil
 	silentMarketEnter = false
@@ -305,6 +306,7 @@ function toggle()
 end
 
 function hide()
+	g_ui.cancelWidgetEvents(marketWindow)
 	resetMarketCatalog()
 	if g_game.resetMarketSession then
 		g_game.resetMarketSession()
@@ -1946,6 +1948,8 @@ function onSearchItem(textField)
 end
 
 function onShowRedirect(item)
+	local itemId = type(item) == 'table' and item.id or item:getId()
+	local classification = type(item) == 'table' and item.classification or item:getClassification()
 	lastSelectedItem = {}
 
 	if lastSelectedCategory then
@@ -2000,8 +2004,8 @@ function onShowRedirect(item)
 		local marketItem = marketItems[c]
 		if marketItem then
 			for _, data in pairs(marketItem) do
-				if item:getId() == data.thingType:getId() then
-					local tierCount = item:getClassification()
+				if itemId == data.thingType:getId() then
+					local tierCount = classification
 					if tierCount == 4 then
 						tierCount = 10
 					end
@@ -2260,11 +2264,12 @@ function getItemNameById(itemId)
 end
 
 function onRedirect(item)
-  g_game.sendMarketAction(3, item:getId(), 0)
+  local snapshot = {id = item:getId(), classification = item:getClassification()}
+  g_game.sendMarketAction(3, snapshot.id, 0)
 
-  scheduleEvent(function()
-	onShowRedirect(item)
-  end, 100)
+  g_ui.scheduleWidgetEvent(marketWindow, function()
+	if g_game.isOnline() then onShowRedirect(snapshot) end
+  end, 100, 'marketRedirect')
 end
 
 function focusPrevItemWidget(list)

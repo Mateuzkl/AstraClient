@@ -689,6 +689,7 @@ function online()
 end
 
 function offline()
+  g_ui.cancelWidgetEvents(inventoryWindow)
   bumpMonkMirrorSession()
   resetMonkMirrorSlot(true)
 
@@ -919,13 +920,14 @@ function openBlessedWindow()
 end
 
 function move(panel, index, minimized)
-  addEvent(function()
-    inventoryWindow:setParent(panel)
-    inventoryWindow:open()
+  g_ui.scheduleWidgetEvent(inventoryWindow, function(window)
+    if not g_ui.isWidgetAlive(panel) then return end
+    window:setParent(panel)
+    window:open()
     if minimized then
       onInventoryMinimize(minimized)
     end
-  end)
+  end, nil, 'inventoryMove')
 
   return inventoryWindow
 end

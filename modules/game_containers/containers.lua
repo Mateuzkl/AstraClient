@@ -29,6 +29,7 @@ function terminate()
   disconnect(g_game, {
     onGameEnd = clean
   })
+  clean()
 end
 
 function reloadContainers()
@@ -145,11 +146,9 @@ function onContainerOpen(container, previousContainer)
     -- white border flash effect
     containerWindow:setBorderWidth(2)
     containerWindow:setBorderColor("#FFFFFF")
-    scheduleEvent(function()
-      if containerWindow then
-        containerWindow:setBorderWidth(0)
-      end
-    end, 300)
+    g_ui.scheduleWidgetEvent(containerWindow, function(window)
+      window:setBorderWidth(0)
+    end, 300, 'containerFlash')
   end
 
   if not containerWindow then return end
@@ -278,7 +277,8 @@ function onContainerOpen(container, previousContainer)
   toggleContainerPages(containerWindow, container:hasPages())
   refreshContainerPages(container)
 
-  addEvent(function ()
+  g_ui.scheduleWidgetEvent(containerPanel, function()
+    if container.window ~= containerWindow or not g_ui.isWidgetAlive(containerWindow) then return end
     local layout = containerPanel:getLayout()
     if not layout then
       return
@@ -378,10 +378,9 @@ function move(instance, panel, height, index, minimized, locked)
   end
 
   if locked then
-    scheduleEvent(function()
-      if not widget then return end
-      widget:lock(true)
-    end, 100)
+    g_ui.scheduleWidgetEvent(widget, function(window)
+      window:lock(true)
+    end, 100, 'containerLock')
   end
 
   return widget
