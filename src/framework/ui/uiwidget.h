@@ -281,6 +281,11 @@ public:
     bool isFixedSize() { return m_fixedSize; }
     bool isClipping() { return m_clipping; }
     bool isDestroyed() { return m_destroyed; }
+    std::function<UIWidgetPtr()> getWeakReference()
+    {
+        std::weak_ptr<UIWidget> weak = static_self_cast<UIWidget>();
+        return [weak] { return weak.lock(); };
+    }
     bool isPixelTesting() { return m_pixelTest; }
     bool isPixelTransparent(const Point& mousePos);
 

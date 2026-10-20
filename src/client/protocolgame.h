@@ -27,6 +27,7 @@
 #include "protocolcodes.h"
 #include <framework/net/protocol.h>
 #include "creature.h"
+#include "walktracebudget.h"
 
 class ProtocolGame : public Protocol
 {
@@ -377,6 +378,7 @@ public:
 
 private:
     stdext::boolean<false> m_enableSendExtendedOpcode;
+    friend struct ProtocolGameFrameTestAccess;
     stdext::boolean<false> m_gameInitialized;
     stdext::boolean<false> m_mapKnown;
     stdext::boolean<true> m_firstRecv;
@@ -388,6 +390,7 @@ private:
     std::string m_characterName;
     std::string m_worldName;
     LocalPlayerPtr m_localPlayer;
+    WalkTraceBudget m_walkTraceBudget;
     int m_recivedPackeds = 0;
     int m_recivedPackedsSize = 0;
 };

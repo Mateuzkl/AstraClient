@@ -174,7 +174,7 @@ Panel
   end
 
   local VALID_COMMANDS = {
-    goto = true, use = true, usewith = true, wait = true,
+    ["goto"] = true, use = true, usewith = true, wait = true,
     say = true, npc = true, follow = true, label = true,
     gotolabel = true, comment = true, ["function"] = true
   }

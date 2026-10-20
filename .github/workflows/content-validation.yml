@@ -25,6 +25,11 @@ on:
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - '.github/tests/item_details_opcode_framing.lua'
+      - '.github/tests/item_details_framing.cpp'
+      - '.github/tests/rarity_refresh_lifecycle.lua'
+      - '.github/tests/walk_trace_budget.cpp'
+      - 'src/client/walktracebudget.h'
+      - 'src/client/customitemprotocol.h'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
       - 'src/framework/core/module.cpp'
@@ -62,6 +67,11 @@ on:
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - '.github/tests/item_details_opcode_framing.lua'
+      - '.github/tests/item_details_framing.cpp'
+      - '.github/tests/rarity_refresh_lifecycle.lua'
+      - '.github/tests/walk_trace_budget.cpp'
+      - 'src/client/walktracebudget.h'
+      - 'src/client/customitemprotocol.h'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
       - 'src/framework/core/module.cpp'
@@ -119,6 +129,15 @@ jobs:
           luajit .github/tests/item_details_opcode_framing.lua \
             modules/game_protocol/protocol.lua \
             src/client/protocolgameparse.cpp
+          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. \
+            .github/tests/item_details_framing.cpp -o /tmp/item_details_framing
+          /tmp/item_details_framing
+          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. \
+            .github/tests/walk_trace_budget.cpp -o /tmp/walk_trace_budget
+          /tmp/walk_trace_budget
+
+      - name: Test rarity refresh and relog lifecycle
+        run: luajit .github/tests/rarity_refresh_lifecycle.lua modules/gamelib/items.lua
 
       - name: Test Store catalog chunks
         run: |

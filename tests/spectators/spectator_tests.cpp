@@ -21,6 +21,14 @@
 // Exercise the actual anonymous cleanup helper, not a reimplemented algorithm.
 // Test build files exclude map.cpp as a separate translation unit.
 #include "../../src/client/map.cpp"
+#include <client/protocolgame.h>
+#include <framework/net/inputmessage.h>
+
+struct ProtocolGameFrameTestAccess {
+    static void details(ProtocolGame& protocol, const InputMessagePtr& msg) { protocol.parseCustomItemDetails(msg); }
+    static void values(ProtocolGame& protocol, const InputMessagePtr& msg) { protocol.parseCustomItemValues(msg); }
+    static void move(ProtocolGame& protocol, const InputMessagePtr& msg) { protocol.parseCreatureMove(msg); }
+};
 
 namespace {
 thread_local bool countAllocations = false;
@@ -284,6 +292,76 @@ void customSystems()
     g_things.m_thingTypes[ThingCategoryCreature] = oldTypes;
 }
 
+void nativeFramesAndWeakWidgets()
+{
+    g_lua.init();
+    {
+        g_lua.loadBuffer("ItemsDatabase = {registerServerItemDetails = function(id, data) lastDetails = data; return true end, "
+                         "registerServerItemValue = function(id, value) lastValue = value end}; "
+                         "g_game = {onItemDetails = function() end}", "native framing fixture");
+        CHECK(g_lua.safeCall(0, 0) == 0);
+        const int initialStack = g_lua.stackSize();
+        auto append = [](std::string& bytes, uint32_t value, unsigned size) {
+            for (unsigned i = 0; i < size; ++i) bytes += char((value >> (8 * i)) & 255);
+        };
+        std::string move;
+        append(move, 0x6d, 1);
+        append(move, 1000, 2); append(move, 1000, 2); append(move, 7, 1); append(move, 1, 1);
+        append(move, 1001, 2); append(move, 1000, 2); append(move, 7, 1);
+        ProtocolGame protocol;
+        for (bool details : {false, true}) {
+            reset();
+            const auto actor = creature(12345);
+            g_map.addCreature(actor);
+            const auto tile = g_map.getOrCreateTile(Position(1000, 1000, 7));
+            tile->addThing(item(ThingAttrGround), -1);
+            tile->addThing(actor, -1);
+            std::string payload;
+            if (!details) append(payload, 1, 2);
+            append(payload, 2160, 2); append(payload, 77, 4);
+            if (details) {
+                append(payload, 55, 4); append(payload, 33, 4); append(payload, 1, 1);
+                append(payload, 4, 2); payload += "Name";
+                append(payload, 10, 2); payload += "Test Sword";
+                append(payload, 0, 2);
+            }
+            auto msg = std::make_shared<InputMessage>();
+            msg->setBuffer(payload + move);
+            if (details) ProtocolGameFrameTestAccess::details(protocol, msg);
+            else ProtocolGameFrameTestAccess::values(protocol, msg);
+            CHECK(msg->getUnreadSize() == int(move.size()));
+            CHECK(msg->getU8() == 0x6d);
+            ProtocolGameFrameTestAccess::move(protocol, msg);
+            CHECK(msg->eof());
+            CHECK(g_map.getThing(Position(1000, 1000, 7), 1) == nullptr);
+            CHECK(actor->getPosition() == Position(1001, 1000, 7));
+            if (g_lua.stackSize() != initialStack)
+                std::cerr << "native frame Lua stack: initial=" << initialStack << " end=" << g_lua.stackSize() << " details=" << details << '\n';
+            CHECK(g_lua.stackSize() == initialStack);
+        }
+        g_lua.loadBuffer("assert(lastDetails.name == 'Test Sword' and lastDetails.descriptions[1].detail == 'Name'); "
+                         "assert(lastValue == 77)", "native framing assertions");
+        CHECK(g_lua.safeCall(0, 0) == 0);
+        g_lua.registerClass<UIWidget>();
+        g_lua.bindClassMemberFunction<UIWidget>("getWeakReference", &UIWidget::getWeakReference);
+        auto widget = std::make_shared<UIWidget>();
+        auto resolve = widget->getWeakReference();
+        std::weak_ptr<UIWidget> weak = widget;
+        CHECK(resolve() == widget);
+        g_lua.pushObject(widget);
+        g_lua.setGlobal("nativeWidget");
+        g_lua.loadBuffer("nativeWeak = nativeWidget:getWeakReference(); nativeWidget = nil; collectgarbage('collect')",
+                         "native weak widget fixture");
+        CHECK(g_lua.safeCall(0, 0) == 0);
+        widget.reset();
+        g_lua.loadBuffer("collectgarbage('collect'); assert(nativeWeak() == nil)", "expired native weak widget");
+        CHECK(g_lua.safeCall(0, 0) == 0);
+        CHECK(weak.expired() && !resolve());
+        reset();
+    }
+    g_lua.terminate();
+}
+
 void benchmark()
 {
     std::cout << "dataset,multi,known,visible,algorithm,median_us,p95_us,calls_per_s,allocations_per_call\n";
@@ -336,8 +414,8 @@ int main(int argc, char** argv)
     // A named empty font avoids asset lookups; no graphics context is created.
     g_fonts.m_fonts.push_back(std::make_shared<BitmapFont>("verdana-11px-rounded"));
     try {
-        tileMutations(); traversal(); duplicatesAndWalking(); customSystems();
-        std::cout << "PASS: 4 native regression groups, " << checks << " ordered/state checks\n";
+        tileMutations(); traversal(); duplicatesAndWalking(); customSystems(); nativeFramesAndWeakWidgets();
+        std::cout << "PASS: 5 native regression groups, " << checks << " ordered/state checks\n";
         if (argc > 1 && std::string(argv[1]) == "--benchmark") benchmark();
         reset();
         return 0;

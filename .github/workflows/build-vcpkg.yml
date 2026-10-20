@@ -19,6 +19,7 @@ on:
       - .github/workflows/build-vcpkg.yml
       - cmake/**
       - src/**
+      - tests/spectators/**
       - CMakeLists.txt
       - vcpkg.json
       - .github/tests/native_splash.cpp
@@ -33,6 +34,7 @@ on:
       - .github/workflows/build-vcpkg.yml
       - cmake/**
       - src/**
+      - tests/spectators/**
       - CMakeLists.txt
       - vcpkg.json
       - .github/tests/native_splash.cpp
@@ -127,7 +129,7 @@ jobs:
           $commands = @'
           set "COMPILER_LAUNCHER="
           where sccache >nul 2>&1 && set "COMPILER_LAUNCHER=sccache"
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_CXX_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DASTRA_BUILD_SPECTATOR_TESTS=ON -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_CXX_COMPILER_LAUNCHER=%COMPILER_LAUNCHER% -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           if errorlevel 1 exit /b 1
           '@
           & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Configure-CMake' -CmdScript $commands
@@ -150,6 +152,12 @@ jobs:
           if errorlevel 1 exit /b 1
           '@
           & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-Release' -CmdScript $commands
+
+      - name: Test native protocol frames and widget weak references
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: test-standalone-utilities-and-native-networking
         shell: pwsh

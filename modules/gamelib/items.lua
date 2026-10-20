@@ -123,9 +123,11 @@ ItemsDatabase.serverValueCacheData = ItemsDatabase.serverValueCacheData or nil
 ItemsDatabase.serverValueCacheDirty = ItemsDatabase.serverValueCacheDirty or false
 ItemsDatabase.dirtyRarityItemIds = ItemsDatabase.dirtyRarityItemIds or {}
 ItemsDatabase.refreshAllTrackedRarityWidgets = ItemsDatabase.refreshAllTrackedRarityWidgets or false
-ItemsDatabase.rarityWidgetsByItemId = ItemsDatabase.rarityWidgetsByItemId or {}
-ItemsDatabase.rarityWidgetItemIds = ItemsDatabase.rarityWidgetItemIds or setmetatable({}, { __mode = 'k' })
-ItemsDatabase.rarityWidgetDestroyHooked = ItemsDatabase.rarityWidgetDestroyHooked or setmetatable({}, { __mode = 'k' })
+-- Track Lua records containing native weak references, not transient userdata
+-- identities. The same C++ widget can be pushed as different Lua userdata.
+ItemsDatabase.rarityWidgetsByItemId = {}
+ItemsDatabase.rarityWidgetItemIds = {}
+ItemsDatabase.rarityRefreshGeneration = (ItemsDatabase.rarityRefreshGeneration or 0) + 1
 
 local SERVER_VALUE_CACHE_SCHEMA = 2
 local SERVER_VALUE_CACHE_SAVE_DELAY = 5000
@@ -311,7 +313,9 @@ function ItemsDatabase.scheduleServerValueCacheSave()
     return
   end
 
+  local generation = ItemsDatabase.rarityRefreshGeneration
   ItemsDatabase.serverValueCacheSaveEvent = scheduleEvent(function()
+    if generation ~= ItemsDatabase.rarityRefreshGeneration then return end
     ItemsDatabase.serverValueCacheSaveEvent = nil
     ItemsDatabase.saveServerValueCache()
   end, SERVER_VALUE_CACHE_SAVE_DELAY)
@@ -326,6 +330,7 @@ end
 -- Left pending across a character switch, the save would write the outgoing character's
 -- prices into the incoming character's file and the refresh would walk a torn-down UI.
 function ItemsDatabase.cancelPendingCacheEvents()
+  ItemsDatabase.rarityRefreshGeneration = ItemsDatabase.rarityRefreshGeneration + 1
   if ItemsDatabase.serverValueCacheSaveEvent then
     removeEvent(ItemsDatabase.serverValueCacheSaveEvent)
     ItemsDatabase.serverValueCacheSaveEvent = nil
@@ -355,8 +360,10 @@ if not ItemsDatabase.serverValueCacheConnected then
       ItemsDatabase.dirtyRarityItemIds = {}
       ItemsDatabase.refreshAllTrackedRarityWidgets = false
       ItemsDatabase.rarityWidgetsByItemId = {}
-      ItemsDatabase.rarityWidgetItemIds = setmetatable({}, { __mode = 'k' })
+      ItemsDatabase.rarityWidgetItemIds = {}
+      local generation = ItemsDatabase.rarityRefreshGeneration
       ItemsDatabase.serverValueCacheLoadEvent = scheduleEvent(function()
+        if generation ~= ItemsDatabase.rarityRefreshGeneration then return end
         ItemsDatabase.serverValueCacheLoadEvent = nil
         ItemsDatabase.loadServerValueCache()
       end, 100)
@@ -368,7 +375,7 @@ if not ItemsDatabase.serverValueCacheConnected then
       ItemsDatabase.dirtyRarityItemIds = {}
       ItemsDatabase.refreshAllTrackedRarityWidgets = false
       ItemsDatabase.rarityWidgetsByItemId = {}
-      ItemsDatabase.rarityWidgetItemIds = setmetatable({}, { __mode = 'k' })
+      ItemsDatabase.rarityWidgetItemIds = {}
     end
   })
 end
@@ -379,7 +386,11 @@ local function clampLootValueState(value)
 end
 
 function g_game.setLootValueState(value)
-  ItemsDatabase.lootValueState = clampLootValueState(value)
+  local state = clampLootValueState(value)
+  if ItemsDatabase.lootValueState ~= state then
+    ItemsDatabase.lootValueState = state
+    ItemsDatabase.scheduleRarityFrameRefresh()
+  end
 end
 
 g_game.getLootValueState = g_game.getLootValueState or function()
@@ -402,39 +413,54 @@ local function getRarityItemId(item)
   return ok and tonumber(id) or nil
 end
 
-function ItemsDatabase.untrackRarityWidget(widget)
-  local oldItemId = ItemsDatabase.rarityWidgetItemIds[widget]
+local function untrackRarityRecord(record)
+  local oldItemId = ItemsDatabase.rarityWidgetItemIds[record]
   if not oldItemId then
     return
   end
 
   local bucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
   if bucket then
-    bucket[widget] = nil
+    bucket[record] = nil
     if next(bucket) == nil then
       ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
     end
   end
-  ItemsDatabase.rarityWidgetItemIds[widget] = nil
+  ItemsDatabase.rarityWidgetItemIds[record] = nil
 end
 
-local function onTrackedRarityWidgetDestroy(widget)
-  ItemsDatabase.untrackRarityWidget(widget)
-  ItemsDatabase.rarityWidgetDestroyHooked[widget] = nil
+function ItemsDatabase.untrackRarityWidget(widget)
+  local record = widget and widget.itemsDatabaseRarityRecord
+  if record then untrackRarityRecord(record) end
 end
 
-function ItemsDatabase.trackRarityWidget(widget, item)
+function ItemsDatabase.trackRarityWidget(widget, item, corner)
   local itemId = getRarityItemId(item)
   if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID then
     ItemsDatabase.untrackRarityWidget(widget)
     return nil
   end
 
-  local oldItemId = ItemsDatabase.rarityWidgetItemIds[widget]
+  local record = widget.itemsDatabaseRarityRecord
+  if not record then
+    if not widget.getItem then return nil end
+    local resolve
+    if widget.getWeakReference then
+      resolve = widget:getWeakReference()
+    else
+      -- Compatibility for older executables; do not keep their widgets alive.
+      local weak = setmetatable({widget}, { __mode = 'v' })
+      resolve = function() return weak[1] end
+    end
+    record = {resolve = resolve, isDestroyed = widget.isDestroyed, getItem = widget.getItem}
+    widget.itemsDatabaseRarityRecord = record
+    connect(widget, { onDestroy = function() untrackRarityRecord(record) end })
+  end
+  local oldItemId = ItemsDatabase.rarityWidgetItemIds[record]
   if oldItemId and oldItemId ~= itemId then
     local oldBucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
     if oldBucket then
-      oldBucket[widget] = nil
+      oldBucket[record] = nil
       if next(oldBucket) == nil then
         ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
       end
@@ -443,42 +469,35 @@ function ItemsDatabase.trackRarityWidget(widget, item)
 
   local bucket = ItemsDatabase.rarityWidgetsByItemId[itemId]
   if not bucket then
-    bucket = setmetatable({}, { __mode = 'k' })
+    bucket = {}
     ItemsDatabase.rarityWidgetsByItemId[itemId] = bucket
   end
 
-  ItemsDatabase.rarityWidgetItemIds[widget] = itemId
-  bucket[widget] = true
-  if not ItemsDatabase.rarityWidgetDestroyHooked[widget] then
-    connect(widget, { onDestroy = onTrackedRarityWidgetDestroy })
-    ItemsDatabase.rarityWidgetDestroyHooked[widget] = true
-  end
+  ItemsDatabase.rarityWidgetItemIds[record] = itemId
+  record.corner = corner
+  bucket[record] = true
   return itemId
 end
 
-local function refreshTrackedRarityWidget(widget, expectedItemId)
-  if not widget then
-    ItemsDatabase.untrackRarityWidget(widget)
-    return
-  end
-
-  -- A widget can be destroyed between the weak-table iteration and this
-  -- callback (notably while relogging or rebuilding the game panels). Even
-  -- looking up a method on that stale userdata enters the C++ binding, so keep
-  -- every widget access inside the protected call.
+local function refreshTrackedRarityWidget(record, expectedItemId)
+  if ItemsDatabase.rarityWidgetItemIds[record] ~= expectedItemId then return end
+  local widget = record.resolve()
+  if not widget then untrackRarityRecord(record); return end
+  -- Call the already resolved native methods: never enter userdata __index
+  -- before proving that this widget is still alive in the current session.
   local ok, refreshed = pcall(function()
-    if (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
+    if record.isDestroyed and record.isDestroyed(widget) then
       return false
     end
-    local item = widget:getItem()
+    local item = record.getItem(widget)
     if getRarityItemId(item) ~= expectedItemId then
       return false
     end
-    ItemsDatabase.setRarityItem(widget, item)
+    ItemsDatabase.setRarityItem(widget, item, record.corner)
     return true
   end)
   if not ok or not refreshed then
-    ItemsDatabase.untrackRarityWidget(widget)
+    untrackRarityRecord(record)
   end
 end
 
@@ -487,8 +506,8 @@ function ItemsDatabase.refreshVisibleRarityFrames(itemIds)
     for itemId in pairs(itemIds) do
       local bucket = ItemsDatabase.rarityWidgetsByItemId[itemId]
       if bucket then
-        for widget in pairs(bucket) do
-          refreshTrackedRarityWidget(widget, itemId)
+        for record in pairs(bucket) do
+          refreshTrackedRarityWidget(record, itemId)
         end
         if next(bucket) == nil then
           ItemsDatabase.rarityWidgetsByItemId[itemId] = nil
@@ -498,8 +517,8 @@ function ItemsDatabase.refreshVisibleRarityFrames(itemIds)
     return
   end
 
-  for widget, itemId in pairs(ItemsDatabase.rarityWidgetItemIds) do
-    refreshTrackedRarityWidget(widget, itemId)
+  for record, itemId in pairs(ItemsDatabase.rarityWidgetItemIds) do
+    refreshTrackedRarityWidget(record, itemId)
   end
 end
 
@@ -518,13 +537,19 @@ function ItemsDatabase.scheduleRarityFrameRefresh(itemId)
     return
   end
 
+  local generation = ItemsDatabase.rarityRefreshGeneration
   ItemsDatabase.rarityFrameRefreshEvent = addEvent(function()
+    if generation ~= ItemsDatabase.rarityRefreshGeneration then return end
     ItemsDatabase.rarityFrameRefreshEvent = nil
     local refreshAll = ItemsDatabase.refreshAllTrackedRarityWidgets
     local dirtyItemIds = ItemsDatabase.dirtyRarityItemIds
     ItemsDatabase.refreshAllTrackedRarityWidgets = false
     ItemsDatabase.dirtyRarityItemIds = {}
-    ItemsDatabase.refreshVisibleRarityFrames(refreshAll and nil or dirtyItemIds)
+    if refreshAll then
+      ItemsDatabase.refreshVisibleRarityFrames()
+    else
+      ItemsDatabase.refreshVisibleRarityFrames(dirtyItemIds)
+    end
   end)
 end
 
@@ -869,7 +894,7 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
     local enabled = not g_game.getFeature or g_game.getFeature(GameColorizedLootValue)
     local clip, imagePath
     if enabled then
-      ItemsDatabase.trackRarityWidget(widget, item)
+      ItemsDatabase.trackRarityWidget(widget, item, corner)
       clip, imagePath = ItemsDatabase.getClipAndImagePath(item, corner, defaultImageSource)
     else
       ItemsDatabase.untrackRarityWidget(widget)
