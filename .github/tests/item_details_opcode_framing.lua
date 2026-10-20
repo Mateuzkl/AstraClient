@@ -68,7 +68,7 @@ ProtocolGame = {
   registerOpcode = function(opcode, callback) callbacks[opcode] = callback end,
   unregisterOpcode = function(opcode) callbacks[opcode] = nil end
 }
-g_game = { onItemDetails = function() end }
+g_game = { onItemDetails = function() end, getFeature = function() return false end }
 signalcall = function() end
 ItemsDatabase = {
   registerServerItemDetails = function(itemId, data)
@@ -109,6 +109,23 @@ callbacks[0xC6](nil, valueMsg)
 assert(values[2160] == 60 and values[3000] == 100)
 assert(valueMsg:getUnreadSize() == #move, "0xC6 consumed part of next movement")
 assert(valueMsg:getU8() == 0x6D)
+
+-- Several independent item opcodes and a large values batch share one frame.
+local entries = {}
+for i = 1, 200 do entries[i] = u16(4000 + i) .. u32(i) end
+local largeValues = string.char(0xC6) .. u16(#entries) .. table.concat(entries)
+local chain = Message:new(details .. largeValues .. details .. move)
+for _, opcode in ipairs({0xC7, 0xC6, 0xC7}) do
+  assert(chain:getU8() == opcode)
+  callbacks[opcode](nil, chain)
+end
+assert(values[4200] == 200)
+assert(chain:getUnreadSize() == #move and chain:getU8() == 0x6D,
+       "coalesced metadata handlers lost the following movement")
+
+local empty = Message:new(u16(1) .. u32(0) .. u32(0) .. u32(0) .. string.char(0) .. u16(0) .. move)
+callbacks[0xC7](nil, empty)
+assert(empty:getUnreadSize() == #move and empty:getU8() == 0x6D)
 
 local f = assert(io.open(cppPath, "rb"))
 local native = assert(f:read("*a"))
