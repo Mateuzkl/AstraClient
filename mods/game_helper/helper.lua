@@ -949,6 +949,9 @@ function onHelperVocationChange(changedPlayer)
 end
 
 function init()
+  if _Helper.FollowFriend and _Helper.FollowFriend.init then
+    _Helper.FollowFriend.init()
+  end
   -- Carregar dados de spells do JSON (uma única vez)
   if not HelperSpellData.load() then
     g_logger.warning("[game_helper] Failed to load spell data from JSON, using fallback")
@@ -1250,8 +1253,8 @@ function terminate()
     _Helper.ParalyzeCure.terminate()
   end
 
-  if _Helper.FollowFriend and _Helper.FollowFriend.reset then
-    _Helper.FollowFriend.reset()
+  if _Helper.FollowFriend and _Helper.FollowFriend.terminate then
+    _Helper.FollowFriend.terminate()
   end
 
   if LocalPlayer then

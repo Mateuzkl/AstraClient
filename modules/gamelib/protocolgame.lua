@@ -161,17 +161,22 @@ function ProtocolGame.registerExtendedJSONOpcode(opcode, callback)
   extendedJSONCallbacks[opcode] = callback
 end
 
-function ProtocolGame.unregisterExtendedJSONOpcode(opcode)
+function ProtocolGame.unregisterExtendedJSONOpcode(opcode, expectedCallback)
   if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
+  -- An optional owner check makes teardown harmless if another module took over.
+  if expectedCallback and extendedJSONCallbacks[opcode] ~= expectedCallback then
+    return false
+  end
   if not extendedJSONCallbacks[opcode] then
     error('Opcode is not registered.')
   end
 
   clearJSONAssembly(opcode)
   extendedJSONCallbacks[opcode] = nil
+  if expectedCallback then return true end
 end
 
 function ProtocolGame:sendExtendedJSONOpcode(opcode, data)

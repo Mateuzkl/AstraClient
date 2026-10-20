@@ -124,6 +124,9 @@ jobs:
       - name: Test extended JSON lifecycle
         run: luajit .github/tests/extended_json_lifecycle.lua
 
+      - name: Test FollowFriend lifecycle
+        run: luajit .github/tests/follow_friend_lifecycle.lua
+
       - name: Test GameBot auto recording
         run: |
           luajit .github/tests/game_bot_auto_recording.lua \

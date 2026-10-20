@@ -19,7 +19,11 @@ if not _Helper then
   _Helper = {}
 end
 
+if _Helper.FollowFriend and _Helper.FollowFriend.terminate then
+  _Helper.FollowFriend.terminate()
+end
 _Helper.FollowFriend = {}
+local protocolRegistered = false
 
 -- Re-issuing follow costs one small packet, so this can be brisk; it only sends
 -- anything at all when the follow has actually been dropped.
@@ -212,14 +216,22 @@ local function onFollowTransition(_, _, data)
   end
 end
 
-if ProtocolGame and ProtocolGame.registerExtendedJSONOpcode then
-  local registered = pcall(ProtocolGame.registerExtendedJSONOpcode,
+function _Helper.FollowFriend.init()
+  if protocolRegistered or not ProtocolGame or not ProtocolGame.registerExtendedJSONOpcode then return end
+  local ok, err = pcall(ProtocolGame.registerExtendedJSONOpcode,
     ExtendedIds.FollowTransition, onFollowTransition)
-  if not registered and ProtocolGame.unregisterExtendedJSONOpcode then
-    pcall(ProtocolGame.unregisterExtendedJSONOpcode, ExtendedIds.FollowTransition)
-    pcall(ProtocolGame.registerExtendedJSONOpcode,
-      ExtendedIds.FollowTransition, onFollowTransition)
+  protocolRegistered = ok
+  if not ok and g_logger then
+    g_logger.warning('[FollowFriend] Cannot register transition opcode: ' .. tostring(err))
   end
+end
+
+function _Helper.FollowFriend.terminate()
+  if protocolRegistered then
+    ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.FollowTransition, onFollowTransition)
+    protocolRegistered = false
+  end
+  _Helper.FollowFriend.reset()
 end
 
 -- Is Follow Friend switched on AND pointed at somebody?
