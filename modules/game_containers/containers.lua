@@ -366,6 +366,8 @@ function move(instance, panel, height, index, minimized, locked)
 
   if not widget then return end
 
+  -- A newer placement may no longer want the delayed lock from the last move.
+  g_ui.cancelWidgetEvent(widget, 'containerLock')
   widget:setParent(panel)
   widget:open()
 

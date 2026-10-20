@@ -27,7 +27,7 @@ Um novo início substitui uma montagem incompleta do mesmo opcode. P/E sem iníc
 - 23 suítes Lua: passaram, incluindo os 16 testes preexistentes e sete novas suítes de regressão.
 - Reader nativo de ItemDetails: testes com GCC e Clang, C++17, `-Wall -Wextra -Werror -pedantic -fsanitize=address,undefined`: passaram. Incluem payload contado, movimento concatenado e truncamentos em cada offset.
 - `git diff --check`: passou.
-- EmmyLua 0.25.1 reexecutado com a biblioteca parcial da auditoria: 460 arquivos, 29.804 diagnósticos, saída 1 pela presença de diagnósticos. Permanecem avisos de bindings/OTUI e três falsos erros de sintaxe já demonstrados pelo parser LuaJIT. Isso não é um resultado verde do linter. As novas referências a ProtocolGame foram conferidas como API nativa, não tratadas como globals inexistentes.
+- EmmyLua 0.25.1 reexecutado com a biblioteca parcial da auditoria: 460 arquivos, 29.804 diagnósticos, saída 1 pela presença de diagnósticos. Esse resultado é anterior à correção de compatibilidade descrita abaixo. Permanecem avisos de bindings/OTUI; não é um resultado verde do linter. As novas referências a ProtocolGame foram conferidas como API nativa, não tratadas como globals inexistentes.
 
 Comando para repetir os testes Lua:
 
@@ -52,3 +52,13 @@ ASTRA-007: os intervalos do Bot/Battle e a coleta completa após logout não for
 ASTRA-008: a biblioteca de análise continua parcial. Não foram mascarados warnings com `any`, globals genéricos ou supressões. Ela exige uma etapa própria de modelagem das interfaces e dos perfis de Bot; não é um defeito funcional para corrigir com alterações arbitrárias no runtime.
 
 Não foram removidos módulos opcionais nem consolidadas as duas versões de StatusIconBar, pois não há prova de equivalência de todos os consumidores. A correção focal de ItemDetails coincide com trabalho já em revisão no PR #221; esta branch não inclui os diagnósticos de movimento daquele PR ou mudanças dos PRs #221/#222 fora do framing.
+
+## Revisão posterior do PR #223
+
+O log do GitHub Actions `39502731651` confirmou `unexpected symbol near 'goto'` no teste de sintaxe. O binário LuaJIT local aceitava a chave nua, mas essa observação não era uma prova de compatibilidade com o build usado pelo CI. A classificação anterior como falso positivo foi limitada demais. A chave agora usa `["goto"]`, preservando seu valor e permitindo o parsing nos dois ambientes.
+
+O teardown de Hunting libera explicitamente o bloqueio de entrada antes de destruir sua janela ou mensagem, apenas quando uma delas é a dona atual. O fallback de corelib já limpa o lock em onDestroy; a liberação explícita também cancela a passagem de foco pendente de g_client. O teste verifica a ordem antes de destroy e que o lock de uma janela externa não é removido.
+
+Toda movimentação de container cancela o `containerLock` anterior, incluindo uma nova movimentação com `locked=false`. O teste executa o callback antigo após essa troca, valida substituições locked→locked e preserva o cancelamento por destruição.
+
+O teste de TextWindow carrega o módulo inteiro e chama `onGameEditText`/`onGameEditList`. O fechamento usa os callbacks reais do botão Cancel e Escape, chegando ao helper privado que agenda o foco. São verificados foco normal, substituição, logout, destruição do painel e painel ausente; não é mais um evento de foco criado artificialmente pelo teste.

@@ -4,7 +4,13 @@ local function loadProduction(path)
   env.ProtocolGame = {unregisterOpcode = function() end}
   env.disconnect = function() end
   env.g_keyboard = {unbindKeyPress = function() end}
-  env.g_client = {setInputLockWidget = function() end}
+  env.g_ui = {getCustomInputWidget = function() return env.inputLockWidget end}
+  env.g_client = {setInputLockWidget = function(widget)
+    assert(not env.inputLockWidget or not env.inputLockWidget.destroyed,
+      'input lock must be released before destroying its widget')
+    env.inputLockWidget = widget
+    env.lockChanges = (env.lockChanges or 0) + 1
+  end}
   env.removeEvent = function(e) if e then e.cancelled = true end end
   local f = assert(loadfile(path)); setfenv(f, env); f()
   return env
@@ -33,14 +39,23 @@ for _ = 1, 2 do
   prey.updateRerollTime() -- A callback already queued before cancel is harmless.
 end
 local hunting = loadProduction('mods/game_prey_hunting/hunting.lua')
-for _ = 1, 2 do
+for iteration = 1, 2 do
   local window, event = widget(), {}
   hunting.huntingWindow = window
   hunting.huntingSlots = {{window = window}}
+  local lockOwner = iteration == 1 and window or widget()
+  hunting.g_client.setInputLockWidget(lockOwner)
+  local lockChanges = hunting.lockChanges
   seed(hunting.hide, event)
   hunting.terminate()
   assert(event.cancelled and window.destroyed and hunting.huntingWindow == nil)
   assert(next(hunting.huntingSlots) == nil)
+  if lockOwner == window then
+    assert(hunting.inputLockWidget == nil and hunting.lockChanges == lockChanges + 1)
+  else
+    assert(hunting.inputLockWidget == lockOwner and hunting.lockChanges == lockChanges,
+      'Hunting teardown stole another window input lock')
+  end
   hunting.updateVisibleRerollTime()
 end
 local event = {}

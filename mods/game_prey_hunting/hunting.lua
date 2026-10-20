@@ -116,6 +116,10 @@ function terminate()
   })
 
   g_keyboard.unbindKeyPress('Tab', onSelectPrey, huntingWindow)
+  local inputWidget = g_ui.getCustomInputWidget()
+  if inputWidget and (inputWidget == huntingWindow or inputWidget == huuntingMessageWindow) then
+    g_client.setInputLockWidget(nil)
+  end
   if huntingWindow then huntingWindow:destroy(); huntingWindow = nil end
   if huuntingMessageWindow then huuntingMessageWindow:destroy(); huuntingMessageWindow = nil end
   huntingWindowButton = nil

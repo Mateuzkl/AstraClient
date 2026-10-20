@@ -77,15 +77,84 @@ container.lock = function(self) assert(not self.destroyed); self.locked = true e
 env.rootWidget = {recursiveGetChildById = function() return container end}
 env.move(1, widget(), 40, 1, false, true)
 local lock = events[#events]
-container:destroy(); lock.f()
-assert(lock.cancelled and not container.locked)
+env.move(1, widget(), 40, 1, false, false)
+lock.f()
+assert(lock.cancelled and not container.locked, 'an old move re-locked an unlocked placement')
+env.move(1, widget(), 40, 1, false, true)
+local supersededLock = events[#events]
+env.move(1, widget(), 40, 1, false, true)
+local latestLock = events[#events]
+supersededLock.f(); assert(supersededLock.cancelled and not container.locked)
+latestLock.f(); assert(container.locked, 'the latest requested lock was lost')
+container.locked = nil
+env.move(1, widget(), 40, 1, false, true)
+local destroyedLock = events[#events]
+container:destroy(); destroyedLock.f()
+assert(destroyedLock.cancelled and not container.locked)
 
-loadFunction('modules/game_textwindow/textwindow.lua', 'function destroyWindows%(%)')
+-- Load the entire production TextWindow module and close its real edit dialogs.
+-- This reaches the private queueGameFocus through the installed UI callbacks.
+load('modules/game_textwindow/textwindow.lua')
 local gameRoot = widget()
+local focusCalls = 0
+gameRoot.focus = function(self) assert(not self.destroyed); focusCalls = focusCalls + 1 end
 env.rootWidget = {getChildById = function() return gameRoot end}
-env.windows = {}
-local focus = ui.scheduleWidgetEvent(gameRoot, function() error('focus after logout') end, 50, 'textWindowFocus')
-env.destroyWindows(); focus.f(); assert(focus.cancelled)
+env.g_game = {isOnline = function() return true end}
+env.g_client.setInputLockWidget = function() end
+env.g_things = {getThingType = function() return {hasAttribute = function() return false end} end}
+env.ThingAttrWritableOnce, env.ThingAttrWritable = 1, 2
+env.tr = function(s) return s end
+env.table = setmetatable({removevalue = function(values, target)
+  for i, value in ipairs(values) do if value == target then table.remove(values, i); return end end
+end}, {__index = table})
+local dialog
+ui.createWidget = function()
+  local window = widget()
+  window.children = {}
+  function window:getChildById(id)
+    if not self.children[id] then
+      local child = widget()
+      for _, name in ipairs({'setItemId', 'setMaxLength', 'setText', 'setEditable',
+        'setCursorVisible', 'setCursorPos', 'setMarginTop', 'setMarginRight',
+        'setWidth', 'setHeight', 'setValue'}) do child[name] = function() end end
+      child.isHidden = function() return false end
+      child.getHeight = function() return 64 end
+      child.hide = function() end
+      self.children[id] = child
+    end
+    return self.children[id]
+  end
+  window.setText, window.focusChild = function() end, function() end
+  dialog = window
+  return window
+end
+local function closeTextDialog(kind)
+  if kind == 'text' then
+    env.onGameEditText(1, 100, 100, 'editable text', '', '')
+    dialog.children.cancelButton.onClick()
+  else
+    env.onGameEditList(1, 2, 'guest')
+    dialog.onEscape()
+  end
+  assert(dialog.destroyed and #env.windows == 0)
+  return events[#events]
+end
+local firstFocus = closeTextDialog('text')
+assert(firstFocus.delay == 50 and focusCalls == 0)
+local listFocus = closeTextDialog('list')
+assert(firstFocus.cancelled, 'real TextWindow close did not replace the pending focus')
+firstFocus.f(); assert(focusCalls == 0)
+listFocus.f(); assert(focusCalls == 1, 'real TextWindow close did not return focus')
+local logoutFocus = closeTextDialog('text')
+env.destroyWindows(); logoutFocus.f()
+assert(logoutFocus.cancelled and focusCalls == 1, 'TextWindow focus survived logout cleanup')
+local destroyedFocus = closeTextDialog('list')
+gameRoot:destroy(); destroyedFocus.f()
+assert(destroyedFocus.cancelled and focusCalls == 1, 'TextWindow focused a destroyed game panel')
+gameRoot = nil
+local beforeNoPanel = #events
+closeTextDialog('text')
+assert(#events == beforeNoPanel, 'TextWindow scheduled focus without a game panel')
 
 loadFunction('mods/game_tibia_market/t_market.lua', 'function onRedirect%(item%)')
 local redirect
