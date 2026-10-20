@@ -106,6 +106,13 @@ jobs:
             test ! -d "$root/$root" || { echo "::error::nested duplicate package root: $root/$root"; exit 1; }
           done
 
+      - name: Test item metadata frame boundaries
+        run: |
+          luajit .github/tests/item_details_opcode_framing.lua modules/game_protocol/protocol.lua src/client/protocolgameparse.cpp
+          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined \
+            .github/tests/item_details_framing.cpp -I. -o /tmp/item_details_framing_test
+          /tmp/item_details_framing_test
+
       - name: Test GameBot auto recording
         run: |
           luajit .github/tests/game_bot_auto_recording.lua \

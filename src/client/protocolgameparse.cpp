@@ -22,6 +22,7 @@
 
 #include "protocolgame.h"
 #include "spellcooldown.h"
+#include "customitemprotocol.h"
 
 #include <algorithm>
 #include <ctime>
@@ -4051,46 +4052,18 @@ void ProtocolGame::parseCustomItemValues(const InputMessagePtr& msg)
 
 void ProtocolGame::parseCustomItemDetails(const InputMessagePtr& msg)
 {
-    const uint16 itemId = msg->getU16();
-    const uint32 defaultValue = msg->getU32();
-    const uint32 defaultBuyPrice = msg->getU32();
-    const uint32 averageMarketValue = msg->getU32();
+    const auto data = CustomItemProtocol::readDetails(*msg);
+    const auto& [itemId, defaultValue, defaultBuyPrice, averageMarketValue, descriptions, npcSaleData] = data;
 
-    std::vector<std::pair<std::string, std::string>> descriptions;
-    const uint8 descriptionCount = msg->getU8();
-    descriptions.reserve(descriptionCount);
-    for (uint8 i = 0; i < descriptionCount; ++i) {
-        descriptions.emplace_back(msg->getString(), msg->getString());
-    }
-
-    std::vector<std::tuple<std::string, std::string, uint32, uint32, std::string>> npcSaleData;
-    const uint16 npcCount = msg->getU16();
-    npcSaleData.reserve(npcCount);
-    for (uint16 i = 0; i < npcCount; ++i) {
-        auto npcName = msg->getString();
-        auto location = msg->getString();
-        const uint32 buyPrice = msg->getU32();
-        const uint32 salePrice = msg->getU32();
-        auto currencyQuestFlagDisplayName = msg->getString();
-        npcSaleData.emplace_back(npcName, location, buyPrice, salePrice, currencyQuestFlagDisplayName);
-    }
-
+    // ItemDetails ends after the counted NPC entries, not at the end of the frame.
     std::string itemName;
-    if (msg->getUnreadSize() >= 2 && msg->peekU16() + 2 <= msg->getUnreadSize()) {
-        itemName = msg->getString();
-    }
-    if (itemName.empty()) {
-        for (const auto& [detail, description] : descriptions) {
-            std::string lowerDetail = detail;
-            stdext::tolower(lowerDetail);
-            if (lowerDetail == "name") {
-                itemName = description;
-                break;
-            }
+    for (const auto& [detail, description] : descriptions) {
+        std::string lowerDetail = detail;
+        stdext::tolower(lowerDetail);
+        if (lowerDetail == "name") {
+            itemName = description;
+            break;
         }
-    }
-    if (msg->getUnreadSize() > 0) {
-        msg->skipBytes(msg->getUnreadSize());
     }
 
     g_lua.getGlobalField("ItemsDatabase", "registerServerItemDetails");

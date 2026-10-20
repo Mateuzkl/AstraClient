@@ -62,33 +62,6 @@ local DAILY_REWARD_SYSTEM_TYPE_XP_BOOST = 3
 
 local activeStanceSpellIds = {}
 
-local function drainUnreadMessage(msg)
-  if msg and msg.getUnreadSize and msg.skipBytes then
-    local unread = tonumber(msg:getUnreadSize()) or 0
-    if unread > 0 then
-      msg:skipBytes(unread)
-    end
-  end
-end
-
-local function readOptionalTrailingString(msg)
-  if not msg or not msg.getUnreadSize or not msg.peekU16 or not msg.getString then
-    return ""
-  end
-
-  local unread = tonumber(msg:getUnreadSize()) or 0
-  if unread < 2 then
-    return ""
-  end
-
-  local length = tonumber(msg:peekU16()) or 0
-  if length + 2 > unread then
-    return ""
-  end
-
-  return msg:getString()
-end
-
 local function getDescriptionDetail(descriptions, detailName)
   if type(descriptions) ~= "table" then
     return ""
@@ -284,11 +257,8 @@ function registerProtocol()
 			currencyQuestFlagDisplayName = msg:getString()
 		}
 	end
-	local itemName = readOptionalTrailingString(msg)
-	if itemName == "" then
-		itemName = getDescriptionDetail(descriptions, "Name")
-	end
-	drainUnreadMessage(msg)
+	-- The counted payload ends here; unread bytes are other opcodes in this frame.
+	local itemName = getDescriptionDetail(descriptions, "Name")
 
 	if ItemsDatabase and ItemsDatabase.registerServerItemDetails then
 		ItemsDatabase.registerServerItemDetails(itemId, {
