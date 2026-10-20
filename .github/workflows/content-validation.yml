@@ -118,6 +118,9 @@ jobs:
       - name: Test TopMenu lifecycle
         run: luajit .github/tests/topmenu_lifecycle.lua
 
+      - name: Test Prey and Hunting lifecycle
+        run: luajit .github/tests/prey_lifecycle.lua
+
       - name: Test GameBot auto recording
         run: |
           luajit .github/tests/game_bot_auto_recording.lua \

@@ -99,6 +99,8 @@ function init()
 end
 
 function terminate()
+  removeEvent(updateRerollEvent)
+  updateRerollEvent = nil
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline,
@@ -114,6 +116,12 @@ function terminate()
   })
 
   g_keyboard.unbindKeyPress('Tab', onSelectPrey, huntingWindow)
+  if huntingWindow then huntingWindow:destroy(); huntingWindow = nil end
+  if huuntingMessageWindow then huuntingMessageWindow:destroy(); huuntingMessageWindow = nil end
+  huntingWindowButton = nil
+  huntingSlots = {}
+  inactiveSelections = {}
+  lastSelectedCreature = {}
 end
 
 function close()
@@ -181,6 +189,8 @@ function online()
 end
 
 function offline()
+  removeEvent(updateRerollEvent)
+  updateRerollEvent = nil
   huntingWindow:hide()
   g_client.setInputLockWidget(nil)
   huuntingMessageWindow = nil
@@ -1202,7 +1212,7 @@ function updatePreyWidget(slot, state)
 end
 
 function updateVisibleRerollTime()
-	if not g_game.isOnline() or not huntingWindow:isVisible() then
+	if not huntingWindow or not g_game.isOnline() or not huntingWindow:isVisible() then
 		removeEvent(updateRerollEvent)
 		updateRerollEvent = nil
 		return

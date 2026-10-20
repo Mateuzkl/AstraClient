@@ -509,6 +509,8 @@ function onSpecialHover(widget, bonusType, bonusValue)
 end
 
 function terminate()
+  removeEvent(updateRerollEvent)
+  updateRerollEvent = nil
   ProtocolGame.unregisterOpcode(PREY_OPCODE_DATA)
   ProtocolGame.unregisterOpcode(PREY_OPCODE_PRICES)
 
@@ -529,12 +531,15 @@ function terminate()
 
   if preyButton then
     preyButton:destroy()
+    preyButton = nil
   end
   if preyTrackerButton then
     preyTrackerButton:destroy()
+    preyTrackerButton = nil
   end
-  preyWindow:destroy()
-  preyTracker:destroy()
+  if preyWindow then preyWindow:destroy(); preyWindow = nil end
+  if preyTracker then preyTracker:destroy(); preyTracker = nil end
+  preyWindowButton = nil
   if supportWindow then
     supportWindow:destroy()
     supportWindow = nil
@@ -1658,7 +1663,7 @@ function focusNextWildcardLabel(list)
 end
 
 function updateRerollTime()
-  if not g_game.isOnline() or not preyWindow:isVisible() then
+  if not preyWindow or not g_game.isOnline() or not preyWindow:isVisible() then
     removeEvent(updateRerollEvent)
     updateRerollEvent = nil
     return
