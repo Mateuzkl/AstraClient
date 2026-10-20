@@ -147,6 +147,10 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
     int opcodePos = 0;
     int prevOpcodePos = 0;
 
+    // Opt-in diagnostic: only large frames and movement/value opcodes are traced.
+    // A shared frame can contain several independent game opcodes.
+    const bool traceLargeFrame = g_extras.debugWalking && msg->getMessageSize() >= 900;
+
     try {
         while (!msg->eof()) {
             opcodePos = msg->getReadPos();
@@ -173,14 +177,27 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
                 }
             }
 
-            // try to parse in lua first
+            // Lua callbacks operate on the shared frame, not isolated packets.
+            // Log the byte range consumed so a handler skipping a later movement
+            // can be identified from the client's debugWalking output.
             int readPos = msg->getReadPos();
-            if (callLuaField<bool>("onOpcode", opcode, msg)) {
+            const bool handledByLua = callLuaField<bool>("onOpcode", opcode, msg);
+            const bool traceOpcode = g_extras.debugWalking &&
+                (traceLargeFrame || opcode == Proto::GameServerMoveCreature ||
+                 opcode == Proto::GameServerCustomItemValues ||
+                 opcode == Proto::GameServerCustomItemDetails);
+            if (traceOpcode) {
+                g_logger.info(stdext::format(
+                    "[NetworkWalkTrace] opcode=0x%02x frame=%d start=%d afterLua=%d unread=%d lua=%d",
+                    opcode, msg->getMessageSize(), opcodePos, msg->getReadPos(),
+                    msg->getUnreadSize(), handledByLua ? 1 : 0));
+            }
+            if (handledByLua) {
                 prevOpcode = opcode;
                 prevOpcodePos = opcodePos;
                 continue;
-            } else
-                msg->setReadPos(readPos); // restore read pos
+            }
+            msg->setReadPos(readPos); // restore read pos before native parsing
 
             switch (opcode) {
             case Proto::GameServerCustomUnjustifiedStats:
@@ -736,6 +753,11 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             default:
                 stdext::throw_exception(stdext::format("unhandled opcode %d", (int)opcode));
                 break;
+            }
+            if (traceOpcode) {
+                g_logger.info(stdext::format(
+                    "[NetworkWalkTrace] native opcode=0x%02x end=%d unread=%d",
+                    opcode, msg->getReadPos(), msg->getUnreadSize()));
             }
             prevOpcode = opcode;
             prevOpcodePos = opcodePos;
@@ -1432,6 +1454,11 @@ void ProtocolGame::parseCreatureMove(const InputMessagePtr& msg)
         stepDuration = msg->getU16();
 
     if (!thing || !thing->isCreature()) {
+        if (g_extras.debugWalking) {
+            g_logger.info(stdext::format(
+                "[NetworkWalkTrace] 0x6d missing creature, destination=%s mapCenter=%s",
+                stdext::to_string(newPos), stdext::to_string(g_map.getCentralPosition())));
+        }
         g_logger.traceError("no creature found to move");
         return;
     }
@@ -4075,22 +4102,16 @@ void ProtocolGame::parseCustomItemDetails(const InputMessagePtr& msg)
         npcSaleData.emplace_back(npcName, location, buyPrice, salePrice, currencyQuestFlagDisplayName);
     }
 
+    // The TFS 8.60 ItemDetails wire format ends after npcSaleData.
+    // There is no unframed optional string: the next bytes are another opcode.
     std::string itemName;
-    if (msg->getUnreadSize() >= 2 && msg->peekU16() + 2 <= msg->getUnreadSize()) {
-        itemName = msg->getString();
-    }
-    if (itemName.empty()) {
-        for (const auto& [detail, description] : descriptions) {
-            std::string lowerDetail = detail;
-            stdext::tolower(lowerDetail);
-            if (lowerDetail == "name") {
-                itemName = description;
-                break;
-            }
+    for (const auto& [detail, description] : descriptions) {
+        std::string lowerDetail = detail;
+        stdext::tolower(lowerDetail);
+        if (lowerDetail == "name") {
+            itemName = description;
+            break;
         }
-    }
-    if (msg->getUnreadSize() > 0) {
-        msg->skipBytes(msg->getUnreadSize());
     }
 
     g_lua.getGlobalField("ItemsDatabase", "registerServerItemDetails");
