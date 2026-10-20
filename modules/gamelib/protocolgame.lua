@@ -5,6 +5,7 @@ local extendedJSONData = {}
 local maxPacketSize = 65000
 local maxJSONMessageSize = 8 * 1024 * 1024
 local maxJSONBufferedSize = 16 * 1024 * 1024
+local maxJSONFragments = 1024
 local jsonAssemblyTimeout = 30000
 local jsonBufferedSize = 0
 
@@ -62,7 +63,7 @@ function ProtocolGame:onExtendedOpcode(opcode, buffer)
     if status == 'S' or status == 'P' or status == 'E' then
       if status == 'S' then
         clearJSONAssembly(opcode)
-        local assembly = {owner = self, callback = callback, chunks = {}, size = 0}
+        local assembly = {owner = self, callback = callback, chunks = {}, size = 0, fragments = 0}
         extendedJSONData[opcode] = assembly
         assembly.timeout = scheduleEvent(function()
           if extendedJSONData[opcode] == assembly then
@@ -76,11 +77,13 @@ function ProtocolGame:onExtendedOpcode(opcode, buffer)
         return
       end
       local size = #buffer - 1
-      if assembly.size + size > maxJSONMessageSize or jsonBufferedSize + size > maxJSONBufferedSize then
+      if assembly.size + size > maxJSONMessageSize or jsonBufferedSize + size > maxJSONBufferedSize or
+          assembly.fragments >= maxJSONFragments then
         rejectJSONAssembly(opcode, 'assembly size limit exceeded')
         return
       end
       assembly.chunks[#assembly.chunks + 1] = buffer:sub(2)
+      assembly.fragments = assembly.fragments + 1
       assembly.size = assembly.size + size
       jsonBufferedSize = jsonBufferedSize + size
       if status ~= 'E' then return end

@@ -65,6 +65,11 @@ end
 a:onExtendedOpcode(1, 'Sx')
 assert(not bufferTable()[1] and bufferTable()[2] and bufferTable()[3])
 state.gameEnd(); assert(next(bufferTable()) == nil)
+a:onExtendedOpcode(1, 'S')
+for _ = 1, 1023 do a:onExtendedOpcode(1, 'P') end
+assert(bufferTable()[1].size == 0 and bufferTable()[1].fragments == 1024)
+a:onExtendedOpcode(1, 'P')
+assert(not bufferTable()[1], 'empty fragments bypassed the retained-memory bound')
 a:onExtendedOpcode(1, 'Sreload')
 loadProtocol()
 assert(state.disconnected and state.events[#state.events].cancelled)
