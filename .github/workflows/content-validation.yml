@@ -121,6 +121,9 @@ jobs:
       - name: Test Prey and Hunting lifecycle
         run: luajit .github/tests/prey_lifecycle.lua
 
+      - name: Test extended JSON lifecycle
+        run: luajit .github/tests/extended_json_lifecycle.lua
+
       - name: Test GameBot auto recording
         run: |
           luajit .github/tests/game_bot_auto_recording.lua \

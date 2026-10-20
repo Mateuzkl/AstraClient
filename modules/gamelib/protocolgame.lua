@@ -3,6 +3,42 @@ local extendedCallbacks = {}
 local extendedJSONCallbacks = {}
 local extendedJSONData = {}
 local maxPacketSize = 65000
+local maxJSONMessageSize = 8 * 1024 * 1024
+local maxJSONBufferedSize = 16 * 1024 * 1024
+local jsonAssemblyTimeout = 30000
+local jsonBufferedSize = 0
+
+local function clearJSONAssembly(opcode)
+  local assembly = extendedJSONData[opcode]
+  if assembly then
+    extendedJSONData[opcode] = nil
+    jsonBufferedSize = jsonBufferedSize - assembly.size
+    if assembly.timeout then removeEvent(assembly.timeout) end
+  end
+end
+
+local function clearJSONAssemblies()
+  for opcode in pairs(extendedJSONData) do clearJSONAssembly(opcode) end
+end
+
+local function rejectJSONAssembly(opcode, reason)
+  clearJSONAssembly(opcode)
+  if g_logger and g_logger.warning then
+    g_logger.warning('Invalid extended JSON opcode ' .. opcode .. ': ' .. reason)
+  end
+end
+
+-- Reload must retire the previous registry's timers and game-end connection.
+if ProtocolGame._clearExtendedJSONAssemblies then
+  ProtocolGame._clearExtendedJSONAssemblies()
+  if g_game and disconnect then
+    disconnect(g_game, {onGameEnd = ProtocolGame._clearExtendedJSONAssemblies})
+  end
+end
+ProtocolGame._clearExtendedJSONAssemblies = clearJSONAssemblies
+if g_game and connect then
+  connect(g_game, {onGameEnd = clearJSONAssemblies})
+end
 
 function ProtocolGame:onOpcode(opcode, msg)
   for i, callback in pairs(opcodeCallbacks) do
@@ -23,24 +59,49 @@ function ProtocolGame:onExtendedOpcode(opcode, buffer)
   callback = extendedJSONCallbacks[opcode]
   if callback then
     local status = buffer:sub(1,1) -- O - just one message, S - start, P - part, E - end
-    local data = buffer:sub(2)
-    if status ~= "E" and status ~= "P" then
-      extendedJSONData[opcode] = ""
-    end
-    if status ~= "S" and status ~= "P" and status ~= "E" then
-      extendedJSONData[opcode] = buffer
-    else
-      extendedJSONData[opcode] = extendedJSONData[opcode] .. data
-    end
-    if status ~= "S" and status ~= "P" then
-      local json_status, json_data = pcall(function() return json.decode(extendedJSONData[opcode]) end)
-      extendedJSONData[opcode] = nil
-      if not json_status then
-        error("Invalid data in extended JSON opcode (" .. json_status .. "): " .. json_data)
+    local payload
+    if status == 'S' or status == 'P' or status == 'E' then
+      if status == 'S' then
+        clearJSONAssembly(opcode)
+        local assembly = {owner = self, callback = callback, chunks = {}, size = 0}
+        extendedJSONData[opcode] = assembly
+        assembly.timeout = scheduleEvent(function()
+          if extendedJSONData[opcode] == assembly then
+            rejectJSONAssembly(opcode, 'assembly timed out')
+          end
+        end, jsonAssemblyTimeout)
+      end
+      local assembly = extendedJSONData[opcode]
+      if not assembly or assembly.owner ~= self or assembly.callback ~= callback then
+        rejectJSONAssembly(opcode, 'fragment without a matching start')
         return
       end
-      callback(self, opcode, json_data)
+      local size = #buffer - 1
+      if assembly.size + size > maxJSONMessageSize or jsonBufferedSize + size > maxJSONBufferedSize then
+        rejectJSONAssembly(opcode, 'assembly size limit exceeded')
+        return
+      end
+      assembly.chunks[#assembly.chunks + 1] = buffer:sub(2)
+      assembly.size = assembly.size + size
+      jsonBufferedSize = jsonBufferedSize + size
+      if status ~= 'E' then return end
+      -- One concatenation, instead of copying the entire prefix for every chunk.
+      payload = table.concat(assembly.chunks)
+      clearJSONAssembly(opcode)
+    else
+      clearJSONAssembly(opcode)
+      if #buffer > maxJSONMessageSize then
+        rejectJSONAssembly(opcode, 'message size limit exceeded')
+        return
+      end
+      payload = buffer
     end
+    local ok, data = pcall(json.decode, payload)
+    if not ok then
+      rejectJSONAssembly(opcode, tostring(data))
+      return
+    end
+    callback(self, opcode, data)
   end
 end
 
@@ -109,6 +170,7 @@ function ProtocolGame.unregisterExtendedJSONOpcode(opcode)
     error('Opcode is not registered.')
   end
 
+  clearJSONAssembly(opcode)
   extendedJSONCallbacks[opcode] = nil
 end
 
