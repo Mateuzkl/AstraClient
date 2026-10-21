@@ -15,9 +15,9 @@ suite covers large ItemValues batches and chained metadata followed by movement.
 The native regression uses the exact reader called by ProtocolGame and rejects
 every truncated prefix of a representative payload, including NPC strings.
 
-The earlier experimental PR #221 is used as a reviewed starting point, not
-merged automatically. Its incomplete test fixture and the LuaJIT reserved-word
-syntax error in the waypoint command table are corrected here.
+The parser fixes from PR #221 are now included from main. This branch retains
+its additional native framing assertions; the LuaJIT reserved-word correction
+and the rarity/relog lifecycle fixes from main are preserved.
 
 ## Cross-repository finding
 
@@ -33,6 +33,8 @@ Enable Astra's existing `debugWalking` extra only during reproduction.
 `[NetworkWalkTrace]` records include the runtime player ID, client milliseconds,
 opcode offsets before/after Lua and native parsing, unread bytes, map center,
 aware-range dimensions and mapped position/stack lookup results.
+Trace diagnostics are limited to eight grants per frame and 32 per second
+(at most two opcode-boundary lines per grant), including repeated large frames.
 
 On the companion TFS branch, set `TFS_WALK_TRACE_PLAYER_GUID` before starting
 the process to the numeric GUID of one test character. The server logs the same
@@ -72,3 +74,26 @@ c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. .github/tests/item_details_fr
 The same native test can be run with `-fsanitize=address,undefined`.
 The complete native application and existing spectator harness are built with
 CMake; the focused checks also run in Content validation.
+The harness now executes the real native `parseCustomItemDetails`, ItemValues
+and creature movement handlers on coalesced input and runs in Windows CI. The
+standalone reader check is additional coverage, not a substitute for that test.
+
+## Rarity refresh and relog lifecycle
+
+Changing None/Frames/Corners now schedules a coalesced refresh immediately.
+The full-refresh branch uses explicit control flow: `true and nil or dirtyIds`
+always selects dirtyIds in Lua and previously prevented a full repaint.
+
+The rarity registry stores records backed by native weak widget references,
+not weak Lua userdata keys. Two userdata values may represent the same C++
+widget; transient userdata can also be collected while that widget remains
+visible. Destruction hooks now invalidate the shared record without indexing
+the destroyed widget. Refresh resolves and retains a live native object, checks
+its destroyed flag through an already-bound method, and only then accesses UI
+fields. Old-session callbacks are generation-guarded before touching any state.
+
+Regression coverage includes aliases, Lua GC, native weak expiration, live
+Frames/Corners/None changes, destruction and callbacks already dequeued at relog.
+The screenshot identifies the failing refresh path; reproducing the exact
+Windows fatal exception with the user's running executable remains a manual
+check after recompiling the updated client (the native weak-reference API is new).

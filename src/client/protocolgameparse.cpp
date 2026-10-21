@@ -151,6 +151,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
     // Opt-in diagnostic: only large frames and movement/value opcodes are traced.
     // A shared frame can contain several independent game opcodes.
     const bool traceLargeFrame = g_extras.debugWalking && msg->getMessageSize() >= 900;
+    m_walkTraceBudget.beginFrame();
 
     try {
         while (!msg->eof()) {
@@ -186,7 +187,8 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             const bool traceOpcode = g_extras.debugWalking &&
                 (traceLargeFrame || opcode == Proto::GameServerMoveCreature ||
                  opcode == Proto::GameServerCustomItemValues ||
-                 opcode == Proto::GameServerCustomItemDetails);
+                 opcode == Proto::GameServerCustomItemDetails) &&
+                m_walkTraceBudget.allow(g_clock.millis());
             if (traceOpcode) {
                 g_logger.info(stdext::format(
                     "[NetworkWalkTrace] ms=%lld player=%u opcode=0x%02x frame=%u start=%d afterLua=%d unread=%d lua=%d",
@@ -1297,7 +1299,7 @@ void ProtocolGame::parseMapDescription(const InputMessagePtr& msg)
     g_map.setCentralPosition(pos);
 
     AwareRange range = g_map.getAwareRange();
-    if (g_extras.debugWalking) {
+    if (g_extras.debugWalking && m_walkTraceBudget.allow(g_clock.millis())) {
         g_logger.info(stdext::format("[NetworkWalkTrace] map center=%s aware=%dx%d viewport=%dx%d",
             stdext::to_string(pos), range.horizontal(), range.vertical(),
             g_gameConfig.getMapViewPort().width(), g_gameConfig.getMapViewPort().height()));
@@ -1461,7 +1463,7 @@ void ProtocolGame::parseCreatureMove(const InputMessagePtr& msg)
         stepDuration = msg->getU16();
 
     if (!thing || !thing->isCreature()) {
-        if (g_extras.debugWalking) {
+        if (g_extras.debugWalking && m_walkTraceBudget.allow(g_clock.millis())) {
             g_logger.info(stdext::format(
                 "[NetworkWalkTrace] 0x6d missing creature, destination=%s mapCenter=%s",
                 stdext::to_string(newPos), stdext::to_string(g_map.getCentralPosition())));
@@ -4880,7 +4882,7 @@ ThingPtr ProtocolGame::getMappedThing(const InputMessagePtr& msg)
 
         VALIDATE(stackpos != 255);
         thing = g_map.getThing(pos, stackpos);
-        if (g_extras.debugWalking) {
+        if (g_extras.debugWalking && m_walkTraceBudget.allow(g_clock.millis())) {
             const auto tile = g_map.getTile(pos);
             g_logger.info(stdext::format(
                 "[NetworkWalkTrace] mapped pos=%s stack=%u found=%d things=%u creature=%u center=%s",
