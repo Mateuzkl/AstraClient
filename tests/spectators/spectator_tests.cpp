@@ -2,6 +2,7 @@
 #include <framework/global.h>
 #include <new>
 #include <stdexcept>
+#include <type_traits>
 #include <framework/luaengine/luaobject.h>
 #define private public
 #include <client/thingtype.h>
@@ -9,11 +10,18 @@
 #include <framework/graphics/bitmapfont.h>
 #include <client/mapview.h>
 
-// Fixture access only, following upstream tests. Standard headers are already
-// loaded above; no production friendship or Lua API is added.
+// Fixture access only for map, tile and game state. Standard headers are
+// already loaded above; ProtocolGame retains its native access control.
 #define private public
 #include <client/map.h>
 #include <client/tile.h>
+#undef private
+
+// MSVC decorates private methods differently from public ones. Load this
+// header outside the fixture macro; parser access uses the friend below.
+#include <client/protocolgame.h>
+
+#define private public
 #include <client/game.h>
 #include <client/gameconfig.h>
 #undef private
@@ -21,8 +29,16 @@
 // Exercise the actual anonymous cleanup helper, not a reimplemented algorithm.
 // Test build files exclude map.cpp as a separate translation unit.
 #include "../../src/client/map.cpp"
-#include <client/protocolgame.h>
 #include <framework/net/inputmessage.h>
+
+template<class T, class = void>
+struct HasPublicMovementParser : std::false_type { };
+
+template<class T>
+struct HasPublicMovementParser<T, std::void_t<decltype(&T::parseCreatureMove)>> : std::true_type { };
+
+static_assert(!HasPublicMovementParser<ProtocolGame>::value,
+              "ProtocolGame parser access must not be changed by fixture macros");
 
 struct ProtocolGameFrameTestAccess {
     static void details(ProtocolGame& protocol, const InputMessagePtr& msg) { protocol.parseCustomItemDetails(msg); }
