@@ -38,14 +38,11 @@ function terminate()
 end
 
 function importResources(dir, type)
-    local path = '/' .. dir .. '/'
-    if not g_resources.directoryExists(path) then
-        return
-    end
-
     local function importFrom(path)
-        local files = g_resources.listDirectoryFiles(path, true)
-        for _, file in pairs(files) do
+        -- Directory resolution otherwise selects ONLY /layouts/mobile/styles,
+        -- hiding all base definitions (including TopMenu) on touch devices.
+        local files = g_resources.listDirectoryFiles(path, true, true)
+        for _, file in ipairs(files) do
             if g_resources.isFileType(file, type) then
                 resourceLoaders[type](file)
             elseif g_resources.directoryExists(file) then
@@ -54,7 +51,14 @@ function importResources(dir, type)
         end
     end
 
-    importFrom(path)
+    -- Archives may mount resources at /styles, while loose/browser packages
+    -- retain /data/styles. Explicit paths avoid layout shadowing in both cases.
+    importFrom('/' .. dir .. '/')
+    importFrom('/data/' .. dir .. '/')
+    local layout = g_resources.getLayout()
+    if layout and layout ~= '' then
+        importFrom('/layouts/' .. layout .. '/' .. dir .. '/')
+    end
 end
 
 function reloadParticles()

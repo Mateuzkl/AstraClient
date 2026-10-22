@@ -123,7 +123,7 @@ function stage(root, policy, target, things) {
 function audit(dist, policy, sourceRoot, thingsRoot) {
   const publicFiles = new Set(['astraclient.html', 'astraclient.js', 'astraclient.wasm', 'astraclient.data',
     'asset-manifest.json', 'browser-bundle-audit.json', 'config.js', 'runtime.js', 'security.js', 'bootstrap.js',
-    'asset-cache.js', 'launcher.js', 'launcher.css', 'launcher-background.png', 'astra-client-emblem.png']);
+    'asset-cache.js', 'credentials.js', 'launcher.js', 'launcher.css', 'launcher-background.png', 'astra-client-emblem.png']);
   for (const file of fs.readdirSync(dist)) {
     if (!publicFiles.has(file) || !fs.lstatSync(path.join(dist, file)).isFile())
       throw new Error('Arquivo publico inesperado: ' + file);

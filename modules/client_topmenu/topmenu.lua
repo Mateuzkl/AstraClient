@@ -2,6 +2,8 @@
 local topMenu
 local fpsUpdateEvent = nil
 local statusUpdateEvent = nil
+local statusGeneration = 0
+local onlineEvent = nil
 
 -- private functions
 local function addButton(id, description, icon, callback, panel, toggle, front, index)
@@ -43,14 +45,16 @@ end
 
 -- public functions
 function init()
+  topMenu = g_ui.createWidget('TopMenu', g_ui.getRootWidget())
+  if not topMenu then
+    error('Unable to create TopMenu: verify the base and active layout styles.')
+  end
   connect(g_game, { onGameStart = online,
                     onGameEnd = offline,
                     onPingBack = updatePing })
 
-  topMenu = g_ui.createWidget('TopMenu', g_ui.getRootWidget())
-
   if g_game.isOnline() then
-    scheduleEvent(online, 10)
+    onlineEvent = scheduleEvent(function() onlineEvent = nil; if topMenu then online() end end, 10)
   end
 
   updateFps()
@@ -63,11 +67,14 @@ function terminate()
                        onPingBack = updatePing })
   removeEvent(fpsUpdateEvent)
   removeEvent(statusUpdateEvent)
-
-  topMenu:destroy()
+  removeEvent(onlineEvent)
+  fpsUpdateEvent, statusUpdateEvent, onlineEvent = nil, nil, nil
+  statusGeneration = statusGeneration + 1
+  if topMenu then topMenu:destroy(); topMenu = nil end
 end
 
 function online()
+  if not topMenu then return end
   local benchmark = g_clock.millis()
   if topMenu.hideIngame then
     hide()
@@ -81,7 +88,9 @@ function online()
   showGameButtons()
 
   if topMenu.pingLabel then
+    local menu = topMenu
     addEvent(function()
+      if topMenu ~= menu or menu:isDestroyed() then return end
       if m_settings.getOption('showPing') and (g_game.getFeature(GameClientPing) or g_game.getFeature(GameExtendedClientPing)) then
         topMenu.pingLabel:show()
       else
@@ -94,6 +103,7 @@ function online()
 end
 
 function offline()
+  if not topMenu then return end
   if topMenu.hideIngame then
     show()
   end
@@ -109,14 +119,14 @@ function offline()
 end
 
 function updateFps()
-  if not topMenu.fpsLabel then return end
+  if not topMenu or not topMenu.fpsLabel then return end
   fpsUpdateEvent = scheduleEvent(updateFps, 500)
-  text = 'FPS: ' .. g_app.getFps()
+  local text = 'FPS: ' .. g_app.getFps()
   topMenu.fpsLabel:setText(text)
 end
 
 function updatePing(ping)
-  if not topMenu.pingLabel then return end
+  if not topMenu or not topMenu.pingLabel then return end
   if g_proxy and g_proxy.getPing() > 0 then
     ping = g_proxy.getPing()
   end
@@ -141,12 +151,12 @@ function updatePing(ping)
 end
 
 function setPingVisible(enable)
-  if not topMenu.pingLabel then return end
+  if not topMenu or not topMenu.pingLabel then return end
   topMenu.pingLabel:setVisible(enable)
 end
 
 function setFpsVisible(enable)
-  if not topMenu.fpsLabel then return end
+  if not topMenu or not topMenu.fpsLabel then return end
   topMenu.fpsLabel:setVisible(enable)
 end
 
@@ -254,6 +264,10 @@ end
 
 function updateStatus()
   removeEvent(statusUpdateEvent)
+  statusUpdateEvent = nil
+  statusGeneration = statusGeneration + 1
+  local generation, menu = statusGeneration, topMenu
+  if not menu then return end
   if not Services or not Services.status or #Services.status < 1 then return end
   if not topMenu.onlineLabel then return end
   if g_game.isOnline() then return end
@@ -265,8 +279,10 @@ function updateStatus()
   for index = 1, #Services.status do
     local url = Services.status[index]
     HTTP.postJSON(url, {type="cacheinfo"}, function(data, err)
+      if topMenu ~= menu or generation ~= statusGeneration or menu:isDestroyed() or g_game.isOnline() then return end
       if err then
         g_logger.warning("HTTP error for " .. url .. ": " .. err)
+        removeEvent(statusUpdateEvent)
         statusUpdateEvent = scheduleEvent(updateStatus, 60000)
         return
       end
@@ -288,7 +304,7 @@ function updateStatus()
         discordLink = data.discord_link
       end
 
-      if apiCalls == #Services.status then
+      if apiCalls == #Services.status and topOnlineLabel then
         if discordLink ~= '' then
           local discordOnClick = function()
             g_platform.openUrl(discordLink)
@@ -300,8 +316,7 @@ function updateStatus()
           topMenu.discordLabel:setText(discordOnline)
         end
 
-        topOnlineLabel:setText(onlineLabel)
-        topOnlineLabel:setText(playersOnline .. " players online")
+        topOnlineLabel:setText(onlineLabel ~= '' and onlineLabel or (playersOnline .. " players online"))
         topOnlineLabel:setFont(tovar("$var-cip-font"))
         topOnlineLabel:setColor(tovar("$var-text-cip-color"))
       end

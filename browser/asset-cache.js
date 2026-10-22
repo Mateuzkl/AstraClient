@@ -11,7 +11,7 @@
   const identity = m => JSON.stringify([m.schema, m.version, m.packageName, m.uuid, m.size, m.chunks]);
   const verifiedMeta = m => ({ uuid: m.uuid, chunkCount: m.chunks.length, size: m.size,
     astraVerifiedSchema: 1, astraManifest: identity(m) });
-  const matches = (meta, m) => meta && meta.uuid === m.uuid && meta.chunkCount === m.chunks.length &&
+  const matches = (meta, m) => meta && m && meta.uuid === m.uuid && meta.chunkCount === m.chunks.length &&
     (meta.size === undefined || meta.size === m.size);
   function validateManifest(m) {
     if (!m || m.schema !== 1 || m.version !== '8.60' || m.file !== 'astraclient.data' ||
@@ -33,7 +33,10 @@
 
   function openStore(indexedDB, pathname, packageName) {
     if (!indexedDB) return Promise.reject(new Error('Browser storage is unavailable.'));
-    const name = encodeURIComponent(pathname.slice(0, pathname.lastIndexOf('/')) + '/') + packageName;
+    const deployment = encodeURIComponent(pathname.slice(0, pathname.lastIndexOf('/')) + '/');
+    // PACKAGE_NAME contains the build machine's directory, not a content identity.
+    const canonical = deployment + 'astraclient.data';
+    let name = canonical;
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('EM_PRELOAD_CACHE', 1);
       let expired = false;
@@ -61,23 +64,75 @@
           tx.onabort = () => fail(tx.error || req.error || new Error('Browser storage write failed.'));
           tx.onerror = () => {}; // Abort is the single completion path.
         });
+        const metadataEntries = () => new Promise((ok, fail) => {
+          const tx = db.transaction('METADATA', 'readonly'), entries = [];
+          const req = tx.objectStore('METADATA').openCursor();
+          req.onsuccess = () => {
+            const cursor = req.result;
+            if (!cursor) return;
+            const key = cursor.key;
+            if (typeof key === 'string' && key.startsWith('metadata/' + deployment)) {
+              const suffix = key.slice(('metadata/' + deployment).length);
+              if (suffix === 'astraclient.data' || suffix.endsWith('/astraclient.data'))
+                entries.push([key.slice('metadata/'.length), cursor.value]);
+            }
+            cursor.continue();
+          };
+          tx.oncomplete = () => ok(entries);
+          tx.onabort = () => fail(tx.error || new Error('Unable to read game data metadata.'));
+          tx.onerror = () => {};
+        });
         resolve({
-          getMeta: () => transaction('METADATA', 'readonly', s => s.get('metadata/' + name)),
+          async getMeta(manifest) {
+            const entries = await metadataEntries();
+            const current = entries.find(([key]) => key === canonical);
+            const installed = entries.find(([key, value]) => key === canonical && matches(value, manifest)) ||
+              entries.find(([key, value]) => key === deployment + packageName && matches(value, manifest)) ||
+              entries.find(([, value]) => matches(value, manifest));
+            // Old SDK chunks remain in place; verification is still mandatory
+            // before handing them to the engine. Avoid a full-package migration copy.
+            const entry = installed || current || entries[0];
+            name = entry ? entry[0] : canonical;
+            return entry?.[1];
+          },
           putMeta: value => transaction('METADATA', 'readwrite', s => s.put(value, 'metadata/' + name)),
           getChunk: i => transaction('PACKAGES', 'readonly', s => s.get(`package/${name}/${i}`)),
           putChunk: (i, value) => transaction('PACKAGES', 'readwrite', s => s.put(value, `package/${name}/${i}`)),
           async remove() {
             // Remove the metadata first: interrupted writes are never "installed".
-            await transaction('METADATA', 'readwrite', s => s.delete('metadata/' + name));
-            const prefix = `package/${name}/`;
+            const names = new Set([canonical, deployment + packageName, name,
+              ...(await metadataEntries()).map(([key]) => key)]);
+            // Interrupted installs/removals can leave chunks with no metadata.
+            // Scan keys only, without cloning the large package payloads.
             await new Promise((ok, fail) => {
-              const tx = db.transaction('PACKAGES', 'readwrite');
-              const req = tx.objectStore('PACKAGES').openCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
-              req.onsuccess = () => { const cursor = req.result; if (cursor) { cursor.delete(); cursor.continue(); } };
+              const tx = db.transaction('PACKAGES', 'readonly');
+              const prefix = `package/${deployment}`;
+              const req = tx.objectStore('PACKAGES').openKeyCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+              req.onsuccess = () => {
+                const cursor = req.result;
+                if (!cursor) return;
+                const previous = cursor.key.slice('package/'.length, cursor.key.lastIndexOf('/'));
+                const suffix = previous.slice(deployment.length);
+                if (suffix === 'astraclient.data' || suffix.endsWith('/astraclient.data')) names.add(previous);
+                cursor.continue();
+              };
               tx.oncomplete = ok;
-              tx.onabort = () => fail(tx.error || new Error('Unable to remove game data.'));
+              tx.onabort = () => fail(tx.error || new Error('Unable to locate game data chunks.'));
               tx.onerror = () => {};
             });
+            for (const previous of names) {
+              await transaction('METADATA', 'readwrite', s => s.delete('metadata/' + previous));
+              const prefix = `package/${previous}/`;
+              await new Promise((ok, fail) => {
+                const tx = db.transaction('PACKAGES', 'readwrite');
+                const req = tx.objectStore('PACKAGES').openKeyCursor(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+                req.onsuccess = () => { const cursor = req.result; if (cursor) { cursor.delete(); cursor.continue(); } };
+                tx.oncomplete = ok;
+                tx.onabort = () => fail(tx.error || new Error('Unable to remove game data.'));
+                tx.onerror = () => {};
+              });
+            }
+            name = canonical;
           },
           close
         });
@@ -87,7 +142,7 @@
 
   // Legacy SDK installs still need a full hash check; our metadata is committed last.
   async function state(store, manifest) {
-    const meta = await store.getMeta();
+    const meta = await store.getMeta(manifest);
     return !meta ? 'missing' : matches(meta, manifest) ? 'installed' : 'outdated';
   }
   async function verify(store, manifest, progress = () => {}) {
@@ -107,7 +162,7 @@
     return true;
   }
   async function readPackage(store, manifest, progress = () => {}, options = {}) {
-    const meta = await store.getMeta();
+    const meta = await store.getMeta(manifest);
     if (!matches(meta, manifest)) return null;
     const trusted = !options.fullVerify && meta.size === manifest.size &&
       meta.astraVerifiedSchema === 1 && meta.astraManifest === identity(manifest);

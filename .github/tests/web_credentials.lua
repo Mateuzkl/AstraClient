@@ -105,6 +105,8 @@ local function widget(id)
   function w:getOptionsCount() return self.count end
   function w:isOption() return false end
   function w:setOption() end
+  function w:isOn() return self.on == true end
+  function w:setOn(value) self.on = value end
   function w:getText() return self.text end
   function w:setText(text) self.text = text end
   function w:setCursorPos() end
@@ -116,7 +118,7 @@ local function widget(id)
   function w:raise() end
   function w:focus() end
   function w:destroy() end
-  w.accountNameTextEdit = { setTextHidden = function() end }
+  w.accountNameTextEdit = { setTextHidden = function() end, isTextHidden = function() return false end }
   return w
 end
 g_ui = { displayUI = function() return widget('login') end }
@@ -135,6 +137,61 @@ for _, browser in ipairs({true, false}) do
     assert(widgets.accountPasswordTextEdit.text == '')
   else assert(widgets.accountPasswordTextEdit.text == 'fictitious-password') end
 end
+-- The opt-in vault is independent from OTML; only successful password logins
+-- may save, OAuth tokens stay session-only, and unchecking forgets immediately.
+g_platform.isBrowser = function() return true end
+local remembered, forgotten = {}, 0
+g_platform.canRememberWebPassword = function() return true end
+g_platform.getWebCredentials = function() return 'vault-json' end
+g_platform.saveWebCredentials = function(scope, account, password)
+  remembered[#remembered+1] = {scope, account, password}; return true
+end
+g_platform.forgetWebCredentials = function() forgotten = forgotten + 1 end
+json = {decode = function(value)
+  assert(value == 'vault-json'); return {account = 'identifier', password = 'fictitious-password'}
+end}
+widgets = {}; EnterGame.init()
+assert(widgets.rememberPasswordBox.enabled and widgets.rememberPasswordBox.checked)
+assert(widgets.accountPasswordTextEdit.text == 'fictitious-password')
+assert(not widgets.autoLoginBox.enabled and not widgets.autoLoginBox.checked)
+-- Switching to an unsaved scope must preserve manual input, but not a password
+-- that was automatically restored for the previous server.
+local originalScope = 'https://login.example/login:860'
+Servers = {{name = 'Test', loginLink = originalScope, version = 860},
+  {name = 'Unsaved', loginLink = 'https://other.example/login', version = 860}}
+modules.client_background.updateStatus = function() end
+local restoredScope
+g_platform.getWebCredentials = function(scope)
+  restoredScope = scope
+  return scope == originalScope and 'vault-json' or ''
+end
+local function selectServer(name)
+  widgets.serverSelector.text = name
+  EnterGame.onServerChange()
+end
+selectServer('Test')
+widgets.accountPasswordTextEdit.text = 'manually-typed'
+selectServer('Unsaved')
+assert(widgets.accountPasswordTextEdit.text == 'manually-typed', 'server change must not erase manual input')
+selectServer('Test'); selectServer('Unsaved')
+assert(widgets.accountPasswordTextEdit.text == '', 'the previous server\'s restored password must be cleared')
+widgets.accountPasswordTextEdit.text = 'initial-stale-input'
+upvalue(EnterGame.onServerChange, 'restoreWebPassword')(true)
+assert(widgets.accountPasswordTextEdit.text == '', 'initialization still clears an unsaved password')
+selectServer('Test')
+local loginHttp = EnterGame.doLoginHttp
+EnterGame.doLoginHttp = function() end
+perform('identifier', 'fictitious-password', '')
+EnterGame.doLoginHttp = loginHttp
+assert(G.host == 'https://login.example/login', 'fixture must exercise host normalization')
+finish({}, {})
+assert(#remembered == 1 and remembered[1][1] == originalScope and restoredScope == originalScope and settings.password == nil,
+  'save and restore must use the original scope, not the normalized G.host')
+G.gtoken = 'session-only'; finish({}, {})
+assert(#remembered == 1, 'OAuth tokens must not enter the password vault')
+widgets.rememberPasswordBox.checked = false
+EnterGame.onRememberPasswordChange()
+assert(forgotten == 1)
 -- Offline/reload clears session credentials; active world/reconnect and native are preserved.
 for _, scenario in ipairs({{true, false, false}, {true, true, false}, {true, false, true}, {false, false, false}}) do
   local browser = scenario[1]; online, logging = scenario[2], scenario[3]

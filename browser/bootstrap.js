@@ -3,8 +3,21 @@ const setAstraStatus = (message) => {
   statusElement.textContent = message || '';
   if (window.AstraLauncher) AstraLauncher.status(message);
 };
+const credentialNotice = (message, error = false) => {
+  document.getElementById('astra-credentials-status').textContent = message;
+  if (error) {
+    document.getElementById('astra-web-options-panel').hidden = false;
+    document.getElementById('astra-web-options-button').setAttribute('aria-expanded', 'true');
+  }
+};
+let credentialStorage;
+try { credentialStorage = window.indexedDB; } catch (_) {} // Some private/sandboxed contexts deny even the getter.
+const credentialVault = AstraCredentials.create({ indexedDB: credentialStorage, crypto: window.crypto,
+  location: window.location, secure: window.isSecureContext, notify: credentialNotice });
+document.getElementById('astra-forget-login').addEventListener('click', () => credentialVault.forget());
 
 var Module = {
+  astraCredentials: credentialVault,
   canvas: document.getElementById('canvas'),
   arguments: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? ['-mobile'] : [],
   locateFile: (path) => new URL(path, self.location.href).href,
@@ -37,6 +50,8 @@ var Module = {
     if (!FS.analyzePath('/user').exists) FS.mkdir('/user');
     FS.mount(IDBFS, {}, '/user');
     addRunDependency('astra-idbfs');
+    addRunDependency('astra-credentials');
+    credentialVault.restore().finally(() => removeRunDependency('astra-credentials'));
     const restoreStarted = performance.now();
     AstraLauncher.status('Restoring saved settings…');
     AstraBrowser.restorePersistence(FS, error => {

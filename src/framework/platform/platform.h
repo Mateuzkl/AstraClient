@@ -53,6 +53,11 @@ public:
     std::vector<std::string> getDlls();
     std::vector<std::string> getProcesses();
     std::vector<std::string> getWindows();
+    bool canRememberWebPassword();
+    std::string getWebCredentials(const std::string& scope);
+    bool saveWebCredentials(const std::string& scope, const std::string& account, const std::string& password);
+    void forgetWebCredentials();
+    void allowWebPasswordStorage();
     bool isBrowser() const
     {
 #ifdef __EMSCRIPTEN__

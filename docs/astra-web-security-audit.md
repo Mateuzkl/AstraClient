@@ -1,5 +1,35 @@
 # Astra Web — auditoria e correcoes de seguranca
 
+## Atualizacao de 14/10/2026 — senha cifrada opcional e mobile
+
+A pedido explicito do responsavel pelo projeto, o Web passa a oferecer
+`Remember Password` voluntario. Esta atualizacao substitui somente a decisao
+historica abaixo de nunca lembrar senha no Web; o restante do hardening permanece.
+
+- A senha e lembrada apenas apos autenticacao bem-sucedida, em um vault IndexedDB
+  separado (`ASTRA_CREDENTIAL_VAULT`), com AES-256-GCM, IV aleatorio por gravacao e
+  CryptoKey nao exportavel. Origem/pasta do cliente e endpoint de login sao
+  vinculados pela autenticacao do ciphertext. Nao e Base64/XOR.
+- Senhas, tokens Google/OAuth, 2FA e session keys continuam proibidos no OTML/IDBFS.
+  Autologin Web continua desligado. Tokens nao sao guardados no vault.
+- Desmarcar `Remember Password` ou usar `Web options > Forget saved login` remove
+  a entrada local. Esquecer invalida gravacoes pendentes; uma caixa antiga ainda
+  marcada nao pode recriar a entrada sem uma nova marcacao voluntaria.
+- O vault nao bloqueia a abertura do jogo quando indisponivel/danificado. Erros
+  de persistencia sao exibidos sem incluir senha ou conteudo do servidor.
+- Limite de confianca: a chave fica no mesmo perfil do navegador que o ciphertext.
+  Isto protege o armazenamento contra leitura casual, nao contra XSS/codigo hostil
+  da mesma origem, controle do perfil ou do dispositivo. Nao substitui um cofre
+  com senha-mestra/keystore do SO. Nao usar em aparelhos compartilhados.
+- Mobile importa estilos-base antes das substituicoes do layout. TopMenu cancela
+  eventos e rejeita respostas HTTP atrasadas apos fechamento/recriacao.
+- Erros de conexao Web retornam ao login dentro da instancia existente; cache de
+  assets usa identidade de instalacao independente do diretorio de compilacao.
+  Instalacoes antigas sao reaproveitadas apos verificacao, sem copiar o pacote todo.
+  Update sem mudanca nao baixa novamente; falha de armazenamento e sinalizada.
+
+Validacoes e limites desta alteracao estao em `astra-web-mobile-validation.md`.
+
 Data: 08/10/2026. Base: `042d144a708380b31172dafee2eb48f4d6a68f3b`.
 Branch exclusiva: `fix/astra-web-security-hardening`. Nenhum merge automatico.
 

@@ -6,8 +6,10 @@
   pelo runtime somente em loopback; um site remoto HTTP nao pode iniciar o client.
 - Usar WSS para login e jogo: navegador → WebSocket binario → bridge TCP → TFS.
   Nao ha conversao do protocolo 8.60 para JSON.
-- Senha, 2FA, tokens Google e session keys nao sao lembrados no Web. A migracao
-  limpa chaves antigas de `config.otml` antes do inicio e sincroniza IDBFS.
+- Senha pode ser lembrada por escolha explicita no vault AES-256-GCM separado,
+  com chave nao exportavel e opcao de apagar neste navegador. Nao usar em aparelho
+  compartilhado. 2FA, tokens Google, session keys e autologin nao sao persistidos.
+  A migracao limpa chaves antigas de `config.otml` antes do inicio e sincroniza IDBFS.
   Conta pode ser lembrada por escolha do jogador; hotkeys, minimapa e quickloot
   sao mantidos. Credenciais de world/reconnect permanecem apenas na RAM da sessao.
 - POST Web usa Fetch com `redirect: error`, sem cookies automaticos, sem referrer
@@ -38,6 +40,9 @@ de infraestrutura em `dist`, `config.js` ou nos artefatos do CI.
 Lua, WASM e assets enviados ao navegador continuam recuperaveis. Hashes verificam
 consistencia/integridade, nao sigilo nem autenticidade contra comprometimento da
 origem. Nao foi adicionado XOR/Base64 como protecao de senha no Web.
+O vault local nao protege contra XSS, codigo hostil da mesma origem ou um perfil
+de navegador comprometido. Consulte `astra-web-mobile-validation.md` para testes
+de cache, mobile e armazenamento cifrado e para os limites de validacao.
 
 ## Checklist da VPS
 
