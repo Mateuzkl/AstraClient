@@ -583,6 +583,7 @@ void WIN32Window::show()
             ShowWindow(m_window, SW_MAXIMIZE);
         else
             ShowWindow(m_window, SW_SHOW);
+        m_visible = !IsIconic(m_window);
     });
 }
 
@@ -591,6 +592,7 @@ void WIN32Window::hide()
     g_graphicsDispatcher.addEvent([&] {
         m_hidden = true;
         ShowWindow(m_window, SW_HIDE);
+        m_visible = false;
     });
 }
 

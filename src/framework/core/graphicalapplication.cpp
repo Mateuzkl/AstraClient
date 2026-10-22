@@ -393,7 +393,7 @@ void GraphicalApplication::browserMainLoop()
     const bool visible = g_window.isVisible();
     const bool focused = g_window.hasFocus();
     const ticks_t now = stdext::micros();
-    if (!visible) {
+    if (!visible && pendingScreenshots.empty()) {
         state.telemetryPreviousFrame = 0;
         if (now - state.lastRender >= frameDelayForCap(HIDDEN_FPS)) {
             g_adaptiveRenderer.refresh();
@@ -759,7 +759,7 @@ void GraphicalApplication::run()
         const bool focused = g_window.hasFocus();
 
         // Even when invisible we need to keep processing graphics events and avoid busy waiting.
-        if (!visible) {
+        if (!visible && pendingScreenshots.empty()) {
             AutoStat s(STATS_RENDER, "Sleep");
             const int cap = HIDDEN_FPS;
             const ticks_t delay = frameDelayForCap(cap);
@@ -996,6 +996,15 @@ void GraphicalApplication::doScreenshot(std::string file)
         g_graphicsDispatcher.addEvent(std::bind(&GraphicalApplication::doScreenshot, this, file));
         return;
     }
+
+#ifdef ANDROID
+    // A paused NativeActivity may have destroyed its EGL surface. Never keep a
+    // request until resume and silently save a different game/event instead.
+    if (!g_window.isVisible()) {
+        g_logger.warning("Cannot capture screenshot while the Android surface is unavailable");
+        return;
+    }
+#endif
 
     if (pendingScreenshots.size() >= MAX_PENDING_SCREENSHOTS) {
         g_logger.warning("Too many pending screenshots; wait for the next rendered frame");

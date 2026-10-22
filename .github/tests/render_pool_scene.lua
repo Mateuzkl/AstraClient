@@ -5,6 +5,8 @@ local function run(missing)
   rootWidget = widget
   g_ui = {createWidget=function() return widget end}
   g_clock = {millis=function() return 42 end}
+  local visible=true
+  g_window={hide=function() visible=false end,show=function() visible=true end,isVisible=function() return visible end}
   g_app = {
     setDrawCommandPooling=function(value) modes[#modes+1]=value end,
     doScreenshot=function(file) files[file]=true; reads[file]=0 end,
