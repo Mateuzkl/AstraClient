@@ -52,6 +52,13 @@ local steps={
         assert(element('skill-11'):IsClassSet('on-path') and element('skill-1'):IsClassSet('on-path'))
         assert(not element('skill-3'):IsClassSet('on-path'))
         assert(element('tree-canvas'):QuerySelector('.connection.active.on-path'),'connected path did not light up')
+        -- Clip only the sprite's circular parent: the outer rank/glow must remain visible.
+        local node=element('skill-11')
+        local inner=node:QuerySelector('.node-inner')
+        local portrait=window:getDocument():QuerySelector('.portrait-rim')
+        assert(inner.style['overflow-x'] == 'hidden' and inner.style['overflow-y'] == 'hidden','sprite escaped the node circle')
+        assert(portrait.style['overflow-x'] == 'hidden' and portrait.style['overflow-y'] == 'hidden','detail sprite escaped its circle')
+        assert(node.style['overflow-x'] == 'visible' and node:QuerySelector('.rank'),'circular clipping hid the outer rank/glow')
         screenshot('tree',next)
     end,
     function(next) click('upgrade');next() end,
