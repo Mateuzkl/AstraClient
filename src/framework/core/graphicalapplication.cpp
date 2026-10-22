@@ -44,6 +44,7 @@
 #include <framework/util/stats.h>
 #include <mutex>
 #include <array>
+#include <utility>
 #ifdef FW_RMLUI
 #include <framework/rml/rmlmanager.h>
 #endif
@@ -90,6 +91,38 @@ std::unique_ptr<BrowserRunState> browserRunState;
 #endif
 
 namespace {
+    // Only touched by the graphics thread. Never read a discarded back buffer
+    // from pollGraphics(): capture the completed frame immediately before swap.
+    std::vector<std::string> pendingScreenshots;
+    constexpr size_t MAX_PENDING_SCREENSHOTS = 16;
+
+    void capturePendingScreenshots()
+    {
+        if (pendingScreenshots.empty())
+            return;
+        auto files = std::exchange(pendingScreenshots, {});
+        const auto resolution = g_graphics.getViewportSize();
+        const int width = resolution.width(), height = resolution.height();
+        if (width <= 0 || height <= 0)
+            return;
+        auto pixels = std::make_shared<std::vector<uint8_t>>(size_t(width) * size_t(height) * 4);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels->data());
+        g_asyncDispatcher.dispatch([resolution, pixels, files = std::move(files)] {
+            for (int line = 0, h = resolution.height(), w = resolution.width(); line < h / 2; ++line) {
+                std::swap_ranges(pixels->begin() + 4 * w * line, pixels->begin() + 4 * w * (line + 1),
+                    pixels->begin() + 4 * w * (h - line - 1));
+            }
+            Image image(resolution, 4, pixels->data());
+            for (const auto& file : files) {
+                try {
+                    image.savePNG(file);
+                } catch (const stdext::exception& e) {
+                    g_logger.error(std::string("Can't do screenshot: ") + e.what());
+                }
+            }
+        });
+    }
+
     // Fallback FPS used when VSync is requested but could not be applied by the driver.
     // This prevents an unbounded render loop when swapBuffers() does not block.
     constexpr int VSYNC_FALLBACK_FPS = 100;
@@ -217,6 +250,7 @@ void GraphicalApplication::finishStartup()
 
 void GraphicalApplication::terminate()
 {
+    pendingScreenshots.clear();
     // destroy any remaining widget
     g_ui.terminate();
 #ifdef FW_RMLUI
@@ -511,6 +545,7 @@ void GraphicalApplication::browserMainLoop()
 
     g_graphs[GRAPH_GPU_CALLS].addValue(g_painter->calls());
     g_graphs[GRAPH_GPU_DRAWS].addValue(g_painter->draws());
+    capturePendingScreenshots();
     {
         AutoStat stat(STATS_RENDER, "SwapBuffers");
         g_window.swapBuffers();
@@ -885,6 +920,7 @@ void GraphicalApplication::run()
         g_graphs[GRAPH_GPU_CALLS].addValue(g_painter->calls());
         g_graphs[GRAPH_GPU_DRAWS].addValue(g_painter->draws());
 
+        capturePendingScreenshots();
         AutoStat s(STATS_RENDER, "SwapBuffers");
         g_window.swapBuffers();
 #if defined(WIN32) && !defined(__EMSCRIPTEN__)
@@ -961,29 +997,11 @@ void GraphicalApplication::doScreenshot(std::string file)
         return;
     }
 
-    if (file.empty()) {
-        file = "screenshot.png";
+    if (pendingScreenshots.size() >= MAX_PENDING_SCREENSHOTS) {
+        g_logger.warning("Too many pending screenshots; wait for the next rendered frame");
+        return;
     }
-    auto resolution = g_graphics.getViewportSize();
-    int width = resolution.width();
-    int height = resolution.height();
-    auto pixels = std::make_shared<std::vector<uint8_t>>(width * height * 4 * sizeof(GLubyte), 0);
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, (GLubyte*)(pixels->data()));
-
-    g_asyncDispatcher.dispatch([resolution, pixels, file] {
-        for (int line = 0, h = resolution.height(), w = resolution.width(); line != h / 2; ++line) {
-            std::swap_ranges(
-                pixels->begin() + 4 * w * line,
-                pixels->begin() + 4 * w * (line + 1),
-                pixels->begin() + 4 * w * (h - line - 1));
-        }
-        try {
-            Image image(resolution, 4, pixels->data());
-            image.savePNG(file);
-        } catch (stdext::exception& e) {
-            g_logger.error(std::string("Can't do screenshot: ") + e.what());
-        }
-    });
+    pendingScreenshots.push_back(file.empty() ? "screenshot.png" : std::move(file));
 }
 
 void GraphicalApplication::scaleUp()

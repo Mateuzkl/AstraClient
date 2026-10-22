@@ -38,4 +38,14 @@ local function run(missing)
 end
 run(false)
 run(true)
+local source=assert(io.open('src/framework/core/graphicalapplication.cpp','rb'))
+local cpp=source:read('*a');source:close()
+local request=assert(cpp:match('void GraphicalApplication::doScreenshot.-\n}'))
+assert(not request:find('glReadPixels',1,true), 'screenshot reads the discarded post-swap buffer')
+local swaps=0
+for prefix in cpp:gmatch('(.-)g_window%.swapBuffers%(%);') do
+  assert(prefix:find('capturePendingScreenshots();',1,true), 'a render loop swaps before capturing pending screenshots')
+  swaps=swaps+1
+end
+assert(swaps == 2, 'both native and browser capture boundaries must be tested')
 print('Render scene: PASS (partial/failed PNG reads and bounded timeout)')
