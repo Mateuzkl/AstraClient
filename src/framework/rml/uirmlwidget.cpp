@@ -335,12 +335,12 @@ void UIRmlWidget::applyStyleSheet()
 
 void UIRmlWidget::tick()
 {
-    if (!m_context || !isVisible())
+    if (isDestroyed() || !m_context || !isVisible())
         return;
 
     callLuaField("onRmlUpdate");
 
-    if (!m_context) // the callback may have destroyed us
+    if (isDestroyed() || !m_context) // context release is deferred after destroy()
         return;
 
     {
@@ -350,6 +350,8 @@ void UIRmlWidget::tick()
         const Rml::Vector2i dimensions{ size.width(), size.height() };
         if (m_context->GetDimensions() != dimensions)
             m_context->SetDimensions(dimensions);
+        if (isDestroyed()) // SetDimensions can dispatch a Lua resize listener.
+            return;
 
         const bool effects = g_rml.supportsAdvancedEffects();
         if (effects != m_effectsTheme) {
@@ -360,7 +362,7 @@ void UIRmlWidget::tick()
         m_context->Update();
     }
 
-    if (m_context)
+    if (!isDestroyed() && m_context)
         callLuaField("onRmlLayout");
 }
 

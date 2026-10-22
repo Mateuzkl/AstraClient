@@ -1,0 +1,23 @@
+# Exercise the real feature gate without fetching RmlUi or requiring a compiler.
+cmake_minimum_required(VERSION 3.24)
+set(FRAMEWORK_RMLUI ON)
+set(FRAMEWORK_GRAPHICS ON)
+set(WASM OFF)
+set(ANDROID OFF)
+set(OPENGLES OFF)
+set(LUAJIT OFF)
+set(framework_SOURCES original-source)
+set(framework_LIBRARIES original-library)
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/AstraRmlUi.cmake")
+if(ASTRA_RMLUI_ENABLED OR NOT framework_SOURCES STREQUAL "original-source" OR
+        NOT framework_LIBRARIES STREQUAL "original-library")
+    message(FATAL_ERROR "LuaJIT-off fallback changed the OTUI build inputs")
+endif()
+set(FRAMEWORK_RMLUI OFF)
+set(LUAJIT ON)
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/AstraRmlUi.cmake")
+if(ASTRA_RMLUI_ENABLED OR NOT framework_SOURCES STREQUAL "original-source" OR
+        NOT framework_LIBRARIES STREQUAL "original-library")
+    message(FATAL_ERROR "Explicitly disabled RmlUi changed build inputs")
+endif()
+message(STATUS "RmlUi fallback: PASS (LuaJIT off and explicit feature disable)")

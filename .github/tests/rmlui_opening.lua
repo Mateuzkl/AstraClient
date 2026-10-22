@@ -116,4 +116,28 @@ env.init()
 assert(bindings['Ctrl+Shift+J'] == env.toggle)
 env.terminate()
 assert(bindings['Ctrl+Shift+J'] == nil and bindings['Ctrl+Shift+M'] == originalMap)
-print('RmlUi opening: PASS (lazy tabs, bounded rebuilds, outfit fields and shortcut ownership)')
+
+local manifest = assert(io.open('modules/client_rmloptions/rmloptions.otmod', 'rb'))
+local dependencies = assert(manifest:read('*a'):match('dependencies:%s*%[(.-)%]'))
+manifest:close()
+local declared = {}
+for name in dependencies:gmatch('[%w_]+') do declared[name]=true end
+assert(declared.client_options and declared.client_settings, 'options module did not declare its settings API dependency')
+local saved, classic = {vsync=false}, 0
+env.modules = {client_settings={
+    getOption=function(key) return saved[key] end,
+    setOption=function(key, value) saved[key]=value end,
+    toggle=function() classic=classic+1 end,
+}}
+env.GameOptions = {getDataSet=function(_, key) return key == 'vsync' and {} or nil end}
+assert(setfenv(assert(loadfile('modules/client_rmloptions/rmloptions.lua')), env))()
+env.toggle()
+local settings = created[#created]
+assert(#settings.model.sections[1].options == 1)
+for i=1,3 do update(settings.w) end
+settings.model.sections[1].options[1].value=true
+update(settings.w)
+assert(saved.vsync == true, 'RmlUi did not apply through client_settings')
+settings.model.OpenClassic()
+assert(classic == 1)
+print('RmlUi opening: PASS (lazy tabs, rebuild bounds, outfit fields, shortcuts and settings API)')

@@ -21,8 +21,9 @@ foreach ($resourceName in @('data', 'modules', 'mods', 'layouts')) {
 $credentialFile = Join-Path $testDirectory 'session-config.json'
 $process = $null
 try {
-  @{ account=$Account; password=$Password; character=$Character; host=$ServerHost; port=$Port; version=$Version } |
-    ConvertTo-Json | Set-Content -LiteralPath $credentialFile -Encoding utf8
+  $sessionJson = @{ account=$Account; password=$Password; character=$Character; host=$ServerHost; port=$Port; version=$Version } |
+    ConvertTo-Json
+  [IO.File]::WriteAllText($credentialFile, $sessionJson, (New-Object Text.UTF8Encoding $false))
   $stdout = Join-Path $testDirectory 'stdout.log'
   $stderr = Join-Path $testDirectory 'stderr.log'
   $process = Start-Process -FilePath $binary -ArgumentList '--test' -WorkingDirectory $testDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr

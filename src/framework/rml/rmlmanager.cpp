@@ -476,9 +476,15 @@ ImagePtr RmlManager::loadImage(const std::string& source)
 
     if (image) {
         m_pendingImages.erase(source);
-        if (match[3].matched)
-            image = scaleNearest(image, std::stoi(match[3].str()));
-        return image;
+        try {
+            if (match[3].matched)
+                image = scaleNearest(image, std::stoi(match[3].str()));
+            return image;
+        } catch (const std::exception& e) {
+            // Permanent size errors must not escape RenderInterface or retry every second.
+            g_logger.error(stdext::format("[rmlui] image '%s' could not be scaled: %s", source, e.what()));
+            return std::make_shared<Image>(Size(32, 32));
+        }
     }
 
     // Not available yet (assets not loaded, sprite file busy): a transparent placeholder keeps

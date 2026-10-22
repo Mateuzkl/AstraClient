@@ -19,7 +19,17 @@ function testRenderPooling(done)
         end
     end
     local function waitFile(file, callback, attempts)
-        if g_resources.fileExists(file) then callback(); return end
+        -- savePNG creates the file before encoding/writing it on another thread.
+        -- Consume the bytes only after both the signature and final IEND are present.
+        if g_resources.fileExists(file) then
+            local ok, data = pcall(g_resources.readFileContents, file)
+            local signature = string.char(137, 80, 78, 71, 13, 10, 26, 10)
+            local ending = string.char(0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130)
+            if ok and data:sub(1, 8) == signature and data:sub(-12) == ending then
+                callback(data)
+                return
+            end
+        end
         assert(attempts > 0, 'screenshot did not complete: ' .. file)
         scheduleEvent(function() waitFile(file, callback, attempts-1) end, 100)
     end
@@ -29,14 +39,13 @@ function testRenderPooling(done)
     g_app.setDrawCommandPooling(false)
     scheduleEvent(function()
         g_app.doScreenshot(heap)
-        waitFile(heap, function()
+        waitFile(heap, function(original)
             g_app.setDrawCommandPooling(true)
             scheduleEvent(function()
                 g_app.doScreenshot(pool)
-                waitFile(pool, function()
-                    local original = g_resources.readFileContents(heap)
+                waitFile(pool, function(pooled)
                     assert(#original > 1024, 'render test captured an empty scene')
-                    assert(original == g_resources.readFileContents(pool), 'pool changed rendered pixels/order/clipping/opacity')
+                    assert(original == pooled, 'pool changed rendered pixels/order/clipping/opacity')
                     panel:destroy()
                     print('[RENDER POOL TEST] PASS: identical pixels with heap and pooled commands')
                     done()

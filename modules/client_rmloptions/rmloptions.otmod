@@ -6,6 +6,6 @@ Module
   sandboxed: true
   scripts: [ rmloptions ]
   autoload: true
-  dependencies: [ client_options ]
+  dependencies: [ client_options, client_settings ]
   @onLoad: init()
   @onUnload: terminate()

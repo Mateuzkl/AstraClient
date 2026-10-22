@@ -3,6 +3,27 @@ assert(Rml.isAvailable(), 'native RmlUi missing')
 assert(print == originalPrint, 'RmlUi replaced the client logger')
 local initialContexts = g_rml.getContextCount()
 local initialWidgets = g_rml.getWidgetCount()
+local function testDestroyDuringUpdate(done)
+    local closing = Rml.createWindow {
+        document='/smoke.rml', model='smoke', width=420, height=280,
+        data={title='Destroy during update', shown=true, name=''},
+    }
+    assert(closing)
+    local updates, lateLayouts = 0, 0
+    connect(closing, {onRmlUpdate=function()
+        updates=updates+1
+        closing:destroy()
+        -- destroy clears the Lua field table. Reattach a trap so the test detects
+        -- a native post-destroy call even when the old handler was already cleared.
+        closing.onRmlLayout=function() lateLayouts=lateLayouts+1 end
+    end})
+    scheduleEvent(function()
+        assert(updates == 1 and closing:isDestroyed(), 'destroy-on-update did not execute')
+        assert(lateLayouts == 0, 'layout callback ran after destruction in onRmlUpdate')
+        assert(g_rml.getContextCount() == initialContexts and g_rml.getWidgetCount() == initialWidgets)
+        done()
+    end, 100)
+end
 local timerCalls = 0
 local window, model = Rml.createWindow {
     document = '/smoke.rml', model = 'smoke', width = 420, height = 280,
@@ -78,9 +99,11 @@ scheduleEvent(function()
                     assert(g_rml.getWidgetCount() == initialWidgets)
                     collectgarbage('collect')
                     dofile('/render-scene.lua')
-                    testRenderPooling(function()
-                        print('[RMLUI TEST] PASS: render, models, reload, host visibility, timers and 30 close cycles')
-                        g_app.exit()
+                    testDestroyDuringUpdate(function()
+                        testRenderPooling(function()
+                            print('[RMLUI TEST] PASS: render, models, reload, host visibility, destroy-on-update, timers and 30 close cycles')
+                            g_app.exit()
+                        end)
                     end)
                 end, 80)
             end, 80)

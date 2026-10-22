@@ -16,6 +16,9 @@ on:
       - 'src/framework/graphics/linegeometry.h'
       - 'src/framework/rml/rmlglstate.h'
       - 'tests/rmlui/gl_state.cpp'
+      - 'tests/rmlui/cmake-fallback.cmake'
+      - 'cmake/AstraRmlUi.cmake'
+      - '.github/tests/render_pool_scene.lua'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -69,6 +72,9 @@ on:
       - 'src/framework/graphics/linegeometry.h'
       - 'src/framework/rml/rmlglstate.h'
       - 'tests/rmlui/gl_state.cpp'
+      - 'tests/rmlui/cmake-fallback.cmake'
+      - 'cmake/AstraRmlUi.cmake'
+      - '.github/tests/render_pool_scene.lua'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -135,6 +141,8 @@ jobs:
 
       - name: Test render command ownership and line bounds
         run: |
+          luajit .github/tests/render_pool_scene.lua
+          cmake -P tests/rmlui/cmake-fallback.cmake
           c++ -std=c++23 -O2 -Wall -Wextra -Werror -Isrc tests/rendering/command_pool.cpp -o /tmp/render-command-pool
           /tmp/render-command-pool
           c++ -std=c++23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tests/rendering/line_geometry.cpp -o /tmp/render-line-geometry

@@ -77,6 +77,10 @@ jobs:
         shell: pwsh
         run: ./tests/rmlui/msbuild.ps1
 
+      - name: Test live-session JSON encoding on Windows PowerShell
+        shell: powershell
+        run: ./tests/cpp23/Test-LiveSessionEncoding.ps1
+
       - name: Read build context
         shell: pwsh
         run: |
