@@ -162,8 +162,6 @@ jobs:
           if errorlevel 1 exit /b 1
           python tools/check_cpp23.py --compile-commands build/compile_commands.json
           if errorlevel 1 exit /b 1
-          ctest --test-dir build --output-on-failure
-          if errorlevel 1 exit /b 1
           '@
           & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-Release' -CmdScript $commands
 

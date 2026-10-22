@@ -1,5 +1,9 @@
 # C++23 validation evidence
 
+This is the historical evidence imported from PR #207 (2026-10-11), not a new
+certification of the latest main. The port and its freshly executed checks are
+recorded in [cpp23-port-20261022.md](cpp23-port-20261022.md).
+
 Local validation: 2026-10-11. Base `96a0953`, branch
 `feat/astra-cpp23-migration`. See [migration and reproduction](cpp23-migration.md)
 and the complete classified [before](cpp23-inventory-before.tsv) /

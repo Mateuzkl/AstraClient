@@ -142,10 +142,10 @@ jobs:
           luajit .github/tests/item_details_opcode_framing.lua \
             modules/game_protocol/protocol.lua \
             src/client/protocolgameparse.cpp
-          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -Werror -pedantic -I. \
             .github/tests/item_details_framing.cpp -o /tmp/item_details_framing
           /tmp/item_details_framing
-          c++ -std=c++17 -Wall -Wextra -Werror -pedantic -I. \
+          c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -Werror -pedantic -I. \
             .github/tests/walk_trace_budget.cpp -o /tmp/walk_trace_budget
           /tmp/walk_trace_budget
 

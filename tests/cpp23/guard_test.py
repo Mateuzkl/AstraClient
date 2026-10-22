@@ -10,6 +10,16 @@ spec.loader.exec_module(policy)
 
 
 class PolicyTests(unittest.TestCase):
+    def test_live_profile_is_discovered_before_lua_executes(self):
+        # ResourceManager::getCompactName scans init.lua before Lua runs and
+        # recognizes double-quoted APP_NAME values, not single-quoted ones.
+        import re
+        root = Path(__file__).resolve().parents[2]
+        bootstrap = (root / 'tests/cpp23/live_bootstrap.lua').read_text(encoding='utf-8')
+        match = re.search(r'APP_NAME[^\"]+\"([^\"]+)', bootstrap)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.group(1), 'astra_cpp23_live')
+
     def test_exactly_one_supported_flag(self):
         for command in ['cl /std:c++23preview /c x.cpp', 'c++ -std=c++23 x.cpp', 'cl -std:c++23preview x.cpp']:
             policy.check_command(command, 'test')
