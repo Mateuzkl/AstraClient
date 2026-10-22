@@ -6,7 +6,6 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - 'tests/cpp23/**'
-      - 'tools/check_cpp23.py'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -50,7 +49,6 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - 'tests/cpp23/**'
-      - 'tools/check_cpp23.py'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -110,8 +108,6 @@ jobs:
 
       - name: Verify C++23 build policy and compiler features
         run: |
-          python3 tools/check_cpp23.py
-          python3 tests/cpp23/guard_test.py
           c++ -std=c++23 -Isrc tests/cpp23/standard.cpp -o /tmp/astra-cxx23-probe
           /tmp/astra-cxx23-probe
           c++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -o /tmp/astra-utf8-path

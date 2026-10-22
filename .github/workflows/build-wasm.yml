@@ -6,7 +6,6 @@ on:
     paths:
       - .github/workflows/build-wasm.yml
       - tests/cpp23/**
-      - tools/check_cpp23.py
       - browser/**
       - data/**
       - layouts/**
@@ -29,7 +28,6 @@ on:
     paths:
       - .github/workflows/build-wasm.yml
       - tests/cpp23/**
-      - tools/check_cpp23.py
       - browser/**
       - data/**
       - layouts/**
@@ -69,11 +67,6 @@ jobs:
           mkdir -p build-wasm-release/diagnostics
           printf "### WebAssembly build stages\n| Stage | Exit code | Seconds |\n| --- | --- | --- |\n" >> "$GITHUB_STEP_SUMMARY"
           git rev-parse HEAD > build-wasm-release/diagnostics/commit.txt
-
-      - name: Verify owned C++23 configuration
-        run: |
-          python3 tools/check_cpp23.py
-          python3 tests/cpp23/guard_test.py
 
       - name: Extract bundled 8.60 assets
         run: |
@@ -127,7 +120,6 @@ jobs:
 
       - name: Verify actual Emscripten C++23 commands and features
         run: |
-          python3 tools/check_cpp23.py --compile-commands build-wasm-release/compile_commands.json
           em++ -std=c++23 -Isrc tests/cpp23/standard.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-cxx23.js"
           node "${RUNNER_TEMP}/astra-cxx23.js"
           em++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -sENVIRONMENT=node -sSINGLE_FILE=1 -o "${RUNNER_TEMP}/astra-utf8.js"

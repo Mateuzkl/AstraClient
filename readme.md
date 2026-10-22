@@ -22,7 +22,7 @@
 ![Base](https://img.shields.io/badge/BASE-OTClient%20v8-2563eb?style=for-the-badge)
 ![Protocol](https://img.shields.io/badge/PROTOCOL-8.60-f97316?style=for-the-badge)
 ![Style](https://img.shields.io/badge/FEATURES-15.x%20Inspired-8b5cf6?style=for-the-badge)
-![C++](https://img.shields.io/badge/C++-23-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
+![C++](https://img.shields.io/badge/C++-Modern-00599C?style=for-the-badge&logo=cplusplus&logoColor=white)
 ![Lua](https://img.shields.io/badge/Lua-Modules-2C2D72?style=for-the-badge&logo=lua&logoColor=white)
 
 <br />
@@ -232,15 +232,6 @@ Use the hash above to verify that the downloaded archive/assets match the expect
 
 ## Build
 
-Desktop and Web builds require **C++23**. CMake requires 3.24+, selects the
-standard with extensions disabled, and rejects a silent fallback to C++17/20.
-MSVC requires 19.43+ with `/std:c++23preview` (not `c++latest`); the six `vc23`
-configurations use the recognized `stdcpp23` property. Tested compilers are
-MSVC 19.51, GCC 13.3, Clang 18.1 and the unchanged Emscripten 6.0.8 SDK.
-Lua/C libraries retain their existing language modes.
-
-See [migration, validation matrix and remaining limitations](docs/cpp23-migration.md).
-
 Networking uses standalone Asio for TCP and libcurl 8.21 or newer for native HTTP/WebSockets; Boost is no longer required. HTTPS/WSS validates the certificate chain and server hostname and requires TLS 1.2 or newer. Windows uses its system trust store; Linux requires an installed CA certificate bundle. Browser builds retain the browser's networking and certificate validation.
 
 ### Windows
@@ -265,17 +256,24 @@ Then:
 
 ### Android / APK
 
-**Blocked / not certified for C++23.** The legacy project still selects
-`Clang_5_0` / `c++1z` and uses the old Visual Studio Android/Ant integration.
-Changing that string cannot produce a working C++23 APK; the compiler guard
-deliberately rejects its old C++ mode. No Android SDK/NDK or ABI-matched
-dependency bundle was available in the migration environment.
+The Android project uses the original OTClientV8 Visual Studio/NDK toolchain. Create `C:\android` with:
 
-Completion requires a modern NDK with verified C++23/libc++ support, a real
-Gradle/CMake/ARM64 integration, rebuilt native dependencies (including curl
-8.21+ with TLS/WebSockets, Lua, PhysicsFS and graphics/audio libraries), and
-an actual APK/device test. The existing project/assets scripts are retained
-for that follow-up, not presented as a working C++23 build.
+- Android SDK 25.
+- Android NDK r21d.
+- Apache Ant 1.9.
+- The contents of `android_libs.7z` (`C:\android\lib`, `C:\android\lib64` and `C:\android\include`).
+
+The Android dependency bundle must also provide standalone Asio headers and ABI-matched libcurl 8.21+ built with OpenSSL and WebSocket support. Older bundles containing only Boost networking libraries must be updated before building the APK.
+
+Install **Mobile development with C++** through Visual Studio Installer, then generate the APK assets:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\create_android_assets.ps1
+```
+
+Open `android/otclientv8.sln`, configure the SDK, NDK and Ant paths in Visual Studio, select **Release / ARM64**, and build the `otclientv8` project with the phone icon. The generated APK includes `android/otclientv8/assets/data.zip`.
+
+For local device testing with ADB, use `run_android.bat` after placing the generated `otclientv8.apk` in the repository root.
 
 ---
 

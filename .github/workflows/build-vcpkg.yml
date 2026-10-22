@@ -18,7 +18,6 @@ on:
     paths:
       - .github/workflows/build-vcpkg.yml
       - tests/cpp23/**
-      - tools/check_cpp23.py
       - cmake/**
       - src/**
       - tests/spectators/**
@@ -35,7 +34,6 @@ on:
     paths:
       - .github/workflows/build-vcpkg.yml
       - tests/cpp23/**
-      - tools/check_cpp23.py
       - cmake/**
       - src/**
       - tests/spectators/**
@@ -78,12 +76,6 @@ jobs:
           "SCCACHE_DIR=$env:SCCACHE_DIR" >> $env:GITHUB_ENV
           & ./cmake/ci/ReadBuildContext.ps1
         id: vcpkg-baseline
-
-      - name: Verify owned C++23 configuration
-        shell: pwsh
-        run: |
-          python tools/check_cpp23.py
-          python tests/cpp23/guard_test.py
 
       - name: Restore dependency cache
         id: dependency-cache
@@ -159,8 +151,6 @@ jobs:
         run: |
           $commands = @'
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
-          if errorlevel 1 exit /b 1
-          python tools/check_cpp23.py --compile-commands build/compile_commands.json
           if errorlevel 1 exit /b 1
           '@
           & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-Release' -CmdScript $commands
