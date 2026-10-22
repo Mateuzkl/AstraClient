@@ -141,6 +141,8 @@ UIRmlWidget::CallScope::~CallScope() = default;
 
 void UIRmlWidget::onDestroy()
 {
+    // Lua may retain a destroyed widget indefinitely; it must not keep the tick alive.
+    g_rml.unregisterWidget(this);
     if (m_context && !m_releaseQueued) {
         m_releaseQueued = true;
         g_rml.deferContextRelease(static_self_cast<UIRmlWidget>());

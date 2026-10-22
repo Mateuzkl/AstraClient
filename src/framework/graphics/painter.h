@@ -155,10 +155,8 @@ public:
 
     void drawLine(const std::vector<float>& vertex, int size, int width = 1);
 
-    void setSecondTexture(const TexturePtr& texture);
     void setOffset(const Point& offset);
 
-    void setAtlasTextures(const TexturePtr& atlas);
     void drawCache(const std::vector<float>& vertex, const std::vector<float>& texture, const std::vector<float>& color, int size);
 
     void setColor(const Color& color) { m_color = color; }
@@ -221,7 +219,6 @@ protected:
     Matrix3 m_transformMatrix;
     Matrix3 m_projectionMatrix;
     Matrix3 m_textureMatrix;
-    Matrix3 m_atlasTextureMatrix;
 
     BlendEquation m_blendEquation;
     TexturePtr m_texture;

@@ -50,7 +50,13 @@ local function open()
 
     local function outfitFromModel()
         local addons = (model.addon1 and 1 or 0) + (model.addon2 and 2 or 0)
-        return { type = model.lookType, head = model.head, body = model.body, legs = model.legs, feet = model.feet, addons = addons }
+        -- Preserve mount/familiar and server-specific fields, including changes
+        -- received while this window was open. Only replace the controls we edit.
+        local edited = {}
+        for key, value in pairs(currentOutfit()) do edited[key] = value end
+        edited.type, edited.head, edited.body = model.lookType, model.head, model.body
+        edited.legs, edited.feet, edited.addons = model.legs, model.feet, addons
+        return edited
     end
 
     local function refresh()

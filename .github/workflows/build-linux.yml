@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, 'feat/**', 'fix/**']
-    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'tests/rendering/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
   pull_request:
-    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'tests/rendering/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
 
 permissions:
   contents: read

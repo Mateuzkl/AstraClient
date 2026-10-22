@@ -378,13 +378,13 @@ void GraphicalApplication::browserMainLoop()
     const ticks_t renderStart = stdext::millis();
     {
         AutoStat stat(STATS_MAIN, "DrawMapBackground");
-        g_drawQueue = std::make_shared<DrawQueue>();
+        g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
         g_ui.render(Fw::MapBackgroundPane);
         state.toDrawMapQueue = g_drawQueue;
     }
     {
         AutoStat stat(STATS_MAIN, "DrawMapForeground");
-        g_drawQueue = std::make_shared<DrawQueue>();
+        g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
         g_ui.render(Fw::MapForegroundPane);
         state.toDrawMapForegroundQueue = g_drawQueue;
     }
@@ -393,7 +393,7 @@ void GraphicalApplication::browserMainLoop()
         || now - state.uiBuildLast >= (visualDelay > 0 ? visualDelay : UI_UPDATE_INTERVAL_US);
     if (buildForeground) {
         AutoStat stat(STATS_MAIN, "DrawForeground");
-        g_drawQueue = std::make_shared<DrawQueue>();
+        g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
         g_ui.render(Fw::ForegroundPane);
         state.toDrawQueue = g_drawQueue;
         state.uiBuildLast = now;
@@ -657,14 +657,14 @@ void GraphicalApplication::run()
                 std::shared_ptr<DrawQueue> mapBackgroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawMapBackground");
-                    g_drawQueue = std::make_shared<DrawQueue>();
+                    g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
                     g_ui.render(Fw::MapBackgroundPane);
                     mapBackgroundQueue = g_drawQueue;
                 }
                 std::shared_ptr<DrawQueue> mapForegroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawMapForeground");
-                    g_drawQueue = std::make_shared<DrawQueue>();
+                    g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
                     g_ui.render(Fw::MapForegroundPane);
                     mapForegroundQueue = g_drawQueue;
                 }
@@ -687,7 +687,7 @@ void GraphicalApplication::run()
                 std::shared_ptr<DrawQueue> foregroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawForeground");
-                    g_drawQueue = std::make_shared<DrawQueue>();
+                    g_drawQueue = std::make_shared<DrawQueue>(m_drawCommandPooling.load());
                     g_ui.render(Fw::ForegroundPane);
                     foregroundQueue = g_drawQueue;
                 }

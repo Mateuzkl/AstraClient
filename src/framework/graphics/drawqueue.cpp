@@ -184,18 +184,10 @@ void DrawQueueItemTextColored::draw()
     g_text.drawColoredText(m_point, m_hash, m_colors, m_shadow, m_shader);
 }
 
-void::DrawQueueItemLine::draw()
+void DrawQueueItemLine::draw()
 {
     g_painter->setColor(m_color);
-    static std::vector<float> vertices(1024, 0);
-    if (vertices.size() < m_points.size())
-        vertices.resize(m_points.size());
-    int i = 0;
-    for (Point& point : m_points) {
-        vertices[i++] = point.x;
-        vertices[i++] = point.y;
-    }
-    g_painter->drawLine(vertices, i / 2, m_width);
+    g_painter->drawLine(m_vertices, static_cast<int>(m_vertices.size() / 2), m_width);
 }
 
 void DrawQueueConditionClip::start(DrawQueue*)
@@ -281,8 +273,7 @@ void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect&
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(std::make_unique<DrawQueueItemText>(screenCoords.topLeft(), font->getTexture(), hash, color,
-                                                         shadow, shader));
+    m_queue.emplace<DrawQueueItemText>(screenCoords.topLeft(), font->getTexture(), hash, color, shadow, shader);
 }
 
 void DrawQueue::addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords,
@@ -291,8 +282,7 @@ void DrawQueue::addColoredText(BitmapFontPtr font, const std::string& text, cons
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(std::make_unique<DrawQueueItemTextColored>(screenCoords.topLeft(), font->getTexture(), hash,
-                                                                colors, shadow, shader));
+    m_queue.emplace<DrawQueueItemTextColored>(screenCoords.topLeft(), font->getTexture(), hash, colors, shadow, shader);
 }
 
 void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bool center)
@@ -369,9 +359,12 @@ void DrawQueue::draw(DrawType drawType)
         start = mapPosition;
     }
 
-    std::sort(m_conditions.begin(), m_conditions.end(), [](const auto& a, const auto& b) -> bool { // NOSONAR: project is C++17.
-        return a->m_start == b->m_start ? a->m_end < b->m_end : a->m_start < b->m_start;
-    });
+    if (!m_conditionsSorted) {
+        std::sort(m_conditions.begin(), m_conditions.end(), [](const auto& a, const auto& b) {
+            return a->m_start == b->m_start ? a->m_end < b->m_end : a->m_start < b->m_start;
+        });
+        m_conditionsSorted = true;
+    }
 
     Size originalResolution = g_painter->getResolution();
     const float coordinateScale = m_renderScale * m_scaling;

@@ -75,4 +75,45 @@ outfit.w.watch()
 assert(outfit.model.parts == parts, 'unchanged watch rebuilt controls')
 env.toggle()
 assert(paletteBuilds == 1, 'immutable palette rebuilt for every window')
-print('RmlUi opening: PASS (lazy tabs and bounded outfit rebuilds)')
+
+local current = {type=161, head=1, body=2, legs=3, feet=4, addons=0,
+    mount=17, familiar=18, wings=19, aura=20, shader='custom', healthBar=21, manaBar=22}
+local sent
+env.g_game.isOnline = function() return true end
+env.g_game.getLocalPlayer = function() return {getOutfit=function() return current end} end
+env.g_game.changeOutfit = function(value) sent=value end
+env.toggle()
+local online = created[#created]
+online.model.head, online.model.addon1 = 55, true
+-- A server update while the editor is open must not be reverted by Apply.
+current.mount = 37
+online.model.Apply()
+assert(sent ~= current and sent.head == 55 and sent.addons == 1)
+for _, key in ipairs({'type', 'body', 'legs', 'feet', 'mount', 'familiar', 'wings', 'aura', 'shader', 'healthBar', 'manaBar'}) do
+    assert(sent[key] == current[key], 'Apply lost outfit field: ' .. key)
+end
+assert(current.head == 1 and current.addons == 0, 'Apply mutated the live outfit')
+
+local originalMap = function() end
+local bindings = {['Ctrl+Shift+M'] = originalMap}
+env.g_keyboard = {
+    bindKeyDown = function(key, callback)
+        assert(key ~= 'Ctrl+Shift+M', 'RmlUi replaced the full-map shortcut')
+        bindings[key] = callback
+    end,
+    unbindKeyDown = function(key, callback)
+        assert(callback == env.toggle, 'module unload unbound other modules callbacks')
+        if bindings[key] == callback then bindings[key] = nil end
+    end,
+}
+local available = false
+env.Rml.isAvailable = function() return available end
+assert(setfenv(assert(loadfile('modules/game_rmlminimap/rmlminimap.lua')), env))()
+env.init()
+assert(bindings['Ctrl+Shift+J'] == nil, 'unavailable RmlUi registered a shortcut')
+available = true
+env.init()
+assert(bindings['Ctrl+Shift+J'] == env.toggle)
+env.terminate()
+assert(bindings['Ctrl+Shift+J'] == nil and bindings['Ctrl+Shift+M'] == originalMap)
+print('RmlUi opening: PASS (lazy tabs, bounded rebuilds, outfit fields and shortcut ownership)')

@@ -763,32 +763,6 @@ void Painter::drawLine(const std::vector<float>& vertex, int size, int width)
     m_calls += 1;
 }
 
-void Painter::setAtlasTextures(const TexturePtr& atlas)
-{
-    static uint activeTexture = 0;
-    if (activeTexture == atlas->getId())
-        return;
-    activeTexture = atlas ? atlas->getId() : 0;
-    glActiveTexture(GL_TEXTURE6); // atlas
-    glBindTexture(GL_TEXTURE_2D, activeTexture);
-    if (atlas)
-        m_atlasTextureMatrix = atlas->getTransformMatrix();
-    glActiveTexture(GL_TEXTURE0);
-}
-
-void Painter::setSecondTexture(const TexturePtr& texture)
-{
-    static uint activeTexture = 0;
-    if (texture)
-        texture->update();
-    if (activeTexture == texture->getId())
-        return;
-    activeTexture = texture ? texture->getId() : 0;
-    glActiveTexture(GL_TEXTURE1); // u_Tex1
-    glBindTexture(GL_TEXTURE_2D, activeTexture);
-    glActiveTexture(GL_TEXTURE0);
-}
-
 void Painter::setOffset(const Point& offset)
 {
     if (!m_shaderProgram) return;

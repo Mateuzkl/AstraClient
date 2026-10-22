@@ -275,7 +275,7 @@ local function open()
             end,
             LoadAssets = function()
                 local version = selectedVersion()
-                addEvent(function()
+                Rml.defer(window, function()
                     g_game.setClientVersion(version)
                     g_game.setProtocolVersion(version)
                 end)

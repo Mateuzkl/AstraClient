@@ -2,6 +2,7 @@
 -- hospedado sobre #minimap-slot com Rml.host (técnica para qualquer widget OTUI pronto).
 
 local M = {}
+local SHORTCUT = 'Ctrl+Shift+J' -- Ctrl+Shift+M belongs to the existing full map.
 
 -- área com bastante mapa no minimapa do NWO usado nos testes; troque pela do seu servidor
 local DEFAULT_POSITION = { x = 1856, y = 1024, z = 7 }
@@ -108,10 +109,10 @@ function toggle()
 end
 
 function init()
-    g_keyboard.bindKeyDown('Ctrl+Shift+M', toggle)
+    if Rml.isAvailable() then g_keyboard.bindKeyDown(SHORTCUT, toggle) end
 end
 
 function terminate()
-    g_keyboard.unbindKeyDown('Ctrl+Shift+M')
+    g_keyboard.unbindKeyDown(SHORTCUT, toggle)
     if M.window then M.window:destroy() M.window = nil end
 end

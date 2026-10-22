@@ -27,6 +27,7 @@
 #include <framework/graphics/glutil.h>
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/image.h>
+#include "rmlglstate.h"
 
 RmlTargetTexture::RmlTargetTexture(const Size& size) : Texture(size, false, false, true)
 {
@@ -316,6 +317,7 @@ void RmlRenderer::replay()
         return;
     }
 
+    const RmlGlStateScope restorePainterBindings;
     if (!m_gl) {
         m_gl = std::make_unique<RenderInterface_GL3>();
         if (!*m_gl) {
@@ -330,27 +332,9 @@ void RmlRenderer::replay()
         g_rml.onBackendResult(true);
     }
 
-    // The painter caches GL state (program, texture, buffers) and uses client-side vertex arrays;
-    // put everything back exactly as it was once the RmlUi backend is done.
-    GLint prevFbo = 0, prevProgram = 0, prevActiveTexture = 0, prevTexture = 0, prevArrayBuffer = 0, prevVao = 0;
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFbo);
-    glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
-    glGetIntegerv(GL_ACTIVE_TEXTURE, &prevActiveTexture);
-    glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTexture);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrayBuffer);
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVao);
-
     for (auto& cmd : commands)
         execute(cmd);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-    glUseProgram(prevProgram);
-    glBindVertexArray(prevVao);
-    glBindBuffer(GL_ARRAY_BUFFER, prevArrayBuffer);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, prevTexture);
-    glActiveTexture(prevActiveTexture);
     m_pendingFrame = false;
 }
 

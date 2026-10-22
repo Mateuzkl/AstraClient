@@ -4,6 +4,9 @@ binary=$(realpath "${1:?Pass the RmlUi-enabled native client}")
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 fixture=$(mktemp -d "${ASTRA_SMOKE_TEMP:-${TMPDIR:-/tmp}}/astra-rmlui-XXXXXXXX")
 mkdir -p "$fixture/modules" "$fixture/data/fonts" "$fixture/data/styles" "$fixture/profile"
+mkdir -p "$fixture/data/images/ui"
+cp "$repo/data/images/ui/background.png" "$fixture/data/images/ui/"
+cp "$repo/tests/rendering/scene.lua" "$fixture/render-scene.lua"
 cp -a "$repo/modules/corelib" "$fixture/modules/"
 cp -a "$repo/data/fonts/rml" "$fixture/data/fonts/"
 cp -a "$repo/data/styles/rml" "$fixture/data/styles/"

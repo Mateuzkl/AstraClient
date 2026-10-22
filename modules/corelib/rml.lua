@@ -151,7 +151,7 @@ function Rml.close(window)
     if not window or window:isDestroyed() then return end
     if window.rmlClosing then return end
     window.rmlClosing = true
-    addEvent(function()
+    Rml.defer(window, function()
         if window:isDestroyed() then return end
         local onClose = window.rmlOnClose
         window:destroy()
@@ -167,7 +167,8 @@ function Rml.toggle(holder, key, create)
     local window = holder[key]
     if window and not window:isDestroyed() then
         Rml.close(window)
-        holder[key] = nil
+        -- Keep ownership until destruction: a second toggle must not create a
+        -- replacement that the previous window's deferred onClose could clear.
         return
     end
     holder[key] = create()
@@ -446,10 +447,8 @@ function Rml.watch(window, model, keys, onChange, kinds)
     })
 end
 
---- Executa `callback` periodicamente enquanto a janela existir (animações simples, relógios).
--- @param interval milissegundos
-function Rml.every(window, interval, callback)
-    if not window or window:isDestroyed() then return nil end
+local function trackWindowEvents(window)
+    if not window or window:isDestroyed() then return false end
     window.rmlTimers = window.rmlTimers or {}
     if not window.rmlTimersConnected then
         window.rmlTimersConnected = true
@@ -458,6 +457,26 @@ function Rml.every(window, interval, callback)
             self.rmlTimers = nil
         end })
     end
+    return true
+end
+
+--- Agenda um callback de uso único e cancela-o se a janela for destruída.
+function Rml.defer(window, callback)
+    if not trackWindowEvents(window) then return nil end
+    local event
+    event = addEvent(function()
+        if window:isDestroyed() then return end
+        if window.rmlTimers then window.rmlTimers[event] = nil end
+        callback()
+    end)
+    window.rmlTimers[event] = true
+    return event
+end
+
+--- Executa `callback` periodicamente enquanto a janela existir (animações simples, relógios).
+-- @param interval milissegundos
+function Rml.every(window, interval, callback)
+    if not trackWindowEvents(window) then return nil end
     local event
     event = cycleEvent(function()
         if not window or window:isDestroyed() then

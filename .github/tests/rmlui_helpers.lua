@@ -21,7 +21,7 @@ g_logger = {warning=function() end}
 function connect(w, signals) for k,v in pairs(signals) do w[k]=v end end
 function cycleEvent(f) local e={}; events[e]=f; return e end
 function removeEvent(e) events[e]=nil end
-function addEvent(f) callbacks[#callbacks+1]=f end
+function addEvent(f) local e={}; events[e]=f; callbacks[#callbacks+1]=f; return e end
 dofile(arg[1] or 'modules/corelib/rml.lua')
 assert(Rml.isAvailable() and Rml.hasEffects())
 assert(Rml.escape('<hello & world>') == '&lt;hello &amp; world&gt;')
@@ -42,6 +42,29 @@ Rml.close(closing); Rml.close(closing)
 assert(#callbacks == 1, 'close queued twice')
 callbacks[1]()
 assert(closed == 1 and closeState.destroyed)
+
+local holder, opened = {}, 0
+local function open()
+  opened = opened + 1
+  local window = widget()
+  window.rmlOnClose = function() holder.window = nil end
+  return window
+end
+Rml.toggle(holder, 'window', open)
+local original = holder.window
+Rml.toggle(holder, 'window', open)
+Rml.toggle(holder, 'window', open)
+assert(opened == 1 and holder.window == original, 'pending close created a replacement window')
+callbacks[#callbacks]()
+Rml.toggle(holder, 'window', open)
+assert(opened == 2 and holder.window ~= original)
+local lateCalls = 0
+local deferred = Rml.defer(holder.window, function() lateCalls=lateCalls+1 end)
+local pending = callbacks[#callbacks]
+holder.window:destroy()
+assert(events[deferred] == nil, 'window destruction did not cancel its deferred event')
+pending()
+assert(lateCalls == 0, 'deferred callback survived its window')
 g_ui.createWidget=function() local failed, s=widget(); s.load=false; return failed end
 local before=destroyed
 assert(Rml.createPanel(nil, '/missing.rml') == nil)

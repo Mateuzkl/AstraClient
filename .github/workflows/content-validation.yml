@@ -11,6 +11,11 @@ on:
       - '.github/tests/style_font_routing.lua'
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
+      - 'tests/rendering/**'
+      - 'src/framework/graphics/drawcommandpool.h'
+      - 'src/framework/graphics/linegeometry.h'
+      - 'src/framework/rml/rmlglstate.h'
+      - 'tests/rmlui/gl_state.cpp'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -59,6 +64,11 @@ on:
       - '.github/tests/style_font_routing.lua'
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
+      - 'tests/rendering/**'
+      - 'src/framework/graphics/drawcommandpool.h'
+      - 'src/framework/graphics/linegeometry.h'
+      - 'src/framework/rml/rmlglstate.h'
+      - 'tests/rmlui/gl_state.cpp'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/indexed_spr*'
@@ -122,6 +132,15 @@ jobs:
           /tmp/astra-cxx23-probe
           c++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -o /tmp/astra-utf8-path
           /tmp/astra-utf8-path
+
+      - name: Test render command ownership and line bounds
+        run: |
+          c++ -std=c++23 -O2 -Wall -Wextra -Werror -Isrc tests/rendering/command_pool.cpp -o /tmp/render-command-pool
+          /tmp/render-command-pool
+          c++ -std=c++23 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Isrc tests/rendering/line_geometry.cpp -o /tmp/render-line-geometry
+          ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/render-line-geometry
+          c++ -std=c++23 -O2 -Wall -Wextra -Werror -Isrc tests/rmlui/gl_state.cpp -o /tmp/rmlui-gl-state
+          /tmp/rmlui-gl-state
 
       - name: Validate Lua syntax
         run: |

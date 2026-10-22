@@ -64,6 +64,9 @@ public:
     }
     bool isCacheUI() const { return m_cacheUI.load(); }
 
+    void setDrawCommandPooling(bool enabled) { m_drawCommandPooling = enabled; m_mustRepaint = true; }
+    bool isDrawCommandPooling() const { return m_drawCommandPooling.load(); }
+
     void setMaxFps(int maxFps) { m_maxFps = maxFps; }
     int getMaxFps() const { return m_maxFps; }
     int getFps() { return m_graphicsFrames.getFps(); }
@@ -110,6 +113,7 @@ private:
   std::atomic_bool m_unlimitedFps = false;
   std::atomic_bool m_mapSmooth = true;
   std::atomic_bool m_cacheUI = true;
+  std::atomic_bool m_drawCommandPooling = true;
   std::atomic_bool m_mustRepaint = false;
   stdext::boolean<false> m_onInputEvent;
   FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;

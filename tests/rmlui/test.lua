@@ -2,12 +2,14 @@ local originalPrint = print
 assert(Rml.isAvailable(), 'native RmlUi missing')
 assert(print == originalPrint, 'RmlUi replaced the client logger')
 local initialContexts = g_rml.getContextCount()
+local initialWidgets = g_rml.getWidgetCount()
 local timerCalls = 0
 local window, model = Rml.createWindow {
     document = '/smoke.rml', model = 'smoke', width = 420, height = 280,
     data = {title = 'Astra C++23 RmlUi', shown = true, name = ''},
 }
 assert(window and model, 'RML/data model did not load')
+print('[RMLUI TEST] document loaded')
 local extraStyle = '#caption { height: 37dp; }'
 assert(window:setExtraStyleSheet(extraStyle))
 assert(window:setExtraStyleSheet(extraStyle), 'repeated identical stylesheet rejected')
@@ -18,6 +20,7 @@ connect(window, {onRmlUpdate = function() ticks = ticks + 1 end})
 Rml.every(window, 10, function() timerCalls = timerCalls + 1 end)
 
 scheduleEvent(function()
+    print('[RMLUI TEST] validating initial layout')
     assert(Rml.element(window, 'caption').offset_height == 37, 'extra stylesheet was not applied')
     assert(window:setExtraStyleSheet(''))
     assert(g_rml.supportsAdvancedEffects(), 'GL3 backend failed')
@@ -56,6 +59,8 @@ scheduleEvent(function()
             document:AddEventListener('keydown', function() window:destroy() end, false)
             document:DispatchEvent('keydown', {})
             local callsAtDestroy = timerCalls
+            -- Keep the Lua owner alive: destruction, not GC, must retire the tick.
+            assert(g_rml.getWidgetCount() == initialWidgets, 'destroyed widget retained native tick registration')
             assert(window:getDocument() == nil, 'destroyed document was exposed')
             assert(window:getContext() == nil, 'destroyed context was recreated')
             scheduleEvent(function()
@@ -68,10 +73,15 @@ scheduleEvent(function()
                     w:destroy()
                 end
                 scheduleEvent(function()
+                    print('[RMLUI TEST] contexts released')
                     assert(g_rml.getContextCount() == initialContexts)
+                    assert(g_rml.getWidgetCount() == initialWidgets)
                     collectgarbage('collect')
-                    print('[RMLUI TEST] PASS: render, models, reload, host visibility, timers and 30 close cycles')
-                    g_app.exit()
+                    dofile('/render-scene.lua')
+                    testRenderPooling(function()
+                        print('[RMLUI TEST] PASS: render, models, reload, host visibility, timers and 30 close cycles')
+                        g_app.exit()
+                    end)
                 end, 80)
             end, 80)
         end, 120)

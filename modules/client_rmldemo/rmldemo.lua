@@ -59,9 +59,10 @@ end
 
 local function close()
     if window then
-        window:destroy()
+        local closing = window
         window = nil
         model = nil
+        closing:destroy()
     end
 end
 
@@ -81,6 +82,10 @@ local function open()
     window:setId('rmlDemoWindow')
     window:setSize({ width = 600, height = 500 })
     window.onEscape = close
+    local owner = window
+    connect(owner, {onDestroy = function()
+        if window == owner then window = nil; model = nil end
+    end})
 
     -- The model must exist before the document that references it (data-model="demo").
     model = window:getContext():OpenDataModel('demo', {
@@ -107,18 +112,18 @@ local function open()
             model.progress = math.max(0, math.min(10, model.count))
         end,
         Select = function(event, id) model.selected = id end,
-        Close = function() addEvent(close) end,
+        Close = function() Rml.close(owner) end,
         LoadAssets = function()
             -- same path as the login screen: game_things loads data/things/<version>/ on version change
             local version = selectedVersion()
             if version == 0 then return end
-            addEvent(function()
+            Rml.defer(owner, function()
                 g_game.setClientVersion(version)
                 g_game.setProtocolVersion(version)
             end)
         end,
         ToggleDebugger = function() window:setDebuggerVisible(not window:isDebuggerVisible()) end,
-        Reload = function() addEvent(function() if window then window:reloadDocument() end end) end,
+        Reload = function() Rml.defer(owner, function() owner:reloadDocument() end) end,
     })
 
     window.onRmlUpdate = function()

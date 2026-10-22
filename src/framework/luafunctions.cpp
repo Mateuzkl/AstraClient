@@ -347,6 +347,8 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_app", "setUnlimitedFps", &GraphicalApplication::setUnlimitedFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "setCacheUI", &GraphicalApplication::setCacheUI, &g_app);
     g_lua.bindSingletonFunction("g_app", "isCacheUI", &GraphicalApplication::isCacheUI, &g_app);
+    g_lua.bindSingletonFunction("g_app", "setDrawCommandPooling", &GraphicalApplication::setDrawCommandPooling, &g_app);
+    g_lua.bindSingletonFunction("g_app", "isDrawCommandPooling", &GraphicalApplication::isDrawCommandPooling, &g_app);
     g_lua.bindSingletonFunction("g_app", "getFps", &GraphicalApplication::getFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "getGraphicsFps", &GraphicalApplication::getGraphicsFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "getProcessingFps", &GraphicalApplication::getProcessingFps, &g_app);
