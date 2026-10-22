@@ -220,8 +220,8 @@ local function open()
         { text = 'Criar meu primeiro .rml', done = false },
         { text = 'Trocar uma janela OTUI por RmlUi', done = false },
     }
-    local items, bigItems = spriteData()
-    local slides = carouselSlides()
+    local spritesReady, examplesReady = false, false
+    local slides
     local window
     window, model = Rml.createWindow{
         id = 'rmlShowcase',
@@ -252,13 +252,13 @@ local function open()
             -- sprites
             thingsLoaded = thingsLoaded(),
             assetsHint = Rml.text(string.format('Sem assets: coloque os arquivos em data/things/%d/ e clique em Carregar assets.', selectedVersion())),
-            items = items, bigItems = bigItems,
+            items = {}, bigItems = {},
             direction = 2,
-            outfitSrc = Rml.outfitImage({ type = exampleLookType(), head = 78, body = 69, legs = 58, feet = 76 }, 2, 3),
+            outfitSrc = '',
 
-            examples = translate(OTUI_EXAMPLES),
+            examples = {},
             flag = '/images/flags/pt.png',
-            slides = slides, slide = 0, paused = false,
+            slides = {}, slide = 0, paused = false,
             trackTransform = 'translateX(0dp)',
 
             -- nested tables come back from the model as proxies: change the original
@@ -281,6 +281,7 @@ local function open()
                 end)
             end,
             Slide = function(_, delta)
+                if not slides then return end
                 model.slide = (model.slide + delta) % #slides
                 model.trackTransform = string.format('translateX(%ddp)', -model.slide * SLIDE_WIDTH)
             end,
@@ -314,6 +315,18 @@ local function open()
     -- valores derivados calculados no Lua (o documento só exibe)
     connect(window, {
         onRmlUpdate = function()
+            -- data-if only hides nodes: don't instantiate lists/images in unopened tabs.
+            if model.tab == 'sprites' and not spritesReady then
+                spritesReady = true
+                model.items, model.bigItems = spriteData()
+                model.outfitSrc = Rml.outfitImage({ type = exampleLookType(), head = 78, body = 69, legs = 58, feet = 76 }, model.direction, 3)
+            elseif model.tab == 'images' and not slides then
+                slides = carouselSlides()
+                model.slides = slides
+            elseif model.tab == 'otui' and not examplesReady then
+                examplesReady = true
+                model.examples = translate(OTUI_EXAMPLES)
+            end
             local meter = math.max(0, math.min(100, model.count * 5))
             if model.meter ~= meter then model.meter = meter end
             local nameLength = #Rml.fromRml(model.name)
@@ -323,7 +336,7 @@ local function open()
             local loaded = thingsLoaded()
             if model.thingsLoaded ~= loaded then
                 model.thingsLoaded = loaded
-                model.items, model.bigItems = spriteData()
+                if spritesReady then model.items, model.bigItems = spriteData() end
             end
             if model.online ~= g_game.isOnline() then model.online = g_game.isOnline() end
         end
@@ -331,13 +344,14 @@ local function open()
 
     -- animação feita pelo Lua: gira o outfit
     Rml.every(window, 600, function()
+        if model.tab ~= 'sprites' then return end
         model.direction = (model.direction + 1) % 4
         model.outfitSrc = Rml.outfitImage({ type = exampleLookType(), head = 78, body = 69, legs = 58, feet = 76 }, model.direction, 3)
     end)
 
     -- carrossel: avança sozinho, exceto com o mouse em cima ou fora da aba
     Rml.every(window, 3000, function()
-        if model.tab ~= 'images' or model.paused then return end
+        if model.tab ~= 'images' or model.paused or not slides then return end
         model.slide = (model.slide + 1) % #slides
         model.trackTransform = string.format('translateX(%ddp)', -model.slide * SLIDE_WIDTH)
     end)

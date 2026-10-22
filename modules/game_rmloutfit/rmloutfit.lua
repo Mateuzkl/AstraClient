@@ -6,6 +6,15 @@ local M = {}
 local PARTS = { { id = 'head', label = 'Cabeça' }, { id = 'body', label = 'Corpo' },
     { id = 'legs', label = 'Pernas' }, { id = 'feet', label = 'Pés' } }
 local DIRECTIONS = { [0] = 'Norte', [1] = 'Leste', [2] = 'Sul', [3] = 'Oeste' }
+local palette
+
+local function colorParts(outfit)
+    local parts = {}
+    for _, p in ipairs(PARTS) do
+        parts[#parts + 1] = { id = p.id, label = Rml.text(p.label), hex = Rml.colorHex(outfit[p.id] or 0) }
+    end
+    return parts
+end
 
 local function currentOutfit()
     local player = g_game.isOnline() and g_game.getLocalPlayer()
@@ -35,6 +44,9 @@ end
 local function open()
     local window, model
     local outfit = currentOutfit()
+    local looksText = defaultLooks()
+    palette = palette or Rml.outfitPalette()
+    local lastColors = {head = outfit.head or 0, body = outfit.body or 0, legs = outfit.legs or 0, feet = outfit.feet or 0}
 
     local function outfitFromModel()
         local addons = (model.addon1 and 1 or 0) + (model.addon2 and 2 or 0)
@@ -43,14 +55,20 @@ local function open()
 
     local function refresh()
         local o = outfitFromModel()
-        model.preview = Rml.outfitImage(o, model.direction, 3)
-        model.directionName = Rml.text(DIRECTIONS[model.direction])
-        model.selectedColor = model[model.part]
-        local parts = {}
+        local preview = Rml.outfitImage(o, model.direction, 3)
+        if model.preview ~= preview then model.preview = preview end
+        local directionName = Rml.text(DIRECTIONS[model.direction])
+        if model.directionName ~= directionName then model.directionName = directionName end
+        local selectedColor = model[model.part]
+        if model.selectedColor ~= selectedColor then model.selectedColor = selectedColor end
+        local colorsChanged = false
         for _, p in ipairs(PARTS) do
-            parts[#parts + 1] = { id = p.id, label = Rml.text(p.label), hex = Rml.colorHex(model[p.id]) }
+            if lastColors[p.id] ~= o[p.id] then colorsChanged = true end
         end
-        model.parts = parts
+        if colorsChanged then
+            model.parts = colorParts(o)
+            lastColors = o
+        end
     end
 
     window, model = Rml.createWindow{
@@ -63,11 +81,11 @@ local function open()
             lookType = outfit.type, head = outfit.head or 0, body = outfit.body or 0,
             legs = outfit.legs or 0, feet = outfit.feet or 0,
             addon1 = (outfit.addons or 0) % 2 == 1, addon2 = (outfit.addons or 0) >= 2,
-            direction = 2, directionName = '', preview = '',
-            part = 'head', selectedColor = 0, parts = {},
-            palette = Rml.outfitPalette(),
-            looksText = defaultLooks(),
-            looks = parseLooks(defaultLooks()),
+            direction = 2, directionName = Rml.text(DIRECTIONS[2]), preview = Rml.outfitImage(outfit, 2, 3),
+            part = 'head', selectedColor = outfit.head or 0, parts = colorParts(outfit),
+            palette = palette,
+            looksText = looksText,
+            looks = parseLooks(looksText),
             status = Rml.text(g_game.isOnline() and 'Escolha e clique em Aplicar.' or 'Fora do jogo: só pré-visualização.'),
 
             Turn = function(_, delta)
@@ -105,7 +123,6 @@ local function open()
 
     -- part e addons mudam pelo próprio documento; o preview acompanha
     Rml.watch(window, model, { 'part', 'addon1', 'addon2' }, refresh, { booleans = { addon1 = true, addon2 = true } })
-    refresh()
     return window
 end
 
@@ -120,4 +137,5 @@ end
 function terminate()
     g_keyboard.unbindKeyDown('Ctrl+Shift+F')
     if M.window then M.window:destroy() M.window = nil end
+    palette = nil
 end

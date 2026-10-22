@@ -7,6 +7,7 @@ on:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/rmlui_helpers.lua'
       - '.github/tests/rmlui_assets.lua'
+      - '.github/tests/rmlui_opening.lua'
       - '.github/tests/style_font_routing.lua'
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
@@ -54,6 +55,7 @@ on:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/rmlui_helpers.lua'
       - '.github/tests/rmlui_assets.lua'
+      - '.github/tests/rmlui_opening.lua'
       - '.github/tests/style_font_routing.lua'
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
@@ -140,6 +142,9 @@ jobs:
 
       - name: Test RmlUi example assets
         run: luajit .github/tests/rmlui_assets.lua
+
+      - name: Test RmlUi opening work
+        run: luajit .github/tests/rmlui_opening.lua
 
       - name: Test bitmap and RmlUi font routing
         run: luajit .github/tests/style_font_routing.lua modules/client_styles/styles.lua

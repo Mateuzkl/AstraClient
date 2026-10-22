@@ -1,0 +1,78 @@
+-- Exercise production module callbacks and count unnecessary model/list rebuilds.
+local created, paletteBuilds = {}, 0
+local function createWidget()
+    return setmetatable({updates = {}}, {__index = function() return function() end end})
+end
+local env = setmetatable({
+    g_rml = {getBackendName = function() return 'test' end},
+    g_game = {isOnline = function() return false end, getClientVersion = function() return 860 end},
+    g_settings = {getString = function() return '' end, getInteger = function() return 860 end},
+    g_things = {isDatLoaded = function() return false end},
+    g_ui = {createWidget = createWidget},
+    connect = function(w, events)
+        if events.onRmlUpdate then w.updates[#w.updates + 1] = events.onRmlUpdate end
+    end,
+}, {__index = _G})
+local function update(w) for _, callback in ipairs(w.updates) do callback() end end
+env.Rml = {
+    text = function(s) return s end, fromRml = function(s) return s end,
+    itemImage = function(id) return 'item/' .. id end,
+    outfitImage = function(o, direction) return 'outfit/' .. o.type .. '/' .. direction end,
+    hasEffects = function() return true end, host = function() end, on = function() end,
+    every = function(w, _, callback) w.timers[#w.timers + 1] = callback end,
+    watch = function(w, _, _, callback) w.watch = callback end,
+    colorHex = function(id) return tostring(id) end,
+    outfitPalette = function() paletteBuilds = paletteBuilds + 1; return {{id = 0, hex = '#000000'}} end,
+    toggle = function(holder, key, open) holder[key] = open() end,
+    createWindow = function(opts)
+        local w = createWidget()
+        w.timers = {}
+        local writes = {}
+        local model = setmetatable({}, {__index = opts.data, __newindex = function(_, k, v)
+            writes[k] = (writes[k] or 0) + 1
+            opts.data[k] = v
+        end})
+        created[#created + 1] = {w = w, model = model, writes = writes, opts = opts}
+        return w, model
+    end,
+}
+assert(setfenv(assert(loadfile('modules/client_rmlshowcase/showcase.lua')), env))()
+env.toggle()
+local s = created[#created]
+assert(#s.model.items == 0 and #s.model.bigItems == 0 and #s.model.slides == 0 and #s.model.examples == 0,
+    'unopened tabs eagerly instantiated lists')
+update(s.w)
+assert(#s.model.items == 0 and #s.model.slides == 0, 'home update instantiated hidden tabs')
+for _, timer in ipairs(s.w.timers) do timer() end
+assert(s.model.outfitSrc == '', 'hidden outfit kept animating')
+s.model.tab = 'sprites'; update(s.w)
+assert(#s.model.items == 6 and #s.model.bigItems == 3 and s.model.outfitSrc ~= '')
+local items = s.model.items
+update(s.w)
+assert(s.model.items == items, 'sprite list rebuilt every tick')
+s.model.tab = 'images'; update(s.w)
+assert(#s.model.slides == 5)
+s.model.Slide(nil, 1); assert(s.model.slide == 1)
+s.model.tab = 'otui'; update(s.w)
+assert(#s.model.examples > 0)
+s.model.tab = 'home'; update(s.w)
+s.model.tab = 'sprites'; update(s.w)
+assert(s.model.items == items, 'returning to a tab rebuilt its list')
+
+assert(setfenv(assert(loadfile('modules/game_rmloutfit/rmloutfit.lua')), env))()
+env.toggle()
+local outfit = created[#created]
+assert(outfit.model.preview ~= '' and #outfit.model.parts == 4 and outfit.model.selectedColor == 78,
+    'outfit document loaded with an incomplete initial model')
+assert(not next(outfit.writes), 'initial model was dirtied after document load')
+local parts = outfit.model.parts
+outfit.model.Turn(nil, 1)
+assert(outfit.model.parts == parts, 'turning rebuilt unchanged color controls')
+outfit.model.Pick(nil, 12)
+assert(outfit.model.parts ~= parts and outfit.model.selectedColor == 12)
+parts = outfit.model.parts
+outfit.w.watch()
+assert(outfit.model.parts == parts, 'unchanged watch rebuilt controls')
+env.toggle()
+assert(paletteBuilds == 1, 'immutable palette rebuilt for every window')
+print('RmlUi opening: PASS (lazy tabs and bounded outfit rebuilds)')

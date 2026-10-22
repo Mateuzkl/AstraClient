@@ -8,6 +8,9 @@ local window, model = Rml.createWindow {
     data = {title = 'Astra C++23 RmlUi', shown = true, name = ''},
 }
 assert(window and model, 'RML/data model did not load')
+local extraStyle = '#caption { height: 37dp; }'
+assert(window:setExtraStyleSheet(extraStyle))
+assert(window:setExtraStyleSheet(extraStyle), 'repeated identical stylesheet rejected')
 local native = g_ui.createWidget('UIWidget')
 Rml.host(window, 'slot', native)
 local ticks = 0
@@ -15,6 +18,8 @@ connect(window, {onRmlUpdate = function() ticks = ticks + 1 end})
 Rml.every(window, 10, function() timerCalls = timerCalls + 1 end)
 
 scheduleEvent(function()
+    assert(Rml.element(window, 'caption').offset_height == 37, 'extra stylesheet was not applied')
+    assert(window:setExtraStyleSheet(''))
     assert(g_rml.supportsAdvancedEffects(), 'GL3 backend failed')
     assert(g_rml.getContextCount() == initialContexts + 1)
     if not native:isVisible() then
@@ -38,10 +43,13 @@ scheduleEvent(function()
     assert(native:getParent():isClipping(), 'host clipping missing')
     model.shown = false
     scheduleEvent(function()
+        assert(Rml.element(window, 'caption').offset_height ~= 37, 'base stylesheet was not restored')
         assert(not native:isVisible(), 'data-if did not hide native widget')
         model.shown = true
+        assert(window:setExtraStyleSheet('#caption { height: 41dp; }'))
         assert(window:reloadDocument(), 'RML reload failed')
         scheduleEvent(function()
+            assert(Rml.element(window, 'caption').offset_height == 41, 'reload lost extra stylesheet')
             assert(native:isVisible(), 'host not restored after reload')
             -- Direct DOM dispatch from Lua bypasses the native widget's input hook.
             local document = window:getDocument()

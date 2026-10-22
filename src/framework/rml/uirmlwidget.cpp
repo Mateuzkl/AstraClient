@@ -234,11 +234,9 @@ bool UIRmlWidget::loadDocument(const std::string& path)
 
         m_documentPath = path;
 
-        // keep a private copy of the document stylesheets so extra sheets can be swapped
-        const auto empty = Rml::Factory::InstanceStyleSheetString("");
-        const auto* base = m_document->GetStyleSheetContainer();
-        m_baseStyleSheet = base && empty ? base->CombineStyleSheetContainer(*empty) : empty;
-
+        // Keep the already compiled document sheet unless an override is requested.
+        // Cloning/reapplying it here invalidates all computed styles before Show().
+        m_baseStyleSheet = nullptr;
         applyStyleSheet();
         m_document->Show();
     }
@@ -299,6 +297,8 @@ void UIRmlWidget::setDebuggerVisible(const bool visible)
 
 bool UIRmlWidget::setExtraStyleSheet(const std::string& rcss)
 {
+    if (m_extraStyleSheet == rcss)
+        return true;
     m_extraStyleSheet = rcss;
     CallScope scope(*this);
     applyStyleSheet();
@@ -307,11 +307,12 @@ bool UIRmlWidget::setExtraStyleSheet(const std::string& rcss)
 
 void UIRmlWidget::applyStyleSheet()
 {
-    if (!m_document || !m_baseStyleSheet)
+    if (!m_document)
         return;
 
     if (m_extraStyleSheet.empty()) {
-        m_document->SetStyleSheetContainer(m_baseStyleSheet->CombineStyleSheetContainer(*Rml::Factory::InstanceStyleSheetString("")));
+        if (m_baseStyleSheet)
+            m_document->SetStyleSheetContainer(m_baseStyleSheet);
         return;
     }
 
@@ -320,6 +321,13 @@ void UIRmlWidget::applyStyleSheet()
         g_logger.warning(stdext::format("[rmlui] extra stylesheet rejected for '%s'", m_documentPath));
         return;
     }
+    if (!m_baseStyleSheet) {
+        const auto* base = m_document->GetStyleSheetContainer();
+        m_baseStyleSheet = base ? base->CombineStyleSheetContainer(Rml::StyleSheetContainer{}) :
+            Rml::Factory::InstanceStyleSheetString("");
+    }
+    if (!m_baseStyleSheet)
+        return;
     m_document->SetStyleSheetContainer(m_baseStyleSheet->CombineStyleSheetContainer(*extra));
 }
 
