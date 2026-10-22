@@ -1,6 +1,13 @@
 local originalPrint = print
 assert(Rml.isAvailable(), 'native RmlUi missing')
 assert(print == originalPrint, 'RmlUi replaced the client logger')
+-- Startup already loaded this variable font. Its resource aliases must not
+-- re-enter RmlUi's duplicate-face loader or invalidate FreeType face memory.
+for i=1,20 do
+    assert(g_rml.loadFontFace('/fonts/rml/Cinzel.ttf'))
+    assert(g_rml.loadFontFace('/data/fonts/rml/Cinzel.ttf'))
+    assert(g_rml.loadFontFace('fonts/rml/Cinzel.ttf'))
+end
 local initialContexts = g_rml.getContextCount()
 local initialWidgets = g_rml.getWidgetCount()
 local function testDestroyDuringUpdate(done)

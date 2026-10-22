@@ -90,6 +90,7 @@ public:
 
 private:
     void loadFonts();
+    bool loadFontFaceOnce(const std::string& path, bool fallback);
     void tick();
     void retryPendingImages();
     void releasePendingContexts();
@@ -114,6 +115,7 @@ private:
     bool m_initFailed{ false };
     bool m_reportEnabled{ false };
     int m_lastContextId{ 0 };
+    std::set<std::string> m_loadedFonts;
 };
 
 extern RmlManager g_rml;

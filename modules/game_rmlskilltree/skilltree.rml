@@ -1,0 +1,111 @@
+<rml>
+<head>
+  <title>Árvore de Skills · Laboratório Astra</title>
+  <link type="text/rcss" href="/styles/rml/otc.rcss"/>
+  <link type="text/rcss" href="skilltree.rcss"/>
+  <link type="text/rcss" href="spell-icons.rcss"/>
+</head>
+<body>
+<div class="skill-window" data-model="skilltree">
+  <div class="rim rim-top"></div><div class="rim rim-bottom"></div>
+  <div class="corner top-left"></div><div class="corner top-right"></div>
+  <div class="corner bottom-left"></div><div class="corner bottom-right"></div>
+  <header class="skill-header" data-drag="window">
+    <div class="brand"><span class="brand-name">ASTRA</span><span class="brand-sub">LABORATÓRIO DE TALENTOS</span></div>
+    <div class="heading"><div class="crown"><div class="gem"></div></div><h1>Árvore de Skills</h1><div class="heading-line"></div></div>
+    <div class="point-bank" data-drag="none"><span>Pontos disponíveis:</span><b id="available-points">{{points}}</b><button id="refill" class="grant" data-event-click="Refill()" title="Repor o saldo para 9.999 pontos fictícios, sem apagar os talentos">Repor</button></div>
+    <button id="help" class="header-button help" data-drag="none" data-event-click="Help()" title="Como usar esta demonstração">?</button>
+    <button class="header-button close" data-drag="none" data-event-click="Close()" title="Fechar">&#215;</button>
+  </header>
+
+  <main class="skill-body">
+    <aside class="category-panel">
+      <div class="section-eyebrow">CAMINHOS DE MAESTRIA</div>
+      <nav class="categories">
+        <button class="category" data-for="c : categories" data-attr-id="'category-' + c.id" data-class-selected="category == c.id" data-event-click="Category(c.id)">
+          <span class="category-icon" data-style-decorator="c.icon"></span><span>{{c.name}}</span><span class="category-notch"></span>
+        </button>
+      </nav>
+      <div class="character-card">
+        <div class="character-art"></div><div class="character-shade"></div>
+        <div class="role-plaque">{{role}}</div>
+        <p>{{summary}}</p>
+        <div class="demo-character"><span class="small-gem"></span><span>Nível de teste</span><b>{{level}}</b></div>
+      </div>
+      <div class="local-tag"><span class="local-dot"></span><span>SOMENTE DEMONSTRAÇÃO</span></div>
+      <button id="build-info" class="build-button" data-event-click="Build()"><b>Build Info</b><span>{{buildCount}} talentos</span></button>
+    </aside>
+
+    <section class="tree-panel">
+      <div class="tree-topline"><span>{{categoryName}}</span><span>{{categorySpent}} pontos investidos nesta árvore</span></div>
+      <div id="tree-viewport" class="tree-viewport">
+        <div class="tree-watermark"><div class="sigil-outer"></div><div class="sigil-inner"></div><div class="sigil-blade"></div></div>
+        <div id="tree-canvas" class="tree-canvas" data-style-transform="treeTransform" data-style-left="treeLeft" data-style-top="treeTop">
+          <div class="connection" data-for="line : links" data-class-active="line.active" data-class-on-path="line.onPath" data-class-green="line.color == 'green'" data-class-blue="line.color == 'blue'" data-class-gold="line.color == 'gold'" data-style-left="line.left" data-style-top="line.top" data-style-width="line.width" data-style-height="line.height"></div>
+          <button class="skill-node" data-for="n : nodes" data-attr-id="'skill-' + n.id" data-style-left="n.left" data-style-top="n.top" data-class-selected="n.selected" data-class-owned="n.owned" data-class-on-path="n.onPath" data-class-locked="n.locked" data-class-available="n.available" data-class-keystone="n.keystone" data-class-green="n.green" data-class-blue="n.blue" data-class-gold="n.gold" data-event-click="Select(n.id)" data-attr-title="n.name">
+            <div class="node-diamond"></div><div class="node-inner"><div class="node-icon" data-style-decorator="n.icon"></div></div>
+            <div class="node-jewel"></div>
+            <div class="lock" data-if="n.locked"><div class="lock-shackle"></div><div class="lock-body"><div class="keyhole"></div></div></div>
+            <div class="rank">{{n.rank}}<span>/{{n.max}}</span></div>
+          </button>
+        </div>
+      </div>
+      <div class="tree-legend"><span><i class="legend-dot invested"></i><b>Aprendido</b></span><span><i class="legend-dot available"></i><b>Disponível</b></span><span><i class="legend-dot blocked"></i><b>Bloqueado</b></span><span class="legend-note">O caminho selecionado fica destacado</span></div>
+    </section>
+
+    <aside class="detail-panel">
+      <div class="detail-scroll">
+        <div class="detail-portrait"><div class="portrait-diamond"></div><div class="portrait-rim"><div class="portrait-icon" data-style-decorator="selectedIcon"></div></div><div class="portrait-gem"></div></div>
+        <h2 id="selected-title" class="skill-title">{{selectedName}}</h2>
+        <div class="ornament-rule"><span></span></div>
+        <p class="skill-description">{{description}}</p>
+        <div class="effect-card">
+          <div class="effect-title"><span>Nível atual</span><b>{{rank}}/{{max}}</b></div>
+          <p class="current-effect">{{currentEffect}}</p>
+          <div class="effect-divider"></div>
+          <div class="effect-title"><span>{{maxed ? 'Maestria alcançada' : 'Próximo nível'}}</span><span class="level-pill" data-if="!maxed">{{rank + 1}}/{{max}}</span></div>
+          <p class="next-effect">{{nextEffect}}</p>
+        </div>
+        <div class="requirements">
+          <h3>Requisitos</h3>
+          <div class="requirement" data-class-met="levelMet"><span class="req-symbol">+</span><span>Nível mínimo</span><b>{{minLevel}}</b></div>
+          <div class="requirement" data-class-met="pointsMet"><span class="req-symbol blue">+</span><span>Pontos necessários</span><b>{{cost}}</b></div>
+          <div class="prerequisite" data-for="req : requirements" data-class-met="req.met"><span class="req-icon" data-style-decorator="req.icon"></span><span>{{req.name}}</span><b>{{req.rank}}/{{req.required}}</b></div>
+          <p class="no-prerequisite" data-if="!hasRequirements">O início da sua jornada. Sem pré-requisitos.</p>
+        </div>
+        <div class="availability" data-class-ready="canUpgrade" data-class-mastered="maxed"><span class="availability-dot"></span><span>{{reason}}</span></div>
+        <div class="quote"><span>“Um golpe bem colocado<br/>pode mudar o rumo de uma batalha.”</span></div>
+        <div class="detail-art"></div>
+      </div>
+      <button id="next-required" class="requirement-guide" data-if="hasMissing" data-event-click="NextRequired()"><span>{{nextRequired}}</span>Ver próximo pré-requisito</button>
+    </aside>
+  </main>
+
+  <footer class="skill-footer">
+    <div class="allocation"><div><span>PONTOS INVESTIDOS</span><b>{{spent}} / {{capacity}}</b></div><div class="allocation-track"><div data-style-width="progress"></div></div><span class="allocation-note">Nas cinco árvores · somente nesta sessão</span></div>
+    <div class="footer-actions"><button id="upgrade" class="action upgrade" data-attrif-disabled="!canUpgrade" data-event-click="Upgrade()"><span class="action-icon upgrade-mark"><i class="arrow-head"></i><i class="arrow-stem"></i></span>{{upgradeLabel}}</button><button id="reset" class="action reset" data-event-click="Reset()"><span class="action-icon reset-mark"><i class="reset-tip"></i></span>Resetar</button><button id="close-tree" class="action leave" data-event-click="Close()"><span class="action-icon">&#215;</span>Fechar</button></div>
+  </footer>
+  <div class="status-bar">{{status}}</div>
+
+  <div class="modal-shade" data-if="showHelp">
+    <div class="modal"><div class="modal-gem"></div><h2>Explore os seus talentos</h2><p><b>1.</b> Escolha uma categoria e clique em um talento. O caminho até ele fica destacado.</p><p><b>2.</b> Use <b>Desbloquear / Evoluir</b> para investir. Se faltar uma conexão, clique em <b>Ver próximo pré-requisito</b> e siga os talentos anteriores, começando no topo.</p><p><b>3.</b> Veja sua build em <b>Build Info</b>. Você começa com <b>9.999 pontos</b>; <b>Repor</b> renova o saldo e <b>Resetar</b> limpa só a categoria atual.</p><p><b>Somente teste visual.</b> Bônus são fictícios: esta tela não envia pacotes, não lança spells nem altera seu personagem.</p><button class="action reset" data-event-click="Help()">Entendi, vamos explorar</button></div>
+  </div>
+  <div class="modal-shade" data-if="showBuild">
+    <div id="build-dialog" class="modal build-modal"><div class="modal-gem"></div><h2>Build Info</h2><p class="build-subtitle">Sua distribuição de talentos · simulação local</p>
+      <div class="build-metrics"><div><b>{{buildCount}}</b><span>talentos aprendidos</span></div><div><b>{{spent}}</b><span>pontos investidos</span></div><div><b>{{points}}</b><span>pontos disponíveis</span></div></div>
+      <div class="build-scroll">
+        <h3>Resumo por categoria</h3>
+        <div class="build-tree" data-for="tree : buildTrees"><div><b>{{tree.name}}</b><span>{{tree.count}} talentos · {{tree.spent}} pontos</span></div><p>{{tree.effects}}</p></div>
+        <h3>Skills da sua build</h3>
+        <div id="build-skill-list"><div class="build-skill" data-for="skill : buildSkills"><span class="req-icon" data-style-decorator="skill.icon"></span><div><b>{{skill.name}}</b><span>{{skill.category}}</span></div><b>{{skill.rank}}/{{skill.max}}</b></div></div>
+        <p class="muted" data-if="buildCount == 0">Nenhum talento investido. Comece pelos talentos do topo.</p>
+      </div>
+      <p class="build-disclaimer">Os bônus acima são somas ilustrativas, sem efeito no jogo. Não são uma previsão de dano real.</p><button id="close-build" class="action reset" data-event-click="Build()">Voltar à árvore</button>
+    </div>
+  </div>
+  <div class="modal-shade" data-if="showReset">
+    <div class="modal reset-modal"><div class="modal-gem"></div><h2>Recomeçar este caminho?</h2><p>Os <b>{{categorySpent}} pontos</b> investidos em <b>{{categoryName}}</b> serão devolvidos. As outras categorias permanecem como estão.</p><p class="muted">Nada será alterado no servidor ou no personagem real.</p><div class="modal-actions"><button id="confirm-reset" class="action reset" data-event-click="ConfirmReset()">Sim, devolver pontos</button><button class="action leave" data-event-click="CancelReset()">Continuar explorando</button></div></div>
+  </div>
+</div>
+</body>
+</rml>

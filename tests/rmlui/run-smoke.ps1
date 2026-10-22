@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)][string]$Binary,
-    [string]$TempRoot = [IO.Path]::GetTempPath()
+    [string]$TempRoot = [IO.Path]::GetTempPath(),
+    [ValidateSet('core', 'skilltree')][string]$Scenario = 'core'
 )
 $ErrorActionPreference = 'Stop'
 $binaryPath = (Resolve-Path -LiteralPath $Binary).Path
@@ -15,6 +16,14 @@ Copy-Item -LiteralPath (Join-Path $repo 'data\fonts\rml') -Destination (Join-Pat
 Copy-Item -LiteralPath (Join-Path $repo 'data\styles\rml') -Destination (Join-Path $fixture 'data\styles') -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bootstrap.lua') -Destination (Join-Path $fixture 'init.lua')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'test.lua'), (Join-Path $PSScriptRoot 'smoke.rml') -Destination $fixture
+if ($Scenario -eq 'skilltree') {
+    Copy-Item -LiteralPath (Join-Path $repo 'modules\game_rmlskilltree') -Destination (Join-Path $fixture 'modules') -Recurse
+    foreach ($folder in @('spells', 'tutorial')) { New-Item -ItemType Directory -Path (Join-Path $fixture "data\images\game\$folder") -Force | Out-Null }
+    Copy-Item -LiteralPath (Join-Path $repo 'data\images\game\spells\spell-icons-32x32.png') -Destination (Join-Path $fixture 'data\images\game\spells')
+    Copy-Item -LiteralPath (Join-Path $repo 'data\images\game\tutorial\backdrop_knight.png') -Destination (Join-Path $fixture 'data\images\game\tutorial')
+    Copy-Item -LiteralPath (Join-Path $repo 'modules\gamelib\spells.lua') -Destination (Join-Path $fixture 'spell-catalog.lua')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'skilltree.lua') -Destination (Join-Path $fixture 'test.lua')
+}
 $stdout = Join-Path $fixture 'stdout.log'
 $stderr = Join-Path $fixture 'stderr.log'
 $process = Start-Process -FilePath $binaryPath -ArgumentList '--test' -WorkingDirectory $fixture -WindowStyle Hidden `
@@ -32,4 +41,5 @@ if ($process.ExitCode -ne 0 -or $log -notmatch '\[RMLUI TEST\] PASS:') {
     Get-Content -LiteralPath $stderr
     throw "RmlUi smoke failed (exit $($process.ExitCode)). Artifacts: $fixture"
 }
+if ($log -match 'ERROR:|FreeType error') { throw "RmlUi logged an error. Artifacts: $fixture" }
 "RmlUi smoke artifacts: $fixture"

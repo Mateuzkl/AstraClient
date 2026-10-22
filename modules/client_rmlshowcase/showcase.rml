@@ -32,6 +32,7 @@
               <button class="btn primary" data-event-click="OpenOptions()">Opções</button>
               <button class="btn primary" data-event-click="OpenOutfit()">Outfit</button>
               <button class="btn primary" data-event-click="OpenMinimap()">Minimapa</button>
+              <button class="btn primary" data-event-click="OpenSkillTree()">Árvore de Skills · demo</button>
               <button class="btn" data-event-click="OpenDemo()">Demo simples</button>
             </div>
           </div>

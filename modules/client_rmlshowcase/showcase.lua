@@ -297,6 +297,7 @@ local function open()
                 model.flag = '/images/flags/' .. flags[index] .. '.png'
             end,
             OpenMinimap = function() if modules.game_rmlminimap then modules.game_rmlminimap.toggle() end end,
+            OpenSkillTree = function() if modules.game_rmlskilltree then modules.game_rmlskilltree.toggle() end end,
             OpenOptions = function() if modules.client_rmloptions then modules.client_rmloptions.toggle() end end,
             OpenOutfit = function() if modules.game_rmloutfit then modules.game_rmloutfit.toggle() end end,
             OpenDemo = function() if modules.client_rmldemo then modules.client_rmldemo.toggle() end end,

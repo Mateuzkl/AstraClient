@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 binary=$(realpath "${1:?Pass the RmlUi-enabled native client}")
+scenario=${2:-core}
+case "$scenario" in core|skilltree) ;; *) printf 'Unknown RmlUi scenario: %s\n' "$scenario" >&2; exit 2;; esac
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 fixture=$(mktemp -d "${ASTRA_SMOKE_TEMP:-${TMPDIR:-/tmp}}/astra-rmlui-XXXXXXXX")
 mkdir -p "$fixture/modules" "$fixture/data/fonts" "$fixture/data/styles" "$fixture/profile"
@@ -13,6 +15,14 @@ cp -a "$repo/data/styles/rml" "$fixture/data/styles/"
 cp "$repo/tests/rmlui/bootstrap.lua" "$fixture/init.lua"
 cp "$repo/tests/rmlui/test.lua" "$fixture/test.lua"
 cp "$repo/tests/rmlui/smoke.rml" "$fixture/smoke.rml"
+if [[ "$scenario" == skilltree ]]; then
+  cp -a "$repo/modules/game_rmlskilltree" "$fixture/modules/"
+  mkdir -p "$fixture/data/images/game/spells" "$fixture/data/images/game/tutorial"
+  cp "$repo/data/images/game/spells/spell-icons-32x32.png" "$fixture/data/images/game/spells/"
+  cp "$repo/data/images/game/tutorial/backdrop_knight.png" "$fixture/data/images/game/tutorial/"
+  cp "$repo/modules/gamelib/spells.lua" "$fixture/spell-catalog.lua"
+  cp "$repo/tests/rmlui/skilltree.lua" "$fixture/test.lua"
+fi
 cd "$fixture"
 set +e
 xvfb-run -a env HOME="$fixture/profile" XDG_CONFIG_HOME="$fixture/profile" LIBGL_ALWAYS_SOFTWARE=1 ALSOFT_DRIVERS=null \
@@ -23,4 +33,7 @@ set -e
 cat stdout.log
 if (( status != 0 )); then cat stderr.log; printf 'Failed smoke artifacts: %s\n' "$fixture"; exit "$status"; fi
 grep -q '\[RMLUI TEST\] PASS:' stdout.log
+if grep -qE 'ERROR:|FreeType error' stdout.log stderr.log; then
+  printf 'RmlUi logged an error. Artifacts: %s\n' "$fixture"; exit 1
+fi
 printf 'RmlUi smoke artifacts: %s\n' "$fixture"

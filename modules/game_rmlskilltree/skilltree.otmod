@@ -1,0 +1,10 @@
+Module
+  name: game_rmlskilltree
+  description: Local-only RmlUi skill tree laboratory - no server/gameplay integration
+  author: AstraClient
+  sandboxed: true
+  autoload: true
+  dependencies: [ client_topmenu, gamelib ]
+  scripts: [ model, skilltree ]
+  @onLoad: init()
+  @onUnload: terminate()

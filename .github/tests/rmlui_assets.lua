@@ -1,6 +1,7 @@
 -- Validate literal file textures in the shipped examples against real client assets.
 local modules = {'client_rmldemo/rmldemo', 'client_rmlshowcase/showcase',
-    'client_rmloptions/rmloptions', 'game_rmloutfit/rmloutfit', 'game_rmlminimap/rmlminimap'}
+    'client_rmloptions/rmloptions', 'game_rmloutfit/rmloutfit', 'game_rmlminimap/rmlminimap',
+    'game_rmlskilltree/skilltree'}
 local references = 0
 for _, module in ipairs(modules) do
     for _, extension in ipairs({'lua', 'rcss', 'rml'}) do

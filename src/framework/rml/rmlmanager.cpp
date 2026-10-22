@@ -228,6 +228,7 @@ void RmlManager::terminate()
         widget->releaseContext();
 
     Rml::Shutdown();
+    m_loadedFonts.clear();
     // GraphicalApplication calls terminate on the graphics thread, before Lua/GL die.
     // Drain retained renderers now rather than leaving GL destructors to late Lua GC.
     g_graphicsDispatcher.poll();
@@ -272,10 +273,22 @@ bool RmlManager::loadFontFace(const std::string& path, const bool fallback)
         return false;
 
     std::scoped_lock lock(m_mutex);
-    if (!Rml::LoadFontFace(path, fallback)) {
+    return loadFontFaceOnce(path, fallback);
+}
+
+bool RmlManager::loadFontFaceOnce(const std::string& path, const bool fallback)
+{
+    // Resolve aliases such as /fonts/rml and /data/fonts/rml to the same key.
+    // Re-loading a variable font can invalidate FreeType's shared face data in
+    // RmlUi 6.3; successful loads must be idempotent for this RmlUi lifetime.
+    const auto resolved = g_resources.resolvePath(resourcePath(path));
+    if (m_loadedFonts.contains(resolved))
+        return true;
+    if (!Rml::LoadFontFace(resolved, fallback)) {
         g_logger.warning(stdext::format("[rmlui] font '%s' could not be loaded", path));
         return false;
     }
+    m_loadedFonts.insert(resolved);
     return true;
 }
 
@@ -296,10 +309,8 @@ void RmlManager::loadFonts()
             if (ext != ".ttf" && ext != ".otf")
                 continue;
             // the first face loaded becomes the fallback for missing glyphs
-            if (Rml::LoadFontFace(file, loaded == 0))
+            if (loadFontFaceOnce(file, loaded == 0))
                 ++loaded;
-            else
-                g_logger.warning(stdext::format("[rmlui] font '%s' could not be loaded", file));
         }
         if (loaded > 0)
             break;
