@@ -15,10 +15,11 @@
     <div class="heading"><div class="crown"><div class="gem"></div></div><h1>Árvore de Skills</h1><div class="heading-line"></div></div>
     <div class="point-bank" data-drag="none"><span>Pontos disponíveis:</span><b id="available-points">{{points}}</b><button id="refill" class="grant" data-event-click="Refill()" title="Repor o saldo para 9.999 pontos fictícios, sem apagar os talentos">Repor</button></div>
     <button id="help" class="header-button help" data-drag="none" data-event-click="Help()" title="Como usar esta demonstração">?</button>
+    <button id="resize-tree" class="header-button" data-drag="none" data-event-click="Resize()" title="Alternar tamanho compacto / amplo">+</button>
     <button class="header-button close" data-drag="none" data-event-click="Close()" title="Fechar">&#215;</button>
   </header>
 
-  <main class="skill-body">
+  <main id="skill-body" class="skill-body">
     <aside class="category-panel">
       <div class="section-eyebrow">CAMINHOS DE MAESTRIA</div>
       <nav class="categories">
@@ -36,10 +37,11 @@
       <button id="build-info" class="build-button" data-event-click="Build()"><b>Build Info</b><span>{{buildCount}} talentos</span></button>
     </aside>
 
-    <section class="tree-panel">
+    <section class="tree-panel" data-style-height="panelHeight">
       <div class="tree-topline"><span>{{categoryName}}</span><span>{{categorySpent}} pontos investidos nesta árvore</span></div>
       <div id="tree-viewport" class="tree-viewport">
         <div class="tree-watermark"><div class="sigil-outer"></div><div class="sigil-inner"></div><div class="sigil-blade"></div></div>
+        <div class="tree-space" data-style-width="treeWidth" data-style-height="treeHeight">
         <div id="tree-canvas" class="tree-canvas" data-style-transform="treeTransform" data-style-left="treeLeft" data-style-top="treeTop">
           <div class="connection" data-for="line : links" data-class-active="line.active" data-class-on-path="line.onPath" data-class-green="line.color == 'green'" data-class-blue="line.color == 'blue'" data-class-gold="line.color == 'gold'" data-style-left="line.left" data-style-top="line.top" data-style-width="line.width" data-style-height="line.height"></div>
           <button class="skill-node" data-for="n : nodes" data-attr-id="'skill-' + n.id" data-style-left="n.left" data-style-top="n.top" data-class-selected="n.selected" data-class-owned="n.owned" data-class-on-path="n.onPath" data-class-locked="n.locked" data-class-available="n.available" data-class-keystone="n.keystone" data-class-green="n.green" data-class-blue="n.blue" data-class-gold="n.gold" data-event-click="Select(n.id)" data-attr-title="n.name">
@@ -49,11 +51,12 @@
             <div class="rank">{{n.rank}}<span>/{{n.max}}</span></div>
           </button>
         </div>
+        </div>
       </div>
       <div class="tree-legend"><span><i class="legend-dot invested"></i><b>Aprendido</b></span><span><i class="legend-dot available"></i><b>Disponível</b></span><span><i class="legend-dot blocked"></i><b>Bloqueado</b></span><span class="legend-note">O caminho selecionado fica destacado</span></div>
     </section>
 
-    <aside class="detail-panel">
+    <aside class="detail-panel" data-style-height="panelHeight">
       <div class="detail-scroll">
         <div class="detail-portrait"><div class="portrait-diamond"></div><div class="portrait-rim"><div class="portrait-icon" data-style-decorator="selectedIcon"></div></div><div class="portrait-gem"></div></div>
         <h2 id="selected-title" class="skill-title">{{selectedName}}</h2>

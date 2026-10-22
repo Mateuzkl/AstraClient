@@ -9,6 +9,20 @@ end
 local s=D.new()
 assert(s.points == 9999 and s:spent(1) == 21 and s.selected == 11)
 assert(#D.categories == 5 and #s:nodes() == 22)
+local expected={'','1:1','1:1','2:1','2:1','3:3','3:1','4:2','5:2,7:3','7:2','8:3','8:2','10:3','10:1','11:2','12:2','9:1,11:3,13:2','13:2','14:2','15:3,16:2','17:1,20:1,22:1','18:2,19:3'}
+for category=1,5 do
+  for id=1,22 do
+    local n=s:node(id,category)
+    local req={}
+    for _,r in ipairs(n.requires) do req[#req+1]=r[1] .. ':' .. r[2] end
+    assert(table.concat(req,',') == expected[id], 'compact layout changed prerequisite identity')
+    assert(n.x-30 >= 0 and n.x+30 <= D.width and n.y-33 >= 0 and n.y+36 <= D.height)
+    for other=id+1,22 do
+      local b=s:node(other,category)
+      assert(math.abs(n.x-b.x) >= 64 or math.abs(n.y-b.y) >= 68, 'overlapping nodes/rank badges')
+    end
+  end
+end
 local build=s:build()
 assert(build.count == 10 and build.spent == 21 and #build.skills == 10 and #build.trees == 5)
 assert(build.trees[1].power == 88 and build.trees[1].bonus == 43)

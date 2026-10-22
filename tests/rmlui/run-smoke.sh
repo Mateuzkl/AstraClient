@@ -25,7 +25,7 @@ if [[ "$scenario" == skilltree ]]; then
 fi
 cd "$fixture"
 set +e
-xvfb-run -a env HOME="$fixture/profile" XDG_CONFIG_HOME="$fixture/profile" LIBGL_ALWAYS_SOFTWARE=1 ALSOFT_DRIVERS=null \
+xvfb-run -a -s "${ASTRA_SMOKE_SCREEN:--screen 0 1920x1080x24}" env HOME="$fixture/profile" XDG_CONFIG_HOME="$fixture/profile" LIBGL_ALWAYS_SOFTWARE=1 ALSOFT_DRIVERS=null \
   UBSAN_OPTIONS="${UBSAN_OPTIONS:-halt_on_error=1:print_stacktrace=1}" ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1}" \
   timeout --kill-after=10s 60s "$binary" --test >stdout.log 2>stderr.log
 status=$?

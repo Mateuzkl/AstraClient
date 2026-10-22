@@ -36,12 +36,13 @@ local function links(nodes,path)
       local parent=nodes[req[1]]
       local ready=parent.rank >= req[2]
       local active=ready and child.rank > 0
-      local color=ready and child.branch or 'dim'
       local onPath=path[child.id] == true and path[parent.id] == true
+      local color=(active or onPath) and child.branch or 'dim'
+      local radius=SkillTreeDemo.nodeSize/2
       if parent.y == child.y then
-        segment(math.min(parent.x,child.x)+36,parent.y,math.abs(parent.x-child.x)-72,2,color,active,onPath)
+        segment(math.min(parent.x,child.x)+radius,parent.y,math.abs(parent.x-child.x)-2*radius,2,color,active,onPath)
       else
-        local x1,y1,x2,y2=parent.x,parent.y+32,child.x,child.y-32
+        local x1,y1,x2,y2=parent.x,parent.y+radius+7,child.x,child.y-radius-3
         -- Wrap long cross-branch prerequisites at a common tier, behind the nodes.
         local bend=math.floor((y1+y2)/2)
         segment(x1,math.min(y1,bend),2,math.abs(bend-y1),color,active,onPath)
@@ -62,7 +63,7 @@ local function refresh(message)
   local view={}
   for _, node in ipairs(nodes) do
     local allowed=state:canUpgrade(node.id)
-    view[#view+1]={id=node.id,name=text(node.name),left=(node.x-36) .. 'dp',top=(node.y-36) .. 'dp',
+    view[#view+1]={id=node.id,name=text(node.name),left=(node.x-SkillTreeDemo.nodeSize/2) .. 'dp',top=(node.y-SkillTreeDemo.nodeSize/2) .. 'dp',
       rank=node.rank,max=node.max,icon=icon(node.icon),selected=node.id == state.selected,
       owned=node.rank > 0,locked=node.rank == 0 and not allowed,available=allowed,
       onPath=path[node.id] == true,
@@ -113,15 +114,39 @@ end
 
 local function fit(window)
   if not M.model or window:isDestroyed() then return end
+  local body=Rml.element(window,'skill-body')
+  if body then
+    local height=window:getWidth() <= 800 and math.max(180,math.floor(body.client_height)-95) .. 'dp' or '100%'
+    if M.model.panelHeight ~= height then M.model.panelHeight=height end
+  end
   local viewport=Rml.element(window,'tree-viewport')
   if not viewport then return end
   local w,h=math.floor(viewport.client_width),math.floor(viewport.client_height)
   if w <= 0 or h <= 0 or (M.fitWidth == w and M.fitHeight == h) then return end
   M.fitWidth,M.fitHeight=w,h
-  local scale=math.min(w/SkillTreeDemo.width,h/SkillTreeDemo.height)
+  -- Keep nodes readable: narrow viewports scroll instead of shrinking icons away.
+  local scale=math.max(0.9,math.min(1,w/SkillTreeDemo.width,h/SkillTreeDemo.height))
   M.model.treeTransform=string.format('scale(%.4f)',scale)
   M.model.treeLeft=math.max(0,(w-SkillTreeDemo.width*scale)/2) .. 'dp'
   M.model.treeTop=math.max(0,(h-SkillTreeDemo.height*scale)/2) .. 'dp'
+  M.model.treeWidth=math.max(w,math.ceil(SkillTreeDemo.width*scale)) .. 'dp'
+  M.model.treeHeight=math.max(h,math.ceil(SkillTreeDemo.height*scale)) .. 'dp'
+end
+
+local function availableSize()
+  local root,screen=rootWidget:getSize(),g_window.getSize()
+  return math.max(1,math.min(root.width,screen.width)-24),math.max(1,math.min(root.height,screen.height)-24)
+end
+local function resizeToRoot()
+  if not M.window or M.window:isDestroyed() then return end
+  local w,h=availableSize()
+  M.window:setSize({width=math.min(M.compact and 960 or 1100,w),height=math.min(M.compact and 640 or 720,h)})
+end
+local function toggleSize()
+  if not M.window or M.window:isDestroyed() then return end
+  M.compact=not M.compact
+  local w,h=availableSize()
+  M.window:setSize({width=math.min(M.compact and 960 or 1100,w),height=math.min(M.compact and 640 or 720,h)})
 end
 
 local function open()
@@ -129,9 +154,8 @@ local function open()
   M.state=M.state or SkillTreeDemo.new()
   local categories={}
   for _, category in ipairs(SkillTreeDemo.categories) do categories[#categories+1]={id=category.id,name=text(category.name),icon=icon(category.icon)} end
-  local size=rootWidget:getSize()
-  if size.width < 1 or size.height < 1 then size=g_window.getSize() end
-  local width,height=math.min(1390,math.max(760,size.width-36)),math.min(940,math.max(540,size.height-36))
+  local availableWidth,availableHeight=availableSize()
+  local width,height=math.min(1100,availableWidth),math.min(720,availableHeight)
   local window,model=Rml.createWindow{
     id='rmlSkillTreeDemo',document='/modules/game_rmlskilltree/skilltree.rml',model='skilltree',width=width,height=height,
     data={categories=categories,nodes={},links={},category=1,categoryName='',role='',summary='',points=0,budget=0,capacity=0,buildCount=0,
@@ -139,7 +163,8 @@ local function open()
       minLevel=20,cost=1,currentEffect='',nextEffect='',requirements={},hasRequirements=false,canUpgrade=false,maxed=false,
       levelMet=true,pointsMet=true,reason='',upgradeLabel='Desbloquear',showHelp=false,showReset=false,
       showBuild=false,buildTrees={},buildSkills={},hasMissing=false,nextRequired='',
-      treeTransform='scale(1)',treeLeft='0dp',treeTop='0dp',status=text('Demonstração local. Nenhuma habilidade real será alterada.'),
+      treeTransform='scale(1)',treeLeft='0dp',treeTop='0dp',treeWidth='550dp',treeHeight='506dp',panelHeight='100%',status=text('Demonstração local. Nenhuma habilidade real será alterada.'),
+      Resize=toggleSize,
       Select=function(_,id)
         if M.state:select(tonumber(id)) then
           local _,reason=M.state:canUpgrade()
@@ -167,7 +192,10 @@ local function open()
   }
   if not window then return nil end
   M.window,M.model=window,model
+  M.compact=false
+  connect(rootWidget,{onGeometryChange=resizeToRoot})
   connect(window,{onDestroy=function()
+    disconnect(rootWidget,{onGeometryChange=resizeToRoot})
     if M.window == window then M.window=nil;M.model=nil;M.fitWidth=nil;M.fitHeight=nil end
   end,onRmlLayout=fit})
   refresh()

@@ -1,6 +1,6 @@
 -- Real native RmlUi rendering and DOM events; never load a server or user mods.
 assert(Rml.isAvailable())
-g_window.resize({width=1480,height=1000})
+g_window.resize({width=1920,height=1080})
 local window,activeBefore
 local function element(id) return assert(Rml.element(window,id),id) end
 local function click(id) element(id):DispatchEvent('click',{}) end
@@ -21,8 +21,33 @@ local function screenshot(name,done)
         done()
     end,50)
 end
+local function bounds()
+    local size=window:getSize()
+    local root=rootWidget:getSize()
+    assert(size.width <= root.width-20 and size.height <= root.height-20, 'window exceeds usable client area')
+    for _,id in ipairs({'upgrade','reset','close-tree','refill','help','build-info','resize-tree'}) do
+        local rect=assert(Rml.elementRect(window,id),id)
+        local clip=Rml.clipRect(window,id)
+        assert(rect.x >= clip.x-1 and rect.y >= clip.y-1 and rect.x+rect.width <= clip.x+clip.width+1 and rect.y+rect.height <= clip.y+clip.height+1, 'essential action clipped: ' .. id)
+    end
+    assert(#element('tree-canvas'):QuerySelectorAll('.skill-node:not([data-for])') == 22)
+end
+local function resolutions(done,index)
+    local sizes={{1366,768},{1280,720},{1024,768},{800,600}}
+    local target=sizes[index]
+    if not target then done();return end
+    g_window.resize({width=target[1],height=target[2]})
+    scheduleEvent(function()
+        local actual=rootWidget:getSize()
+        print(string.format('[SKILLTREE VIEWPORT] requested=%dx%d actual=%dx%d window=%dx%d',target[1],target[2],actual.width,actual.height,window:getWidth(),window:getHeight()))
+        bounds()
+        screenshot('compact-' .. target[1],function() resolutions(done,index+1) end)
+    end,500)
+end
 local steps={
     function(next)
+        bounds()
+        print(string.format('[SKILLTREE VIEWPORT] requested=1920x1080 actual=%dx%d window=%dx%d',rootWidget:getWidth(),rootWidget:getHeight(),window:getWidth(),window:getHeight()))
         assert(points() == 9999 and element('selected-title').inner_rml == 'Golpe Brutal')
         assert(element('skill-11'):IsClassSet('on-path') and element('skill-1'):IsClassSet('on-path'))
         assert(not element('skill-3'):IsClassSet('on-path'))
@@ -63,6 +88,7 @@ local steps={
         click('build-info');next()
     end,
     function(next)
+        assert(element('build-dialog'):QuerySelector('.build-scroll').client_height > 100,'build summary collapsed')
         screenshot('build',function()
             local count=#element('build-skill-list'):QuerySelectorAll('.build-skill:not([data-for])')
             assert(count == 11,'build omitted allocated talents: ' .. count)
@@ -77,7 +103,17 @@ local steps={
     function(next) assert(points() == 9999);click('category-3');next() end,
     function(next) assert(element('skill-22'));click('category-4');next() end,
     function(next) assert(element('skill-22'));click('category-5');next() end,
-    function(next) assert(element('skill-22'));click('close-tree');next() end,
+    function(next) assert(element('skill-22'));click('resize-tree');next() end,
+    function(next) bounds();click('help');next() end,
+    function(next) click('help');click('resize-tree');next() end,
+    function(next) bounds();resolutions(next,1) end,
+    function(next) click('build-info');next() end,
+    function(next)
+        assert(element('build-dialog'):QuerySelector('.build-scroll').client_height > 100,'small viewport collapsed the build summary')
+        local r,c=Rml.elementRect(window,'close-build'),Rml.clipRect(window,'close-build')
+        assert(r.y+r.height <= c.y+c.height+1,'build close action clipped')
+        click('close-build');click('close-tree');next()
+    end,
     function(next)
         assert(window:isDestroyed() and g_rml.getContextCount() == 0,'closing retained the RmlUi context')
         toggle();window=assert(rootWidget:getChildById('rmlSkillTreeDemo'));next()
