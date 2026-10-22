@@ -1,0 +1,59 @@
+.outfit-body { display: flex; }
+.preview-col {
+  flex: 0 0 230dp;
+  padding: 12dp;
+  background-color: #0d1520;
+  border-right: 1dp #273644;
+  text-align: center;
+}
+.stage {
+  height: 210dp;
+  border-radius: 8dp;
+  background-color: #070c14;
+  border: 1dp #273644;
+}
+.preview { width: 192dp; height: 192dp; margin-top: 9dp; }
+.rotate { display: flex; align-items: center; justify-content: space-between; margin: 8dp 0; }
+.preview-col .toggle { text-align: left; }
+
+.parts { display: flex; gap: 6dp; margin-bottom: 8dp; }
+.part {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6dp;
+  padding: 5dp 8dp;
+  border-radius: 4dp;
+  background-color: #111a26;
+  border: 1dp #273644;
+}
+.part:hover { border-color: #8ca3b5; }
+.part.selected { border-color: #d6a951; background-color: #46371e; color: #f6dfaa; }
+.swatch { width: 14dp; height: 14dp; border-radius: 3dp; border: 1dp #000000; }
+
+.palette { width: 380dp; }
+.color {
+  display: inline-block;
+  width: 18dp;
+  height: 18dp;
+  margin: 0 2dp 2dp 0;
+  border: 1dp #00000088;
+}
+.color:hover { border-color: #ffffff; }
+.color.selected { border: 2dp #ffffff; }
+
+.looks { margin-top: 4dp; }
+.look {
+  display: inline-block;
+  width: 68dp;
+  height: 68dp;
+  margin: 0 4dp 4dp 0;
+  border-radius: 4dp;
+  background-color: #070c14;
+  border: 1dp #273644;
+}
+.look img { width: 64dp; height: 64dp; margin: 2dp; }
+.look:hover { border-color: #8ca3b5; }
+.look.selected { border-color: #54cbbd; }
+.ids { display: flex; gap: 6dp; margin-top: 6dp; }
+.ids input.text { flex: 1; }

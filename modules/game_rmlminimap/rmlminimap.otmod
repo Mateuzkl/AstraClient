@@ -1,0 +1,10 @@
+Module
+  name: game_rmlminimap
+  description: Minimap window in RmlUi hosting the native UIMinimap
+  author: otclient-rmlui
+  website: none
+  sandboxed: true
+  scripts: [ rmlminimap ]
+  autoload: true
+  @onLoad: init()
+  @onUnload: terminate()

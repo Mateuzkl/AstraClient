@@ -1,0 +1,11 @@
+Module
+  name: client_rmldemo
+  description: RmlUi (HTML/CSS) demo window - Ctrl+Shift+R
+  author: otclient-rmlui
+  website: none
+  sandboxed: true
+  scripts: [ rmldemo ]
+  autoload: true
+  dependencies: [ client_topmenu ]
+  @onLoad: init()
+  @onUnload: terminate()

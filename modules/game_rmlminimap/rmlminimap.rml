@@ -1,0 +1,42 @@
+<rml>
+<head>
+  <title>Minimapa</title>
+  <link type="text/rcss" href="/styles/rml/otc.rcss"/>
+  <link type="text/rcss" href="rmlminimap.rcss"/>
+</head>
+<body>
+<div class="otc-window" data-model="minimap">
+  <header class="otc-header" data-drag="window">
+    <span class="otc-title">Minimapa</span>
+    <span class="otc-subtitle">UIMinimap nativo dentro do RML</span>
+    <button class="otc-close" data-drag="none" data-event-click="Close()">&#215;</button>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn" data-event-click="Zoom(1)">Zoom +</button>
+    <button class="btn" data-event-click="Zoom(-1)">Zoom -</button>
+    <button class="btn" data-event-click="Floor(-1)">Andar acima</button>
+    <button class="btn" data-event-click="Floor(1)">Andar abaixo</button>
+    <button class="btn" data-event-click="Center()">Centralizar</button>
+    <span class="spacer"></span>
+    <button class="btn primary" data-event-click="Load()">Carregar minimapa</button>
+  </div>
+
+  <div class="map-area">
+    <div id="minimap-slot" class="minimap-slot"></div>
+    <div class="map-empty" data-if="!loaded">{{hint}}</div>
+  </div>
+
+  <footer class="otc-footer">
+    <div class="coords">
+      <span>x</span><input type="text" class="text coord" data-value="goX"/>
+      <span>y</span><input type="text" class="text coord" data-value="goY"/>
+      <span>z</span><input type="text" class="text coord small" data-value="goZ"/>
+    </div>
+    <button class="btn" data-event-click="Go()">Ir</button>
+    <span class="spacer"></span>
+    <span class="muted">{{position}}  zoom {{zoom}}</span>
+  </footer>
+</div>
+</body>
+</rml>

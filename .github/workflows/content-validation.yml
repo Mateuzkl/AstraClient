@@ -5,6 +5,10 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/rmlui_helpers.lua'
+      - '.github/tests/rmlui_assets.lua'
+      - '.github/tests/style_font_routing.lua'
+      - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
@@ -48,6 +52,10 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/rmlui_helpers.lua'
+      - '.github/tests/rmlui_assets.lua'
+      - '.github/tests/style_font_routing.lua'
+      - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
@@ -126,6 +134,15 @@ jobs:
             test -d "$root" || { echo "::error::missing package root: $root"; exit 1; }
             test ! -d "$root/$root" || { echo "::error::nested duplicate package root: $root/$root"; exit 1; }
           done
+
+      - name: Test RmlUi helper lifetimes
+        run: luajit .github/tests/rmlui_helpers.lua modules/corelib/rml.lua
+
+      - name: Test RmlUi example assets
+        run: luajit .github/tests/rmlui_assets.lua
+
+      - name: Test bitmap and RmlUi font routing
+        run: luajit .github/tests/style_font_routing.lua modules/client_styles/styles.lua
 
       - name: Test GameBot auto recording
         run: |

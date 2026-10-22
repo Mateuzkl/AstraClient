@@ -4427,6 +4427,7 @@
     "modules/corelib/networkmessage.lua",
     "modules/corelib/options.lua",
     "modules/corelib/orderedtable.lua",
+    "modules/corelib/rml.lua",
     "modules/corelib/outputmessage.lua",
     "modules/corelib/security.lua",
     "modules/corelib/settings.lua",

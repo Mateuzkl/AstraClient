@@ -1,0 +1,59 @@
+<rml>
+<head>
+  <title>Opções</title>
+  <link type="text/rcss" href="/styles/rml/otc.rcss"/>
+  <link type="text/rcss" href="rmloptions.rcss"/>
+</head>
+<body>
+<div class="otc-window" data-model="options">
+  <header class="otc-header" data-drag="window">
+    <span class="otc-title">Opções</span>
+    <span class="otc-subtitle">versão RmlUi de client_options</span>
+    <button class="otc-close" data-drag="none" data-event-click="Close()">&#215;</button>
+  </header>
+
+  <div class="otc-body">
+    <nav class="otc-tabs">
+      <div class="otc-tab" data-for="s : sections" data-class-selected="tab == s.id" data-event-click="tab = s.id">{{s.label}}</div>
+    </nav>
+
+    <main class="otc-content">
+      <section data-for="s : sections" data-if="tab == s.id">
+        <h2>{{s.label}}</h2>
+        <p class="muted">{{s.hint}}</p>
+        <div class="option" data-for="opt : s.options" data-class-off="opt.kind == 'bool' ? !opt.value : false">
+
+          <label class="toggle" data-if="opt.kind == 'bool'">
+            <input type="checkbox" class="checkbox" data-checked="opt.value"/>
+            <span class="label">{{opt.label}}</span>
+          </label>
+
+          <div data-if="opt.kind == 'range'">
+            <div class="field">
+              <span class="label">{{opt.label}}</span>
+              <span class="value">{{opt.value}}{{opt.suffix}}</span>
+            </div>
+            <input type="range" class="range" data-attr-min="opt.min" data-attr-max="opt.max" data-attr-step="opt.step" data-value="opt.value"/>
+          </div>
+
+          <div class="field" data-if="opt.kind == 'select'">
+            <span class="label">{{opt.label}}</span>
+            <select data-value="opt.value">
+              <option data-for="c : opt.choices" data-attr-value="c.value">{{c.label}}</option>
+            </select>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer class="otc-footer">
+    <span class="muted">{{status}}</span>
+    <span class="spacer"></span>
+    <button class="btn" data-event-click="OpenClassic()">Abrir opções OTUI</button>
+    <button class="btn primary" data-event-click="Close()">Fechar</button>
+  </footer>
+</div>
+</body>
+</rml>

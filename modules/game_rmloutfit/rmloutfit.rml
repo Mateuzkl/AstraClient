@@ -1,0 +1,62 @@
+<rml>
+<head>
+  <title>Outfit</title>
+  <link type="text/rcss" href="/styles/rml/otc.rcss"/>
+  <link type="text/rcss" href="rmloutfit.rcss"/>
+</head>
+<body>
+<div class="otc-window" data-model="outfit">
+  <header class="otc-header" data-drag="window">
+    <span class="otc-title">Personalizar outfit</span>
+    <button class="otc-close" data-drag="none" data-event-click="Close()">&#215;</button>
+  </header>
+
+  <div class="otc-body outfit-body">
+    <aside class="preview-col">
+      <div class="stage">
+        <img class="preview" data-attr-src="preview"/>
+      </div>
+      <div class="rotate">
+        <button class="btn" data-event-click="Turn(-1)">&lt;</button>
+        <span class="muted">{{directionName}}</span>
+        <button class="btn" data-event-click="Turn(1)">&gt;</button>
+      </div>
+      <label class="toggle"><input type="checkbox" class="checkbox" data-checked="addon1"/><span>Addon 1</span></label>
+      <label class="toggle"><input type="checkbox" class="checkbox" data-checked="addon2"/><span>Addon 2</span></label>
+      <p class="muted">looktype {{lookType}}</p>
+    </aside>
+
+    <main class="otc-content">
+      <h2>Cores</h2>
+      <div class="parts">
+        <div class="part" data-for="p : parts" data-class-selected="part == p.id" data-event-click="part = p.id">
+          <span class="swatch" data-style-background-color="p.hex"></span>{{p.label}}
+        </div>
+      </div>
+      <div class="palette">
+        <div class="color" data-for="c : palette" data-style-background-color="c.hex"
+             data-class-selected="c.id == selectedColor" data-event-click="Pick(c.id)"></div>
+      </div>
+
+      <h2>Looktypes</h2>
+      <div class="looks">
+        <div class="look" data-for="l : looks" data-class-selected="l.id == lookType" data-event-click="SetLook(l.id)">
+          <img data-attr-src="l.src"/>
+        </div>
+      </div>
+      <div class="ids">
+        <input type="text" class="text" data-value="looksText"/>
+        <button class="btn" data-event-click="ApplyLooks()">Usar lista</button>
+      </div>
+    </main>
+  </div>
+
+  <footer class="otc-footer">
+    <span class="muted">{{status}}</span>
+    <span class="spacer"></span>
+    <button class="btn" data-event-click="Randomize()">Aleatório</button>
+    <button class="btn primary" data-event-click="Apply()">Aplicar</button>
+  </footer>
+</div>
+</body>
+</rml>

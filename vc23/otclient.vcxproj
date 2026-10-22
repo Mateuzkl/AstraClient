@@ -847,6 +847,7 @@
       <AdditionalDependencies>gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <Import Project="RmlUi.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="CopyNativeSplash" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\data\images\splash.png')">
     <MakeDir Directories="$(TargetDir)data\images" />

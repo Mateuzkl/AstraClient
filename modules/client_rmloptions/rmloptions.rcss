@@ -1,0 +1,5 @@
+.option { padding: 6dp 2dp; border-bottom: 1dp #18222e; }
+.option .toggle .label { margin-left: 4dp; }
+.option.off .label { color: #8394a3; }
+.option .field { border-bottom: 0; padding: 0 0 4dp 0; }
+.option select { width: 220dp; }

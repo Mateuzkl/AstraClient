@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, 'feat/**', 'fix/**']
-    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
   pull_request:
-    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
+    paths: ['src/**', 'cmake/**', 'tests/cpp23/**', 'tests/spectators/**', 'tests/rmlui/**', 'modules/*rml*/**', 'modules/corelib/rml.lua', 'data/fonts/rml/**', 'data/styles/rml/**', 'CMakeLists.txt', 'vcpkg.json', '.github/workflows/build-linux.yml']
 
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
       - name: Install native build prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config autoconf automake libtool libx11-dev libxext-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev
+          sudo apt-get install -y ninja-build pkg-config autoconf automake libtool libx11-dev libxext-dev libxrandr-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev libasound2-dev xvfb libgl1-mesa-dri
           mkdir -p vcpkg-cache build/diagnostics
           echo "commit=$(tr -d '\r\n' < cmake/ci/vcpkg-tool.sha)" >> "$GITHUB_ENV"
           ${{ matrix.cxx }} --version | tee build/diagnostics/compiler.txt
@@ -55,6 +55,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.type }} -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} -DCMAKE_CXX_FLAGS="${{ matrix.sanitizer }}" -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-linux -DFRAMEWORK_SOUND=ON -DASTRA_BUILD_SPECTATOR_TESTS=ON 2>&1 | tee build/diagnostics/configure.log
           cmake --build build --parallel 2 2>&1 | tee build/diagnostics/build.log
           UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 ASAN_OPTIONS=detect_leaks=1 ctest --test-dir build --output-on-failure
+          bash tests/rmlui/run-smoke.sh build/AstraClient
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:

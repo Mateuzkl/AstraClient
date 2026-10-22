@@ -1,0 +1,29 @@
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6dp;
+  align-items: center;
+  padding: 8dp 10dp;
+  background-color: #0d1520;
+  border-bottom: 1dp #273644;
+}
+.toolbar .spacer { flex: 1; }
+.map-area { flex: 1; position: relative; padding: 8dp; }
+.minimap-slot {
+  width: 100%;
+  height: 100%;
+  background-color: #000000;
+  border: 1dp #364450;
+  border-radius: 4dp;
+}
+.map-empty {
+  position: absolute;
+  left: 30dp;
+  right: 30dp;
+  top: 45%;
+  text-align: center;
+  color: #8394a3;
+}
+.coords { display: flex; align-items: center; gap: 4dp; }
+input.coord { display: inline-block; width: 58dp; }
+input.coord.small { width: 32dp; }

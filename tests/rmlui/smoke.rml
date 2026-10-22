@@ -1,0 +1,17 @@
+<rml>
+<head><title>Astra RmlUi regression</title>
+<link type="text/rcss" href="/styles/rml/otc.rcss"/>
+<style>
+body { display: block; font-family: Barlow; font-size: 18dp; background: #102030; color: #ffffff; width: 100%; height: 100%; }
+div { display: block; }
+#scroll { width: 100%; height: 80dp; overflow: auto; }
+#slot { width: 100%; height: 160dp; background: #203040; }
+input { width: 100dp; height: 24dp; background: #ffffff; color: #000000; }
+</style>
+</head>
+<body data-model="smoke">
+<div id="caption">{{title}}</div>
+<div id="scroll"><div id="slot" data-if="shown"></div></div>
+<input id="name" data-value="name"/>
+<div style="width: 120dp; height: 40dp; decorator: linear-gradient(90deg, #f00, #00f); filter: blur(1dp);"></div>
+</body></rml>

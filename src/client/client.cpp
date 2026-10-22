@@ -21,6 +21,10 @@
  */
 
 #include "client.h"
+#ifdef FW_RMLUI
+#include "rmlimages.h"
+#include <framework/rml/rmlmanager.h>
+#endif
 #include <framework/core/modulemanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/graphics/graphics.h>
@@ -48,6 +52,11 @@ void Client::init(std::vector<std::string>& args)
     g_shaders.init();
     g_things.init();
     g_healthBars.init();
+#ifdef FW_RMLUI
+    registerRmlImageProvider();
+    // Load the Lua plugin/fonts at startup, not inside the first window's input callback.
+    g_rml.init();
+#endif
 }
 
 void Client::terminate()

@@ -1,0 +1,20 @@
+// RmlUi widgets: a document (.rml + .rcss) rendered inside the OTUI tree.
+
+// A document embedded anywhere in the OTUI tree.
+RmlWidget < UIRmlWidget
+  focusable: true
+
+// A free window drawn entirely by its document; an element with data-drag="window"
+// becomes the drag handle. Escape calls self.onEscape when set.
+RmlWindow < UIRmlWidget
+  size: 400 300
+  focusable: true
+  anchors.centerIn: parent
+  @onKeyPress: |
+    function(self, keyCode, keyboardModifiers)
+      if keyCode == KeyEscape and keyboardModifiers == KeyboardNoModifier and self.onEscape then
+        signalcall(self.onEscape, self)
+        return true
+      end
+      return false
+    end

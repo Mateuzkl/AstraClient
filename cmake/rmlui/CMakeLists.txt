@@ -1,0 +1,10 @@
+# Dependency-only build used by the Visual Studio OpenGL and DirectX projects.
+cmake_minimum_required(VERSION 3.24)
+project(AstraRmlUiDependencies LANGUAGES C CXX)
+include(../AstraCxx23.cmake)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../src/framework/cmake")
+set(USE_STATIC_LIBS ON)
+find_package(LuaJIT REQUIRED)
+set(LUA_LIBRARY "${LUAJIT_LIBRARY}")
+set(LUA_INCLUDE_DIR "${LUAJIT_INCLUDE_DIR}")
+include(../FetchRmlUi.cmake)

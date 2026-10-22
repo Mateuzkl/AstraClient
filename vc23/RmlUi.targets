@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Native GL 3.3 and DirectX through ANGLE ES 3.0 share the RmlUi renderer. -->
+    <AstraRmlUiEnabled Condition="'$(AstraRmlUiEnabled)'=='' and ('$(Configuration)'=='OpenGL' or '$(Configuration)'=='DirectX')">true</AstraRmlUiEnabled>
+    <AstraRmlUiBuildDir Condition="'$(AstraRmlUiBuildDir)'==''">$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntDir)rmlui'))))</AstraRmlUiBuildDir>
+    <AstraRmlUiInstallDir>$(AstraRmlUiBuildDir)\install</AstraRmlUiInstallDir>
+    <AstraCMake Condition="'$(AstraCMake)'=='' and Exists('$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe')">$(VSInstallDir)Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe</AstraCMake>
+    <AstraCMake Condition="'$(AstraCMake)'==''">cmake</AstraCMake>
+    <AstraCMakeGenerator Condition="'$(AstraCMakeGenerator)'==''">Visual Studio 18 2026</AstraCMakeGenerator>
+    <AstraCMakeGenerator Condition="'$(VisualStudioVersion)'=='17.0'">Visual Studio 17 2022</AstraCMakeGenerator>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(AstraRmlUiEnabled)'=='true' and ('$(Configuration)'=='OpenGL' or '$(Configuration)'=='DirectX')">
+    <ClCompile>
+      <PreprocessorDefinitions>FW_RMLUI;RMLUI_STATIC_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AstraRmlUiInstallDir)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(AstraRmlUiInstallDir)\lib\rmlui.lib;$(AstraRmlUiInstallDir)\lib\rmlui_debugger.lib;$(AstraRmlUiInstallDir)\lib\rmlui_lua.lib;freetype.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(AstraRmlUiEnabled)'=='true' and ('$(Configuration)'=='OpenGL' or '$(Configuration)'=='DirectX')">
+    <ClCompile Include="..\src\framework\rml\rmlbindings.cpp;..\src\framework\rml\rmlmanager.cpp;..\src\framework\rml\rmlrenderer.cpp;..\src\framework\rml\uirmlwidget.cpp;..\src\framework\rml\RmlUi_Renderer_GL3.cpp;..\src\client\rmlimages.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ObjectFileName>$(IntDir)rmlui_obj\%(Filename).obj</ObjectFileName>
+    </ClCompile>
+  </ItemGroup>
+  <Target Name="AstraResolveRmlUiDependencies">
+    <!-- vcpkg derives its effective default internally, leaving the public input empty. -->
+    <PropertyGroup>
+      <AstraRmlUiVcpkgRoot>$(VcpkgRoot)</AstraRmlUiVcpkgRoot>
+      <AstraRmlUiVcpkgRoot Condition="'$(AstraRmlUiVcpkgRoot)'==''">$(_ZVcpkgRoot)</AstraRmlUiVcpkgRoot>
+      <AstraRmlUiVcpkgInstalledDir>$(VcpkgInstalledDir)</AstraRmlUiVcpkgInstalledDir>
+      <AstraRmlUiVcpkgInstalledDir Condition="'$(AstraRmlUiVcpkgInstalledDir)'==''">$(_ZVcpkgInstalledDir)</AstraRmlUiVcpkgInstalledDir>
+      <AstraRmlUiVcpkgInstalledDir>$([MSBuild]::EnsureTrailingSlash('$(AstraRmlUiVcpkgInstalledDir)'))</AstraRmlUiVcpkgInstalledDir>
+      <AstraRmlUiLuaIncludeDir>$(AstraRmlUiVcpkgInstalledDir)$(VcpkgTriplet)\include\luajit</AstraRmlUiLuaIncludeDir>
+      <AstraRmlUiLuaLibrary>$(AstraRmlUiVcpkgInstalledDir)$(VcpkgTriplet)\lib\lua51.lib</AstraRmlUiLuaLibrary>
+    </PropertyGroup>
+    <Error Condition="'$(AstraRmlUiVcpkgRoot)'=='' or '$(AstraRmlUiVcpkgInstalledDir)'==''" Text="RmlUi requires vcpkg integration. Enable it for this project or set VcpkgRoot and VcpkgInstalledDir." />
+    <ItemGroup>
+      <ClCompile>
+        <AdditionalIncludeDirectories>$(AstraRmlUiLuaIncludeDir);%(ClCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+  <Target Name="AstraBuildRmlUi" BeforeTargets="ClCompile" DependsOnTargets="VcpkgInstallManifestDependencies;AstraResolveRmlUiDependencies" Condition="'$(AstraRmlUiEnabled)'=='true' and ('$(Configuration)'=='OpenGL' or '$(Configuration)'=='DirectX') and '$(DesignTimeBuild)'!='true'">
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="&quot;$(AstraCMake)&quot; -S &quot;$(MSBuildThisFileDirectory)..\cmake\rmlui&quot; -B &quot;$(AstraRmlUiBuildDir)&quot; -G &quot;$(AstraCMakeGenerator)&quot; -A &quot;$(Platform)&quot; -T &quot;$(PlatformToolset)&quot; -DLUAJIT_INCLUDE_DIR=&quot;$(AstraRmlUiLuaIncludeDir)&quot; -DLUAJIT_LIBRARY=&quot;$(AstraRmlUiLuaLibrary)&quot; -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_TOOLCHAIN_FILE=&quot;$(AstraRmlUiVcpkgRoot)\scripts\buildsystems\vcpkg.cmake&quot; -DVCPKG_TARGET_TRIPLET=$(VcpkgTriplet) -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR=&quot;$(AstraRmlUiVcpkgInstalledDir).&quot; -DCMAKE_INSTALL_PREFIX=&quot;$(AstraRmlUiInstallDir)&quot;" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)" Command="&quot;$(AstraCMake)&quot; --build &quot;$(AstraRmlUiBuildDir)&quot; --config Release --target install --parallel 2" />
+  </Target>
+</Project>

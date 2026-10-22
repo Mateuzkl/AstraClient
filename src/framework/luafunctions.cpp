@@ -36,6 +36,9 @@
 #include <framework/platform/platform.h>
 #include <framework/util/stats.h>
 #include <regex>
+#ifdef FW_RMLUI
+void registerRmlLuaFunctions();
+#endif
 
 #ifdef FW_SOUND
 #include <framework/sound/soundmanager.h>
@@ -798,6 +801,9 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UILayout>("isUIGridLayout", &UILayout::isUIGridLayout);
 
     // UIBoxLayout
+#ifdef FW_RMLUI
+    registerRmlLuaFunctions();
+#endif
     g_lua.registerClass<UIBoxLayout, UILayout>();
     g_lua.bindClassMemberFunction<UIBoxLayout>("setSpacing", &UIBoxLayout::setSpacing);
     g_lua.bindClassMemberFunction<UIBoxLayout>("setFitChildren", &UIBoxLayout::setFitChildren);

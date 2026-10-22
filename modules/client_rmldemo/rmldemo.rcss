@@ -1,0 +1,144 @@
+body {
+  font-family: Barlow;
+  font-size: 15dp;
+  color: #c5d0dc;
+  width: 100%;
+  height: 100%;
+}
+
+.window {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background-color: #0a101aee;
+  border: 1dp #80633b;
+  border-radius: 8dp;
+  overflow: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  height: 34dp;
+  padding: 0 8dp 0 14dp;
+  background-color: #111a26;
+  border-bottom: 1dp #364450;
+  cursor: move;
+}
+
+.title {
+  flex: 1;
+  font-family: "Barlow Condensed";
+  font-weight: bold;
+  font-size: 18dp;
+  color: #f6dfaa;
+}
+
+.close {
+  width: 24dp;
+  height: 24dp;
+  line-height: 22dp;
+  text-align: center;
+  border-radius: 4dp;
+  background-color: #1b2836;
+  color: #f6dfaa;
+}
+.close:hover { background-color: #6b2a24; }
+
+.row {
+  display: flex;
+  gap: 10dp;
+  padding: 10dp 10dp 0 10dp;
+}
+
+.card {
+  flex: 1;
+  padding: 10dp;
+  background-color: #111a26;
+  border: 1dp #273644;
+  border-radius: 6dp;
+}
+
+h2 {
+  display: block;
+  font-family: "Barlow Condensed";
+  font-weight: bold;
+  font-size: 16dp;
+  color: #d6a951;
+  margin-bottom: 6dp;
+}
+
+p { display: block; margin: 4dp 0; }
+.muted { color: #8394a3; font-size: 13dp; }
+.empty { color: #8394a3; }
+
+.buttons { display: flex; gap: 6dp; margin: 6dp 0; }
+
+.btn {
+  padding: 5dp 12dp;
+  border-radius: 4dp;
+  background-color: #1b2836;
+  border: 1dp #536271;
+  color: #c5d0dc;
+}
+.btn:hover { background-color: #293b4d; border-color: #8ca3b5; }
+.btn:active { background-color: #342c1d; }
+.btn.primary { background-color: #46371e; border-color: #d6a951; color: #f6dfaa; }
+
+input.text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4dp 6dp;
+  background-color: #0b121c;
+  border: 1dp #364450;
+  border-radius: 4dp;
+  color: #f6dfaa;
+}
+input.text:focus { border-color: #54cbbd; }
+
+.items { display: flex; flex-wrap: wrap; gap: 4dp; }
+.slot {
+  width: 36dp;
+  height: 36dp;
+  border: 1dp #364450;
+  border-radius: 4dp;
+  background-color: #0b121c;
+}
+.slot img { width: 32dp; height: 32dp; margin: 2dp; }
+.slot:hover { border-color: #8ca3b5; }
+.slot.selected { border-color: #54cbbd; }
+.outfit { width: 68dp; height: 68dp; border: 1dp #364450; border-radius: 4dp; background-color: #0b121c; }
+.outfit img { width: 64dp; height: 64dp; margin: 2dp; }
+.ids { display: flex; gap: 4dp; margin-top: 6dp; }
+.ids input.text { flex: 1; width: auto; font-size: 13dp; }
+.ids input.look { flex: 0 0 52dp; }
+
+.glow {
+  display: block;
+  padding: 14dp;
+  text-align: center;
+  color: #fff0cd;
+  border-radius: 6dp;
+  background-color: #342c1d;
+}
+
+progress.bar {
+  display: block;
+  width: 100%;
+  height: 10dp;
+  margin-top: 8dp;
+  background-color: #0b121c;
+  border-radius: 5dp;
+}
+progress.bar fill { background-color: #54cbbd; border-radius: 5dp; }
+
+/* only with the full OpenGL 3.3 backend (same convention as Ninja World Online) */
+@media (theme: efeitos) {
+  .glow {
+    decorator: linear-gradient(120deg, #d63a2d, #d6a951);
+    box-shadow: #d6a95188 0 0 16dp 2dp;
+  }
+  .btn.primary { decorator: linear-gradient(180deg, #5a4527, #342c1d); }
+}

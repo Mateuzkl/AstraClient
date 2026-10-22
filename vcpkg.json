@@ -19,6 +19,11 @@
         "openal-soft",
         "glew",
         {
+            "name": "freetype",
+            "default-features": false,
+            "platform": "!wasm32 & !android"
+        },
+        {
             "name": "luajit",
             "platform": "!wasm32"
         },

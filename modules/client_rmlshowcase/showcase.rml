@@ -1,0 +1,286 @@
+<rml>
+<head>
+  <title>RmlUi showcase</title>
+  <link type="text/rcss" href="/styles/rml/otc.rcss"/>
+  <link type="text/rcss" href="showcase.rcss"/>
+</head>
+<body>
+<div class="otc-window" data-model="showcase">
+  <header class="otc-header" data-drag="window">
+    <span class="otc-title">RmlUi no OTClient</span>
+    <span class="otc-subtitle">{{backend}}</span>
+    <button class="otc-close" data-drag="none" data-event-click="Close()">&#215;</button>
+  </header>
+
+  <div class="otc-body">
+    <nav class="otc-tabs">
+      <div class="otc-tab" data-for="t : tabs" data-class-selected="tab == t.id" data-event-click="tab = t.id">{{t.label}}</div>
+    </nav>
+
+    <main class="otc-content">
+
+      <!-- Início -->
+      <section data-if="tab == 'home'">
+        <h2>Bem-vindo</h2>
+        <p>Esta janela inteira é um documento <b>.rml</b> (HTML) com <b>.rcss</b> (CSS), desenhado dentro do
+          OTClient por um <span class="tag">UIRmlWidget</span>. Arraste pela barra do título.</p>
+        <div class="row">
+          <div class="card col">
+            <h3>Outros exemplos</h3>
+            <p class="muted">Módulos completos feitos em RmlUi:</p>
+            <div class="buttons">
+              <button class="btn primary" data-event-click="OpenOptions()">Opções</button>
+              <button class="btn primary" data-event-click="OpenOutfit()">Outfit</button>
+              <button class="btn primary" data-event-click="OpenMinimap()">Minimapa</button>
+              <button class="btn" data-event-click="OpenDemo()">Demo simples</button>
+            </div>
+          </div>
+          <div class="card col">
+            <h3>Onde está o código</h3>
+            <p class="muted">modules/client_rmlshowcase/ (showcase.rml, .rcss, .lua)</p>
+            <p class="muted">modules/corelib/rml.lua (helpers documentados)</p>
+            <p class="muted">docs/RMLUI.md</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Como cada aba ensina algo</h3>
+          <p class="muted">Data binding, formulários, sprites do jogo, widgets OTUI (minimapa) dentro do RML,
+            efeitos de CSS, a tradução de OTUI para RmlUi e manipulação do DOM pelo Lua.</p>
+        </div>
+      </section>
+
+      <!-- Data binding -->
+      <section data-if="tab == 'binding'">
+        <h2>Data binding</h2>
+        <div class="row">
+          <div class="card col">
+            <h3>Contador</h3>
+            <p>Valor: <b>{{count}}</b> <span class="tag" data-if="count >= 10">10 ou mais!</span></p>
+            <div class="buttons">
+              <button class="btn" data-event-click="count = count - 1">-1</button>
+              <button class="btn primary" data-event-click="count = count + 1">+1</button>
+              <button class="btn" data-event-click="count = 0">zerar</button>
+            </div>
+            <div class="meter"><div class="meter-fill" data-style-width="meter + '%'"></div></div>
+          </div>
+          <div class="card col">
+            <h3>Texto nos dois sentidos</h3>
+            <input type="text" class="text" data-value="name" maxlength="20"/>
+            <p class="muted">Você digitou: <b>{{name == '' ? '(nada)' : name}}</b> ({{nameLength}} caracteres)</p>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Lista (data-for) com funções Lua</h3>
+          <div class="todo" data-for="item, i : todos" data-class-done="item.done">
+            <input type="checkbox" class="checkbox" data-checked="item.done"/>
+            <span class="todo-text">{{item.text}}</span>
+            <button class="btn small danger" data-event-click="Remove(i)">remover</button>
+          </div>
+          <div class="ids">
+            <input type="text" class="text" data-value="newTodo"/>
+            <button class="btn" data-event-click="AddTodo()">adicionar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Formulários -->
+      <section data-if="tab == 'forms'">
+        <h2>Formulários</h2>
+        <div class="row">
+          <div class="card col">
+            <h3>Checkbox e rádio</h3>
+            <label class="toggle"><input type="checkbox" class="checkbox" data-checked="sound"/><span>Som ligado</span></label>
+            <label class="toggle"><input type="checkbox" class="checkbox" data-checked="lights"/><span>Luzes</span></label>
+            <label class="toggle"><input type="radio" class="radio" name="mode" value="classic" data-checked="mode"/><span>Clássico</span></label>
+            <label class="toggle"><input type="radio" class="radio" name="mode" value="smart" data-checked="mode"/><span>Clique inteligente</span></label>
+            <p class="muted">som={{sound}} luzes={{lights}} modo={{mode}}</p>
+          </div>
+          <div class="card col">
+            <h3>Slider, select e progresso</h3>
+            <div class="field"><span class="label">Volume</span><span class="value">{{volume}}%</span></div>
+            <input type="range" class="range" min="0" max="100" step="1" data-value="volume"/>
+            <div class="field"><span class="label">Qualidade</span>
+              <select data-value="quality">
+                <option value="low">Baixa</option>
+                <option value="medium">Média</option>
+                <option value="high">Alta</option>
+              </select>
+            </div>
+            <progress data-attr-value="volume" max="100"/>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Área de texto</h3>
+          <textarea data-value="notes"></textarea>
+          <p class="muted">{{notesLength}} caracteres</p>
+        </div>
+      </section>
+
+      <!-- Sprites -->
+      <section data-if="tab == 'sprites'">
+        <h2>Sprites do jogo</h2>
+        <p class="muted" data-if="!thingsLoaded">{{assetsHint}}</p>
+        <button class="btn" data-if="!thingsLoaded" data-event-click="LoadAssets()">Carregar assets</button>
+        <div class="row">
+          <div class="card col">
+            <h3>Itens <span class="tag">item/&lt;id&gt;.png</span></h3>
+            <div>
+              <div class="slot" data-for="item : items"><img data-attr-src="item.src"/></div>
+            </div>
+            <h3>Ampliado sem borrar <span class="tag">@3x</span></h3>
+            <div class="big-items"><div class="big" data-for="item : bigItems"><img data-attr-src="item.src"/></div></div>
+          </div>
+          <div class="card col outfit-card">
+            <h3>Outfit girando <span class="tag">outfit/...-&lt;dir&gt;.png</span></h3>
+            <img class="outfit-big" data-attr-src="outfitSrc"/>
+            <p class="muted">direção {{direction}} (troca a cada 600 ms pelo Lua)</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- OTUI dentro do RML -->
+      <section data-if="tab == 'native'">
+        <h2>Widgets OTUI dentro do RML</h2>
+        <p class="muted">O RML só reserva o espaço; um widget OTUI nativo é posicionado em cima dele com
+          <span class="tag">Rml.host(janela, 'id', widget)</span>. Assim dá para usar o minimapa, o mapa ou
+          qualquer widget pronto do cliente numa tela RML.</p>
+        <div class="row">
+          <div class="card col">
+            <h3>Minimapa (UIMinimap)</h3>
+            <div id="minimap-slot" class="host-slot minimap-slot"></div>
+            <p class="muted" data-if="!online">O minimapa mostra o mapa quando você está no jogo.</p>
+          </div>
+          <div class="card col">
+            <h3>UIItem e UICreature</h3>
+            <div class="host-row">
+              <div id="item-slot" class="host-slot item-slot"></div>
+              <div id="creature-slot" class="host-slot creature-slot"></div>
+            </div>
+            <p class="muted">São os mesmos widgets dos .otui (animados, com tooltip e arrastar).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Imagens -->
+      <section data-if="tab == 'images'">
+        <h2>Imagens</h2>
+        <div class="card">
+          <h3>Carrossel</h3>
+          <div class="carousel" data-event-mouseover="paused = true" data-event-mouseout="paused = false">
+            <div class="carousel-track" data-style-transform="trackTransform">
+              <div class="slide" data-for="sl : slides">
+                <div class="slide-image" data-style-decorator="'image(' + sl.src + ' ' + sl.fit + ')'"></div>
+                <div class="slide-caption"><b>{{sl.title}}</b><span class="muted"> {{sl.text}}</span></div>
+              </div>
+            </div>
+            <button class="carousel-nav prev" data-event-click="Slide(-1)">&lt;</button>
+            <button class="carousel-nav next" data-event-click="Slide(1)">&gt;</button>
+          </div>
+          <div class="dots">
+            <div class="dot" data-for="sl, i : slides" data-class-selected="i == slide" data-event-click="GoSlide(i)"></div>
+          </div>
+          <p class="muted">Avança sozinho a cada 3 s pelo Lua (Rml.every) e pausa com o mouse em cima.</p>
+        </div>
+        <div class="row">
+          <div class="card col">
+            <h3>&lt;img&gt; de arquivos do cliente</h3>
+            <img class="logo" src="/images/clienticon.png"/>
+            <img class="icon" src="/images/topbuttons/hotkeys.png"/>
+            <img class="icon" src="/images/topbuttons/options.png"/>
+            <img class="icon" src="/images/topbuttons/audio.png"/>
+            <h3>Tint com image-color</h3>
+            <img class="icon tint-red" src="/images/topbuttons/healthinfo.png"/>
+            <img class="icon tint-green" src="/images/topbuttons/healthinfo.png"/>
+            <img class="icon tint-blue" src="/images/topbuttons/healthinfo.png"/>
+          </div>
+          <div class="card col">
+            <h3>Trocada pelo Lua (data-attr-src)</h3>
+            <img class="flag" data-attr-src="flag"/>
+            <div class="buttons"><button class="btn" data-event-click="NextFlag()">Próxima bandeira</button></div>
+            <h3>Sprite de um spritesheet</h3>
+            <img sprite="btn-idle"/> <img sprite="btn-pressed"/>
+          </div>
+        </div>
+        <div class="row">
+          <div class="card col">
+            <h3>decorator: image(...)</h3>
+            <div class="img-modes">
+              <div class="img-box bg-cover"><span>cover</span></div>
+              <div class="img-box bg-contain"><span>contain</span></div>
+              <div class="img-box bg-repeat"><span>repeat</span></div>
+            </div>
+          </div>
+          <div class="card col">
+            <h3>Nine-patch (borda fixa, miolo estica)</h3>
+            <div class="np np-small">curto</div>
+            <div class="np np-mid">médio</div>
+            <div class="np np-wide">bem mais largo</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Efeitos -->
+      <section data-if="tab == 'effects'">
+        <h2>Efeitos de CSS</h2>
+        <p class="muted" data-if="!effects">Backend sem efeitos avançados: os blocos abaixo aparecem simples.</p>
+        <div class="fx-grid">
+          <div class="fx fx-linear">linear-gradient</div>
+          <div class="fx fx-radial">radial-gradient</div>
+          <div class="fx fx-conic">conic-gradient</div>
+          <div class="fx fx-shadow">box-shadow</div>
+          <div class="fx fx-blur">filter: blur</div>
+          <div class="fx fx-drop">drop-shadow</div>
+          <div class="fx fx-gray">grayscale</div>
+          <div class="fx fx-rotate">transform</div>
+          <div class="fx fx-pulse">@keyframes</div>
+          <div class="fx fx-hover">passe o mouse</div>
+          <div class="fx fx-round">border-radius</div>
+          <div class="fx fx-glow">text glow</div>
+        </div>
+      </section>
+
+      <!-- OTUI -> RmlUi -->
+      <section data-if="tab == 'otui'">
+        <h2>OTUI para RmlUi</h2>
+        <p class="muted">O mesmo componente nos dois formatos. Referência completa em modules/corelib/rml.lua.</p>
+        <div class="cmp" data-for="ex : examples">
+          <h3>{{ex.title}}</h3>
+          <div class="row">
+            <div class="col"><span class="tag">.otui / Lua</span><div class="code">{{ex.otui}}</div></div>
+            <div class="col"><span class="tag">.rml / .rcss</span><div class="code">{{ex.rml}}</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Lua e DOM -->
+      <section data-if="tab == 'dom'">
+        <h2>Lua e DOM</h2>
+        <div class="row">
+          <div class="card col">
+            <h3>Elementos pelo id</h3>
+            <div id="dom-box" class="dom-box">Sou o #dom-box</div>
+            <div class="buttons">
+              <button class="btn" data-event-click="DomText()">inner_rml</button>
+              <button class="btn" data-event-click="DomClass()">SetClass</button>
+            </div>
+          </div>
+          <div class="card col">
+            <h3>Ouvinte de evento (AddEventListener)</h3>
+            <div id="mouse-pad" class="mouse-pad">mova o mouse aqui</div>
+            <p class="muted" id="mouse-info">x = -, y = -</p>
+          </div>
+        </div>
+        <div class="code">local box = Rml.element(janela, 'dom-box')
+box.inner_rml = Rml.escape('texto novo')
+Rml.setClass(janela, 'dom-box', 'destaque', true)
+Rml.on(janela, 'mouse-pad', 'mousemove', function(event)
+  local p = event.parameters
+  Rml.setText(janela, 'mouse-info', 'x = ' .. p.mouse_x)
+end)</div>
+      </section>
+
+    </main>
+  </div>
+</div>
+</body>
+</rml>

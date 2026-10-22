@@ -1,0 +1,268 @@
+/* Shared look for the RmlUi examples (otclient-rmlui).
+   Dark navy panels with gold accents; full effects only under @media (theme: efeitos). */
+
+body {
+  font-family: Barlow;
+  font-size: 15dp;
+  color: #c5d0dc;
+  width: 100%;
+  height: 100%;
+}
+
+div, p, h1, h2, h3, section, header, footer, nav, main, aside, form { display: block; }
+strong, b { font-weight: bold; }
+
+/* ---------- window chrome ---------- */
+.otc-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  background-color: #0a101af2;
+  border: 1dp #80633b;
+  border-radius: 8dp;
+  overflow: hidden;
+}
+.otc-header {
+  display: flex;
+  align-items: center;
+  flex: 0 0 36dp;
+  padding: 0 8dp 0 14dp;
+  background-color: #111a26;
+  border-bottom: 1dp #364450;
+  cursor: move;
+}
+.otc-title {
+  flex: 1;
+  font-family: "Barlow Condensed";
+  font-weight: bold;
+  font-size: 19dp;
+  color: #f6dfaa;
+}
+.otc-subtitle { color: #8394a3; font-size: 13dp; margin-right: 10dp; }
+.otc-close {
+  width: 24dp;
+  height: 24dp;
+  line-height: 22dp;
+  text-align: center;
+  border-radius: 4dp;
+  background-color: #1b2836;
+  color: #f6dfaa;
+  transition: background-color 0.15s linear-in-out;
+}
+.otc-close:hover { background-color: #6b2a24; }
+.otc-body { flex: 1; display: flex; min-height: 0; }
+.otc-footer {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8dp;
+  align-items: center;
+  padding: 8dp 12dp;
+  background-color: #0d1520;
+  border-top: 1dp #273644;
+}
+.otc-footer .spacer { flex: 1; }
+
+/* ---------- side tabs ---------- */
+.otc-tabs {
+  flex: 0 0 150dp;
+  padding: 10dp 8dp;
+  background-color: #0d1520;
+  border-right: 1dp #273644;
+}
+.otc-tab {
+  display: block;
+  padding: 8dp 10dp;
+  margin-bottom: 4dp;
+  border-radius: 5dp;
+  color: #a8b1be;
+  transition: background-color color 0.15s linear-in-out;
+}
+.otc-tab:hover { background-color: #172332; color: #f6e5c3; }
+.otc-tab.selected { background-color: #46371e; color: #f6dfaa; border-left: 3dp #d6a951; }
+.otc-content {
+  flex: 1;
+  padding: 12dp 14dp;
+  overflow-y: auto;
+}
+
+/* ---------- blocks ---------- */
+h2 {
+  font-family: "Barlow Condensed";
+  font-weight: bold;
+  font-size: 18dp;
+  color: #d6a951;
+  margin: 2dp 0 8dp 0;
+}
+h3 { font-weight: bold; color: #f6e5c3; margin: 10dp 0 4dp 0; }
+p { margin: 4dp 0; }
+.muted { color: #8394a3; font-size: 13dp; }
+.row { display: flex; gap: 10dp; margin-bottom: 10dp; }
+.col { flex: 1; }
+.card {
+  padding: 10dp;
+  background-color: #111a26;
+  border: 1dp #273644;
+  border-radius: 6dp;
+  margin-bottom: 10dp;
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8dp;
+  padding: 6dp 0;
+  border-bottom: 1dp #18222e;
+}
+.field .label { flex: 1; }
+.field .value { flex: 0 0 52dp; text-align: right; color: #f6dfaa; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-block;
+  padding: 5dp 12dp;
+  border-radius: 4dp;
+  background-color: #1b2836;
+  border: 1dp #536271;
+  color: #c5d0dc;
+  text-align: center;
+  transition: background-color border-color 0.15s linear-in-out;
+}
+.btn:hover { background-color: #293b4d; border-color: #8ca3b5; }
+.btn:active { background-color: #342c1d; }
+.btn.primary { background-color: #46371e; border-color: #d6a951; color: #f6dfaa; }
+.btn.danger { background-color: #3a1715; border-color: #a0402f; color: #ffd2c8; }
+.btn.small { padding: 2dp 8dp; font-size: 13dp; }
+
+/* ---------- text inputs ---------- */
+input.text, input.password, textarea {
+  display: block;
+  box-sizing: border-box;
+  padding: 4dp 6dp;
+  background-color: #0b121c;
+  border: 1dp #364450;
+  border-radius: 4dp;
+  color: #f6dfaa;
+}
+input.text:focus, input.password:focus, textarea:focus { border-color: #54cbbd; }
+textarea { width: 100%; height: 70dp; }
+
+/* ---------- checkbox / radio ---------- */
+input.checkbox, input.radio {
+  display: inline-block;
+  width: 18dp;
+  height: 18dp;
+  vertical-align: middle;
+  background-color: #0b121c;
+  border: 1dp #536271;
+  border-radius: 4dp;
+}
+input.radio { border-radius: 9dp; }
+input.checkbox:hover, input.radio:hover { border-color: #8ca3b5; }
+input.checkbox:checked { background-color: #54cbbd; border-color: #77cec6; }
+input.radio:checked { background-color: #d6a951; border-color: #f3df9a; }
+.toggle { display: flex; align-items: center; gap: 8dp; padding: 3dp 0; }
+
+/* ---------- range slider ---------- */
+input.range { display: inline-block; width: 100%; height: 16dp; vertical-align: middle; }
+input.range slidertrack {
+  margin-top: 6dp;
+  height: 4dp;
+  background-color: #273644;
+  border-radius: 2dp;
+}
+input.range sliderbar {
+  width: 14dp;
+  height: 14dp;
+  margin-top: 1dp;
+  background-color: #d6a951;
+  border-radius: 7dp;
+}
+input.range sliderbar:hover { background-color: #f3df9a; }
+input.range sliderarrowdec, input.range sliderarrowinc { width: 0; height: 0; }
+
+/* ---------- select ---------- */
+select {
+  display: inline-block;
+  width: 190dp;
+  height: 26dp;
+  background-color: #0b121c;
+  border: 1dp #364450;
+  border-radius: 4dp;
+  color: #f6dfaa;
+}
+select selectvalue { padding: 3dp 8dp; height: 20dp; }
+select selectarrow {
+  width: 20dp;
+  height: 24dp;
+  decorator: linear-gradient(180deg, #1b2836, #111a26);
+}
+select selectbox {
+  margin-top: 1dp;
+  background-color: #0b121c;
+  border: 1dp #536271;
+  border-radius: 0 0 4dp 4dp;
+}
+select selectbox option { padding: 4dp 8dp; }
+select selectbox option:hover { background-color: #293b4d; }
+select selectbox option:checked { color: #54cbbd; }
+
+/* ---------- progress ---------- */
+progress {
+  display: block;
+  height: 10dp;
+  background-color: #0b121c;
+  border: 1dp #273644;
+  border-radius: 5dp;
+}
+progress fill { background-color: #54cbbd; border-radius: 5dp; }
+
+/* ---------- scrollbars ---------- */
+scrollbarvertical { width: 8dp; margin-left: 4dp; }
+scrollbarvertical slidertrack { background-color: #0b121c; border-radius: 4dp; }
+scrollbarvertical sliderbar { background-color: #4c6575; border-radius: 4dp; min-height: 24dp; }
+scrollbarvertical sliderbar:hover { background-color: #54cbbd; }
+scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { height: 0; }
+scrollbarhorizontal { height: 8dp; }
+scrollbarhorizontal slidertrack { background-color: #0b121c; }
+scrollbarhorizontal sliderbar { background-color: #4c6575; border-radius: 4dp; }
+scrollbarhorizontal sliderarrowdec, scrollbarhorizontal sliderarrowinc { width: 0; }
+
+/* ---------- sprite slots ---------- */
+.slot {
+  display: inline-block;
+  width: 36dp;
+  height: 36dp;
+  margin: 0 4dp 4dp 0;
+  border: 1dp #364450;
+  border-radius: 4dp;
+  background-color: #0b121c;
+}
+.slot img { width: 32dp; height: 32dp; margin: 2dp; }
+.slot:hover { border-color: #8ca3b5; }
+.slot.selected { border-color: #54cbbd; }
+
+@media (theme: efeitos) {
+  .otc-header { decorator: linear-gradient(180deg, #172332, #0f1824); }
+  .btn.primary { decorator: linear-gradient(180deg, #5a4527, #342c1d); }
+  .otc-tab.selected { decorator: linear-gradient(90deg, #5a4527, #1f1a12); }
+  .card { box-shadow: #00000066 0 2dp 8dp 0dp; }
+}
+
+/* ---------- code samples ---------- */
+.code {
+  display: block;
+  white-space: pre;
+  font-family: "Share Tech Mono";
+  font-size: 13dp;
+  line-height: 17dp;
+  color: #cfe3ef;
+  background-color: #070c14;
+  border: 1dp #1e2a38;
+  border-radius: 4dp;
+  padding: 8dp;
+  margin: 4dp 0;
+}
+.code .k { color: #d6a951; }
+.code .c { color: #6f8496; }
+.tag { display: inline-block; padding: 1dp 6dp; border-radius: 3dp; background-color: #1b2836; color: #77cec6; font-size: 12dp; }

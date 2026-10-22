@@ -46,7 +46,8 @@ public:
         CompositionMode_Light,
         CompositionMode_AlphaZeroing,
         CompositionMode_AlphaRestoring,
-        CompositionMode_ZeroAlphaOverrite
+        CompositionMode_ZeroAlphaOverrite,
+        CompositionMode_Premultiplied
 
     };
     enum DepthFunc {

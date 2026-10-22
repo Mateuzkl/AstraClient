@@ -1,0 +1,11 @@
+Module
+  name: client_rmloptions
+  description: Client options rebuilt in RmlUi (same options as client_options)
+  author: otclient-rmlui
+  website: none
+  sandboxed: true
+  scripts: [ rmloptions ]
+  autoload: true
+  dependencies: [ client_options ]
+  @onLoad: init()
+  @onUnload: terminate()

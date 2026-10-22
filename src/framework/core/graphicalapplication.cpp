@@ -44,6 +44,9 @@
 #include <framework/util/stats.h>
 #include <mutex>
 #include <array>
+#ifdef FW_RMLUI
+#include <framework/rml/rmlmanager.h>
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -216,6 +219,9 @@ void GraphicalApplication::terminate()
 {
     // destroy any remaining widget
     g_ui.terminate();
+#ifdef FW_RMLUI
+    g_rml.terminate();
+#endif
 
     Application::terminate();
     m_terminated = false;

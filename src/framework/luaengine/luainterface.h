@@ -40,6 +40,7 @@ public:
 
     void init();
     void terminate();
+    lua_State* getLuaState() const { return L; }
 
     /// Register core script functions
     void registerFunctions();

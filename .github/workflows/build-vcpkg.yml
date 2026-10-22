@@ -30,6 +30,8 @@ on:
       - data/images/splash.png
       - data/cursors/**
       - vc23/otclient.vcxproj
+      - vc23/RmlUi.targets
+      - tests/rmlui/**
   pull_request:
     paths:
       - .github/workflows/build-vcpkg.yml
@@ -46,6 +48,8 @@ on:
       - data/images/splash.png
       - data/cursors/**
       - vc23/otclient.vcxproj
+      - vc23/RmlUi.targets
+      - tests/rmlui/**
 
 jobs:
   build-windows:
@@ -68,6 +72,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Validate Visual Studio GL and ANGLE settings
+        shell: pwsh
+        run: ./tests/rmlui/msbuild.ps1
 
       - name: Read build context
         shell: pwsh

@@ -1,0 +1,11 @@
+Module
+  name: client_rmlshowcase
+  description: RmlUi showcase - tabs with every feature, OTUI comparisons and native widgets inside RML
+  author: otclient-rmlui
+  website: none
+  sandboxed: true
+  scripts: [ showcase ]
+  autoload: true
+  dependencies: [ client_topmenu ]
+  @onLoad: init()
+  @onUnload: terminate()

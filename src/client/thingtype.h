@@ -340,6 +340,7 @@ public:
     bool hasBones() { return m_attribs.has(ThingAttrBones); }
 
     std::vector<int> getSprites() { return m_spritesIndex; }
+    const std::vector<int>& getSpriteIndices() const noexcept { return m_spritesIndex; }
 
     // additional
     float getOpacity() { return m_opacity; }

@@ -1,8 +1,6 @@
 local resourceLoaders = {
     ["otui"] = g_ui.importStyle,
     ["otfont"] = g_fonts.importFont,
-    ["ttf"] = g_fonts.importFont,
-    ["otf"] = g_fonts.importFont,
     ["otps"] = g_particles.importParticle,
 }
 
@@ -17,12 +15,7 @@ function init()
     safeCall("import otfonts", function()
         importResources("fonts", "otfont")
     end)
-    safeCall("import ttf", function()
-        importResources("fonts", "ttf")
-    end)
-    safeCall("import otf", function()
-        importResources("fonts", "otf")
-    end)
+    -- Outline fonts (.ttf/.otf) belong to RmlUi, not the OTUI bitmap loader.
     safeCall("import styles", function()
         importResources("styles", "otui")
     end)
@@ -38,6 +31,10 @@ function terminate()
 end
 
 function importResources(dir, type)
+    local loader = resourceLoaders[type]
+    if not loader then
+        return
+    end
     local path = '/' .. dir .. '/'
     if not g_resources.directoryExists(path) then
         return
@@ -47,7 +44,7 @@ function importResources(dir, type)
         local files = g_resources.listDirectoryFiles(path, true)
         for _, file in pairs(files) do
             if g_resources.isFileType(file, type) then
-                resourceLoaders[type](file)
+                loader(file)
             elseif g_resources.directoryExists(file) then
                 importFrom(file)
             end
