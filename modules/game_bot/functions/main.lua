@@ -192,11 +192,15 @@ context.singlehotkey = function(keys, name, callback, parent)
   return context.hotkey(keys, name, callback, parent, true)
 end
 
--- schedule(timeout, callback)
+---Schedule a callback in deadline/FIFO order without changing its timeout.
+---Tasks created during scheduler processing wait until a later pass.
+---@param timeout number Delay in milliseconds, including zero or negative delays.
+---@param callback function Work to invoke once the deadline and generation are eligible.
 context.schedule = function(timeout, callback)
   local executionTime = g_clock.millis() + timeout
   local task = {
     execution = executionTime,
+    generation = context._schedulerGeneration or 0,
     callback = callback
   }
 
