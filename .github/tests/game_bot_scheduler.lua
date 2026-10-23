@@ -54,24 +54,33 @@ local function test(name, callback)
   print("PASS " .. name)
 end
 
----Count Lua iteration of the real queue, excluding table.remove's C array shift.
----Always restore ipairs, including when the tested code fails.
-local function countFutureQueueIterations(queue, callback)
-  local originalIpairs = ipairs
-  local visits = 0
-  _G.ipairs = function(list)
-    local iterator, state, index = originalIpairs(list)
-    if list ~= queue then return iterator, state, index end
-    return function(subject, previous)
-      local nextIndex, value = iterator(subject, previous)
-      if value and value.execution > now then visits = visits + 1 end
-      return nextIndex, value
-    end, state, index
+---Count interpreted Lua instructions regardless of the queue's iterator style.
+---Suspend counting only inside the measured queue's real table.remove: some
+---LuaJIT builds implement its inherited array shift in bytecode. Other queues
+---remain counted. Restore hooks, removal and JIT state
+---before propagating a failure; no instruction limit interrupts the callback.
+local function countLuaInstructions(queue, callback)
+  local previousHook, previousMask, previousCount = debug.gethook()
+  local jitEnabled = jit and jit.status()
+  if jit then jit.off(); jit.flush() end
+  local instructions = 0
+  local hook = function() instructions = instructions + 100 end
+  local originalRemove = table.remove
+  table.remove = function(list, ...)
+    if list ~= queue then return originalRemove(list, ...) end
+    debug.sethook()
+    local ok, removed = pcall(originalRemove, list, ...)
+    debug.sethook(hook, "", 100)
+    assert(ok, removed)
+    return removed
   end
+  debug.sethook(hook, "", 100)
   local ok, result = pcall(callback)
-  _G.ipairs = originalIpairs
+  table.remove = originalRemove
+  debug.sethook(previousHook, previousMask, previousCount)
+  if jitEnabled then jit.on() end
   assert(ok, result)
-  return visits
+  return instructions
 end
 
 ---Contrast a finite same-pass baseline chain with progress across generations.
@@ -236,17 +245,51 @@ test("future-only queue remains untouched", function()
   equal(c._scheduler, queue); equal(c._scheduler[1], task); equal(#queue, 1)
 end)
 
-test("due work does not iterate the future backlog", function()
-  local c, bot = newBot()
-  local calls = 0
-  local future = function() error("future callback must not run") end
-  for index = 1, 10000 do c.schedule(100000 + index, future) end
-  local firstFuture, lastFuture = c._scheduler[1], c._scheduler[10000]
-  c.schedule(0, function() calls = calls + 1 end)
-  local visits = countFutureQueueIterations(c._scheduler, bot.script)
-  equal(visits, 0, "future queue visits during due pass")
-  equal(calls, 1); equal(#c._scheduler, 10000)
-  equal(c._scheduler[1], firstFuture); equal(c._scheduler[10000], lastFuture)
+test("due work does not scan a growing future backlog in Lua", function()
+  ---Build the queue before measuring its one due callback and future boundary.
+  local function measureDuePass(futureCount)
+    local c, bot = newBot()
+    local calls = 0
+    local future = function() error("future callback must not run") end
+    for index = 1, futureCount do c.schedule(100000 + index, future) end
+    local firstFuture, lastFuture = c._scheduler[1], c._scheduler[futureCount]
+    c.schedule(0, function() calls = calls + 1 end)
+    local instructions = countLuaInstructions(c._scheduler, bot.script)
+    equal(calls, 1); equal(#c._scheduler, futureCount)
+    equal(c._scheduler[1], firstFuture); equal(c._scheduler[futureCount], lastFuture)
+    return instructions
+  end
+  local small = measureDuePass(100)
+  local large = measureDuePass(10000)
+  -- A generous relative budget accommodates hook granularity and runtime
+  -- differences while rejecting linear Lua scans via ipairs, pairs or indexing.
+  assert(large <= small + 1000, string.format(
+    "future backlog Lua instructions grew with queue size: small=%d, large=%d", small, large))
+end)
+
+test("instruction measurement restores instrumentation after failure", function()
+  local originalHook, originalMask, originalCount = debug.gethook()
+  local originalRemove = table.remove
+  local originalJit = jit and jit.status()
+  local previousHook = function() end
+  debug.sethook(previousHook, "", 1000000)
+  if jit then jit.off() end
+  local queue = { "removed" }
+  local ok, result = pcall(countLuaInstructions, queue, function()
+    equal(table.remove(queue, 1), "removed")
+    error("expected instruction measurement failure")
+  end)
+  local restoredHook, restoredMask, restoredCount = debug.gethook()
+  local restoredRemove = table.remove
+  local restoredJit = jit and jit.status()
+  -- Restore the fixture's own state even if an assertion detects bad cleanup.
+  debug.sethook(originalHook, originalMask, originalCount)
+  table.remove = originalRemove
+  if originalJit then jit.on() end
+  equal(ok, false); assert(result:find("expected instruction measurement failure", 1, true))
+  equal(#queue, 0); equal(restoredRemove, originalRemove)
+  equal(restoredHook, previousHook); equal(restoredMask, ""); equal(restoredCount, 1000000)
+  if jit then equal(restoredJit, false, "previous disabled JIT state") end
 end)
 
 test("tasks without a generation remain eligible", function()
