@@ -24,6 +24,7 @@ on:
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
+      - '.github/tests/game_bot_scheduler.lua'
       - '.github/tests/item_details_opcode_framing.lua'
       - '.github/tests/item_details_framing.cpp'
       - '.github/tests/rarity_refresh_lifecycle.lua'
@@ -66,6 +67,7 @@ on:
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
+      - '.github/tests/game_bot_scheduler.lua'
       - '.github/tests/item_details_opcode_framing.lua'
       - '.github/tests/item_details_framing.cpp'
       - '.github/tests/rarity_refresh_lifecycle.lua'
@@ -123,6 +125,12 @@ jobs:
           luajit .github/tests/game_bot_auto_recording.lua \
             modules/game_bot/bot.lua \
             modules/game_bot/panels/waypoints.lua
+
+      - name: Test GameBot scheduler generations
+        run: |
+          luajit .github/tests/game_bot_scheduler.lua \
+            modules/game_bot/executor.lua \
+            modules/game_bot/functions/main.lua
 
       - name: Test coalesced ItemValues and ItemDetails frames
         run: |

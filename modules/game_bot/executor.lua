@@ -196,12 +196,28 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
         end
       end
 
-      while #context._scheduler > 0 and context._scheduler[1].execution <= g_clock.millis() do
-        local task = table.remove(context._scheduler, 1)
-        local status, result = pcall(task.callback)
-        context._currentExecution = nil
-        if not status then
-          context.error("Schedule execution error: " .. result)
+      -- Work scheduled by a task belongs to the next pass, even if already due.
+      if #context._scheduler > 0 and context._scheduler[1].execution <= g_clock.millis() then
+        local scheduled = {}
+        for i, task in ipairs(context._scheduler) do
+          scheduled[i] = task
+        end
+        for _, task in ipairs(scheduled) do
+          if task.execution > g_clock.millis() then
+            break
+          end
+          for index, queued in ipairs(context._scheduler) do
+            if queued == task then
+              -- New tasks may have changed the head; remove this exact task.
+              table.remove(context._scheduler, index)
+              local status, result = pcall(task.callback)
+              context._currentExecution = nil
+              if not status then
+                context.error("Schedule execution error: " .. result)
+              end
+              break
+            end
+          end
         end
       end
     end,
