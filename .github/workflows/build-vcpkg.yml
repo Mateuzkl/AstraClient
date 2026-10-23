@@ -175,11 +175,27 @@ jobs:
           ctest --test-dir build -C Release --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Test OpenGL rendering and widget lifetimes
+      - name: Prepare isolated software OpenGL for headless Windows tests
         shell: pwsh
         run: |
-          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics
-          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics -Scenario skilltree
+          $archive = Join-Path $env:RUNNER_TEMP 'mesa3d-26.2.4-release-msvc.7z'
+          $runtime = Join-Path $env:RUNNER_TEMP 'astra-mesa-tests'
+          Invoke-WebRequest 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.4/mesa3d-26.2.4-release-msvc.7z' -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne '351fc8c8b695878ffb3eaa044b3ead08672a48b1a045e3c3e3975811df0f6695') {
+            throw 'Mesa test runtime checksum mismatch.'
+          }
+          & 7z x $archive "-o$runtime" 'x64/opengl32.dll' 'x64/libgallium_wgl.dll' '-y'
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to extract Mesa test runtime.' }
+          "ASTRA_TEST_OPENGL_RUNTIME=$runtime\x64" >> $env:GITHUB_ENV
+
+      - name: Test OpenGL rendering and widget lifetimes
+        shell: pwsh
+        env:
+          GALLIUM_DRIVER: llvmpipe
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics -GraphicsRuntimeDir $env:ASTRA_TEST_OPENGL_RUNTIME
+          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics -GraphicsRuntimeDir $env:ASTRA_TEST_OPENGL_RUNTIME -Scenario skilltree
 
       - name: Build actual DirectX ANGLE client
         shell: pwsh

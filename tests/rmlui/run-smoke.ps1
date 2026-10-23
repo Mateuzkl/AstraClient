@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory)][string]$Binary,
     [string]$TempRoot = [IO.Path]::GetTempPath(),
     [ValidateSet('core', 'skilltree')][string]$Scenario = 'core',
-    [ValidateSet('', '-warp', '-dx11', '-opengl')][string]$GraphicsBackend = ''
+    [ValidateSet('', '-warp', '-dx11', '-opengl')][string]$GraphicsBackend = '',
+    [string]$GraphicsRuntimeDir
 )
 $ErrorActionPreference = 'Stop'
 $binaryPath = (Resolve-Path -LiteralPath $Binary).Path
@@ -27,10 +28,25 @@ if ($Scenario -eq 'skilltree') {
 }
 $stdout = Join-Path $fixture 'stdout.log'
 $stderr = Join-Path $fixture 'stderr.log'
+$launchBinary = $binaryPath
+if ($GraphicsRuntimeDir) {
+    if ($GraphicsBackend -in @('-warp', '-dx11')) { throw 'An OpenGL runtime cannot replace the ANGLE backend.' }
+    $runtimePath = (Resolve-Path -LiteralPath $GraphicsRuntimeDir).Path
+    if (-not (Test-Path -LiteralPath (Join-Path $runtimePath 'opengl32.dll'))) { throw 'Missing test OpenGL runtime.' }
+    # Keep software GL out of the release package and the real client directory.
+    $runtimeBin = Join-Path $fixture 'bin'
+    New-Item -ItemType Directory -Path $runtimeBin | Out-Null
+    $launchBinary = Join-Path $runtimeBin ([IO.Path]::GetFileName($binaryPath))
+    Copy-Item -LiteralPath $binaryPath -Destination $launchBinary
+    Get-ChildItem -LiteralPath (Split-Path $binaryPath) -Filter '*.dll' -File | Copy-Item -Destination $runtimeBin
+    Get-ChildItem -LiteralPath $runtimePath -Filter '*.dll' -File | Copy-Item -Destination $runtimeBin -Force
+}
 $clientArguments = @('--test')
 if ($GraphicsBackend) { $clientArguments += $GraphicsBackend }
-$process = Start-Process -FilePath $binaryPath -ArgumentList $clientArguments -WorkingDirectory $fixture -WindowStyle Hidden `
+$process = Start-Process -FilePath $launchBinary -ArgumentList $clientArguments -WorkingDirectory $fixture -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+# Windows PowerShell can lose ExitCode if the process exits before opening its handle.
+$null = $process.Handle
 if (-not $process.WaitForExit(45000)) {
     $process.Kill()
     throw "Isolated RmlUi smoke timed out. Artifacts: $fixture"
