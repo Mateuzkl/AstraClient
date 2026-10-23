@@ -32,6 +32,7 @@ on:
       - vc23/otclient.vcxproj
       - vc23/RmlUi.targets
       - tests/rmlui/**
+      - tests/rendering/**
   pull_request:
     paths:
       - .github/workflows/build-vcpkg.yml
@@ -50,6 +51,7 @@ on:
       - vc23/otclient.vcxproj
       - vc23/RmlUi.targets
       - tests/rmlui/**
+      - tests/rendering/**
 
 jobs:
   build-windows:
@@ -173,6 +175,29 @@ jobs:
           ctest --test-dir build -C Release --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Test OpenGL rendering and widget lifetimes
+        shell: pwsh
+        run: |
+          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics
+          ./tests/rmlui/run-smoke.ps1 -Binary build/AstraClient.exe -TempRoot build/diagnostics -Scenario skilltree
+
+      - name: Build actual DirectX ANGLE client
+        shell: pwsh
+        run: |
+          $commands = @'
+          cmake -B build-angle -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static -DVCPKG_MANIFEST_MODE=OFF -DVCPKG_INSTALLED_DIR=%GITHUB_WORKSPACE%\build\vcpkg_installed -DOPENGLES=2.0 -DBUILD_TESTING=OFF
+          if errorlevel 1 exit /b 1
+          cmake --build build-angle --target AstraClient --parallel 2
+          if errorlevel 1 exit /b 1
+          '@
+          & ./cmake/ci/InvokeBuildStage.ps1 -Name 'Build-ANGLE' -CmdScript $commands
+
+      - name: Test DirectX ANGLE rendering and widget lifetimes
+        shell: pwsh
+        run: |
+          ./tests/rmlui/run-smoke.ps1 -Binary build-angle/AstraClient.exe -TempRoot build/diagnostics -GraphicsBackend '-warp'
+          ./tests/rmlui/run-smoke.ps1 -Binary build-angle/AstraClient.exe -TempRoot build/diagnostics -GraphicsBackend '-warp' -Scenario skilltree
+
       - name: test-standalone-utilities-and-native-networking
         shell: pwsh
         run: |
@@ -253,6 +278,8 @@ jobs:
           name: windows-diagnostics-${{ github.sha }}
           path: |
             build/diagnostics/
+            build-angle/CMakeCache.txt
+            build-angle/CMakeFiles/CMakeConfigureLog.yaml
             build/CMakeCache.txt
             build/compile_commands.json
             build/CMakeFiles/CMakeConfigureLog.yaml

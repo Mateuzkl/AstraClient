@@ -119,8 +119,10 @@ public:
 
 private:
     std::string readFileContentsImpl(const std::string& fileName, bool safe, size_t maxBytes);
+#ifndef ANDROID
     bool mountDiskData(const std::filesystem::path& path);
     void unmountDiskData();
+#endif
     bool mountMemoryData(const std::shared_ptr<std::vector<uint8_t>>& data);
     void unmountMemoryData();
 

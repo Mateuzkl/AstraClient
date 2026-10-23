@@ -24,7 +24,7 @@ include(src/client/CMakeLists.txt)
 include(cmake/AstraRmlUi.cmake)
 
 # functions map for reading backtraces (flags do linker GNU; nao aplicar no MSVC)
-if(NOT APPLE AND NOT WASM AND NOT MSVC)
+if(NOT APPLE AND NOT WASM AND NOT MSVC AND NOT ANDROID)
     set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -no-pie -Wl,-Map=${PROJECT_NAME}.map")
 endif()
 
@@ -53,7 +53,19 @@ if(VERSION)
 endif()
 
 # add client executable
-add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
+if(ANDROID)
+    add_library(${PROJECT_NAME} SHARED ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES}
+        src/android/android_native_app_glue.cpp)
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME otclientv8)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        "$<$<COMPILE_LANGUAGE:CXX>:-include;${CMAKE_SOURCE_DIR}/src/android/pch.h>")
+    target_include_directories(${PROJECT_NAME} PRIVATE src/android)
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,-u,ANativeActivity_onCreate)
+    set_property(GLOBAL APPEND PROPERTY JOB_POOLS astra_android_compile=2)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY JOB_POOL_COMPILE astra_android_compile)
+else()
+    add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
+endif()
 set_target_properties(${PROJECT_NAME} PROPERTIES
     CXX_STANDARD 23 CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS NO)
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})

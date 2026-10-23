@@ -147,7 +147,7 @@ int main(int argc, const char* argv[]) {
     g_app.setCompactName(compactName);
     g_app.setVersion("3.1");
 
-#ifdef WITH_ENCRYPTION
+#if defined(WITH_ENCRYPTION) && !defined(ANDROID)
     if (std::find(args.begin(), args.end(), "--encrypt") != args.end()) {
         g_lua.init();
         g_resources.encrypt(args.size() >= 3 ? args[2] : "");

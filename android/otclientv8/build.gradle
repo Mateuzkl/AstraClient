@@ -1,0 +1,65 @@
+plugins { id 'com.android.application' }
+
+def vcpkgRoot = providers.environmentVariable('VCPKG_ROOT').orNull
+if (!vcpkgRoot || !file("${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake").isFile()) {
+    throw new GradleException('Set VCPKG_ROOT to the pinned vcpkg checkout before building Android.')
+}
+def externalBuildRoot = providers.gradleProperty('astraBuildRoot').orNull
+if (externalBuildRoot) { layout.buildDirectory.set(file("${externalBuildRoot}/gradle-app")) }
+def selectedAbis = providers.gradleProperty('astraAbis').getOrElse('arm64-v8a,armeabi-v7a').split(',').toList()
+def assetDirectory = file(providers.gradleProperty('astraAssetsDir').getOrElse('assets'))
+if (!selectedAbis || selectedAbis.any { !(it in ['arm64-v8a', 'armeabi-v7a']) }) {
+    throw new GradleException('astraAbis must contain arm64-v8a and/or armeabi-v7a.')
+}
+android {
+    namespace 'com.otclientv8'
+    compileSdk 35
+    ndkVersion '28.2.13676358'
+    def customNdk = providers.environmentVariable('ANDROID_NDK_HOME').orNull
+    if (customNdk) { ndkPath customNdk }
+    defaultConfig {
+        applicationId 'com.otclientv8'
+        minSdk 25
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+        if (providers.gradleProperty('astraSmoke').orNull == 'true') {
+            applicationIdSuffix '.buildsmoke'
+        } else if (providers.gradleProperty('astraPhoneTest').orNull == 'true') {
+            applicationIdSuffix '.phonetest'
+        }
+        ndk { abiFilters.addAll(selectedAbis) }
+        externalNativeBuild {
+            cmake {
+                arguments "-DCMAKE_TOOLCHAIN_FILE=${file('../vcpkg-toolchain.cmake').absolutePath.replace('\\','/')}",
+                    '-DBUILD_TESTING=OFF', '-DFRAMEWORK_RMLUI=OFF', '-DFRAMEWORK_SOUND=ON',
+                    '-DANDROID_STL=c++_static'
+                cppFlags '-std=c++23'
+                targets 'AstraClient'
+            }
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path '../../CMakeLists.txt'
+            version '3.31.6'
+            if (externalBuildRoot) { buildStagingDirectory file("${externalBuildRoot}/native-app") }
+        }
+    }
+    sourceSets.main {
+        manifest.srcFile 'AndroidManifest.xml'
+        java.srcDirs = ['src']
+        res.srcDirs = ['res']
+        assets.srcDirs = [assetDirectory]
+    }
+    androidResources { noCompress.add('zip') }
+    buildTypes { debug { jniDebuggable true }; release { minifyEnabled false } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+tasks.named('preBuild').configure {
+    doFirst {
+        if (!new File(assetDirectory, 'data.zip').isFile()) {
+            throw new GradleException('Missing otclientv8/assets/data.zip: provide the Android client asset bundle before packaging the APK.')
+        }
+    }
+}

@@ -279,7 +279,7 @@ void AndroidWindow::poll()
     // If not animating, we will block forever waiting for events.
     // If animating, we loop until all events are read, then continue
     // to draw the next frame of animation.
-    while ((ident = ALooper_pollAll(0, NULL, &events, (void**)&source)) >= 0) {
+    while ((ident = ALooper_pollOnce(0, NULL, &events, (void**)&source)) >= 0) {
         // Process this event.
         if (source != NULL) {
             source->process(g_androidState, source);

@@ -1,0 +1,86 @@
+name: Android C++23
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['android/**', 'src/**', 'cmake/**', 'CMakeLists.txt', 'vcpkg.json', 'tests/android/**', '.github/workflows/build-android.yml']
+  push:
+    branches: ['main', 'feat/**', 'fix/**']
+    paths: ['android/**', 'src/**', 'cmake/**', 'CMakeLists.txt', 'vcpkg.json', 'tests/android/**', '.github/workflows/build-android.yml']
+
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Android ARM32 + ARM64 APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/vcpkg-downloads
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg-cache
+      VCPKG_MAX_CONCURRENCY: '2'
+      VCPKG_DISABLE_METRICS: '1'
+      GRADLE_USER_HOME: ${{ github.workspace }}/gradle-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { persist-credentials: false }
+      - name: Read pinned dependency tool
+        id: tool
+        run: echo "sha=$(tr -d '\r\n' < cmake/ci/vcpkg-tool.sha)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ steps.tool.outputs.sha }}
+          path: vcpkg
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            vcpkg-cache
+            vcpkg-downloads
+            gradle-cache/caches
+            gradle-cache/wrapper
+          key: android-r28c-${{ hashFiles('vcpkg.json', 'android/triplets/**', 'cmake/ci/vcpkg-tool.sha', 'android/**/build.gradle', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Install Android toolchain
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'cmake;3.31.6' 'ndk;28.2.13676358'
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+          bash vcpkg/bootstrap-vcpkg.sh -disableMetrics
+      - name: Cross-compile C++23 and pool probes for both ABIs
+        run: bash tests/android/compile-probes.sh "$RUNNER_TEMP/android-probes"
+      - name: Package isolated OTUI smoke assets
+        run: bash tests/android/package-smoke.sh
+      - name: Compile and package both Android ABIs
+        run: bash android/gradlew -p android --no-daemon --max-workers=2 -PastraSmoke=true :otclientv8:assembleDebug
+      - name: Verify APK and native libraries
+        run: |
+          set -euo pipefail
+          apk=android/otclientv8/build/outputs/apk/debug/otclientv8-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "$apk"
+          for abi in arm64-v8a armeabi-v7a; do
+            unzip -p "$apk" "lib/$abi/libotclientv8.so" > "$RUNNER_TEMP/$abi.so"
+            "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$RUNNER_TEMP/$abi.so"
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-otui-smoke-apk-not-production
+          path: android/otclientv8/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: android-build-diagnostics
+          path: |
+            android/otclientv8/.cxx/**/CMakeCache.txt
+            android/otclientv8/.cxx/**/CMakeFiles/CMakeConfigureLog.yaml
+            android/otclientv8/.cxx/**/vcpkg-manifest-install.log
+            android/otclientv8/build/reports/

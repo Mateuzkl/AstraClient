@@ -17,7 +17,7 @@
         "libzip",
         "openssl",
         "openal-soft",
-        "glew",
+        { "name": "glew", "platform": "!android & !wasm32" },
         {
             "name": "freetype",
             "default-features": false,

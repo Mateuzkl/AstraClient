@@ -97,7 +97,7 @@ ticks_t Platform::getFileModificationTime(std::string file)
 
 bool Platform::openUrl(std::string url, bool now)
 {
-    g_graphicsDispatcher.addEvent(std::bind(&AndroidWindow::openUrl, g_androidWindow, url));
+    g_graphicsDispatcher.addEvent([url = std::move(url)] { g_androidWindow.openUrl(url); });
     return true;
 }
 

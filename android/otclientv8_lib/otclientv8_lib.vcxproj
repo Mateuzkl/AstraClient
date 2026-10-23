@@ -612,6 +612,10 @@
     <ClCompile Include="..\..\src\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- Kept only to explain migration to users opening the historical .sln. -->
+  <Target Name="AstraRequireModernAndroid" BeforeTargets="PrepareForBuild">
+    <Error Text="The Clang_5_0/C++17 Android project has been replaced by the C++23 Gradle/NDK r28 build. Run pwsh android/Build-Android.ps1 with Gradle 8.11.1, JDK 17 and the pinned VCPKG_ROOT. Do not downgrade shared client headers to C++17." />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

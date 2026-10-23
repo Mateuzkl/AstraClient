@@ -1,2 +1,5 @@
 data/things/*.rar filter=lfs diff=lfs merge=lfs -text
 browser/*.sh text eol=lf
+android/gradlew text eol=lf
+android/gradlew.bat text eol=crlf
+tests/android/*.sh text eol=lf

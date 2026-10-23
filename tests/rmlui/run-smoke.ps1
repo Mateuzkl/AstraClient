@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$Binary,
     [string]$TempRoot = [IO.Path]::GetTempPath(),
-    [ValidateSet('core', 'skilltree')][string]$Scenario = 'core'
+    [ValidateSet('core', 'skilltree')][string]$Scenario = 'core',
+    [ValidateSet('', '-warp', '-dx11', '-opengl')][string]$GraphicsBackend = ''
 )
 $ErrorActionPreference = 'Stop'
 $binaryPath = (Resolve-Path -LiteralPath $Binary).Path
@@ -26,7 +27,9 @@ if ($Scenario -eq 'skilltree') {
 }
 $stdout = Join-Path $fixture 'stdout.log'
 $stderr = Join-Path $fixture 'stderr.log'
-$process = Start-Process -FilePath $binaryPath -ArgumentList '--test' -WorkingDirectory $fixture -WindowStyle Hidden `
+$clientArguments = @('--test')
+if ($GraphicsBackend) { $clientArguments += $GraphicsBackend }
+$process = Start-Process -FilePath $binaryPath -ArgumentList $clientArguments -WorkingDirectory $fixture -WindowStyle Hidden `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
 if (-not $process.WaitForExit(45000)) {
     $process.Kill()
@@ -42,4 +45,7 @@ if ($process.ExitCode -ne 0 -or $log -notmatch '\[RMLUI TEST\] PASS:') {
     throw "RmlUi smoke failed (exit $($process.ExitCode)). Artifacts: $fixture"
 }
 if ($log -match 'ERROR:|FreeType error') { throw "RmlUi logged an error. Artifacts: $fixture" }
+if ($GraphicsBackend -in @('-warp', '-dx11') -and $log -notmatch 'backend ANGLE ES') {
+    throw "DirectX smoke did not initialize the ANGLE backend. Artifacts: $fixture"
+}
 "RmlUi smoke artifacts: $fixture"

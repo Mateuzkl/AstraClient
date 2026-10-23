@@ -3,6 +3,10 @@ ARM/*
 */ARM/*
 .workspace
 .vs
+.gradle/
+**/.cxx/
+**/build/
+local.properties
 !.xml
 !*/*.xml
 !otclientv8/res/*/*.xml

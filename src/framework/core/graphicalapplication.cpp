@@ -758,6 +758,13 @@ void GraphicalApplication::run()
         const bool visible = g_window.isVisible();
         const bool focused = g_window.hasFocus();
 
+        // A surface can disappear after a screenshot was queued but before this frame.
+#ifdef ANDROID
+        if (!visible && !pendingScreenshots.empty()) {
+            pendingScreenshots.clear();
+            g_logger.warning("Cancelled pending screenshots because the Android surface was destroyed");
+        }
+#endif
         // Even when invisible we need to keep processing graphics events and avoid busy waiting.
         if (!visible && pendingScreenshots.empty()) {
             AutoStat s(STATS_RENDER, "Sleep");

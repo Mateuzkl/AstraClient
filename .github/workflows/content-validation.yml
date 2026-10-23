@@ -13,6 +13,8 @@ on:
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
       - 'tests/rendering/**'
+      - 'tests/android/**'
+      - '.github/tests/android_smoke.lua'
       - 'src/framework/graphics/drawcommandpool.h'
       - 'src/framework/graphics/linegeometry.h'
       - 'src/framework/rml/rmlglstate.h'
@@ -70,6 +72,8 @@ on:
       - 'modules/corelib/rml.lua'
       - 'tests/cpp23/**'
       - 'tests/rendering/**'
+      - 'tests/android/**'
+      - '.github/tests/android_smoke.lua'
       - 'src/framework/graphics/drawcommandpool.h'
       - 'src/framework/graphics/linegeometry.h'
       - 'src/framework/rml/rmlglstate.h'
@@ -165,6 +169,9 @@ jobs:
             test -d "$root" || { echo "::error::missing package root: $root"; exit 1; }
             test ! -d "$root/$root" || { echo "::error::nested duplicate package root: $root/$root"; exit 1; }
           done
+
+      - name: Test isolated Android APK fixture
+        run: luajit .github/tests/android_smoke.lua
 
       - name: Test RmlUi helper lifetimes
         run: luajit .github/tests/rmlui_helpers.lua modules/corelib/rml.lua
