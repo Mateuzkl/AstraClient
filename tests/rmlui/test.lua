@@ -10,6 +10,60 @@ for i=1,20 do
 end
 local initialContexts = g_rml.getContextCount()
 local initialWidgets = g_rml.getWidgetCount()
+local function testDestroyFromUnload(done)
+    local first = Rml.createWindow {
+        document='/smoke.rml', model='smoke', width=420, height=280,
+        data={title='First', shown=true, name=''},
+    }
+    local second = Rml.createWindow {
+        document='/smoke.rml', model='smoke', width=420, height=280,
+        data={title='Second', shown=true, name=''},
+    }
+    first:getDocument():AddEventListener('unload', function() second:destroy() end, false)
+    first:destroy()
+    scheduleEvent(function()
+        assert(second:isDestroyed(), 'unload callback did not destroy the second host')
+        assert(g_rml.getContextCount() == initialContexts, 'unload callback stranded a deferred context release')
+        assert(g_rml.getWidgetCount() == initialWidgets)
+        done()
+    end, 100)
+end
+local function testModelLifetime(done)
+    local payloads = setmetatable({}, {__mode='k'})
+    local models, children = {}, {}
+    -- Two live contexts must be allowed to use the same document/model name.
+    for i=1,2 do
+        local payload = {bytes=string.rep('x', 65536)}
+        payloads[payload] = true
+        local w, m = Rml.createWindow {
+            document='/smoke.rml', model='smoke', width=420, height=280,
+            data={title='Lifetime '..i, shown=true, name='', rows={{value=i}},
+                Hold=function() return payload end},
+        }
+        assert(w and m)
+        models[i], children[i] = m, m.rows
+        -- Reopening an existing model must not orphan its original registry refs.
+        assert(w:getContext():OpenDataModel('smoke', {}) == m, 'duplicate open replaced a live data model')
+        if i == 1 then
+            w:getContext():CloseDataModel('smoke')
+            assert(not pcall(function() return m.title end), 'explicit close retained a live model')
+            local reopened = w:getContext():OpenDataModel('smoke', {title='Reopened', shown=true, name=''})
+            assert(reopened and reopened ~= m)
+        end
+        w:destroy()
+    end
+    scheduleEvent(function()
+        collectgarbage('collect'); collectgarbage('collect')
+        assert(next(payloads) == nil, 'closed RmlUi contexts retained Lua callback payloads')
+        for i=1,2 do
+            assert(not pcall(function() return models[i].title end), 'destroyed context left a live model')
+            assert(not pcall(function() return children[i][1] end), 'closed nested proxy remained usable')
+        end
+        assert(g_rml.getContextCount() == initialContexts and g_rml.getWidgetCount() == initialWidgets)
+        print('[RMLUI TEST] model callbacks released; retained model/proxy access safely rejected')
+        done()
+    end, 100)
+end
 local function testDestroyDuringUpdate(done)
     local closing = Rml.createWindow {
         document='/smoke.rml', model='smoke', width=420, height=280,
@@ -107,9 +161,13 @@ scheduleEvent(function()
                     collectgarbage('collect')
                     dofile('/render-scene.lua')
                     testDestroyDuringUpdate(function()
-                        testRenderPooling(function()
-                            print('[RMLUI TEST] PASS: render, models, reload, host visibility, destroy-on-update, timers and 30 close cycles')
-                            g_app.exit()
+                        testDestroyFromUnload(function()
+                            testModelLifetime(function()
+                                testRenderPooling(function()
+                                    print('[RMLUI TEST] PASS: render, models, reload, host visibility, reentrant destruction, timers and 30 close cycles')
+                                    g_app.exit()
+                                end)
+                            end)
                         end)
                     end)
                 end, 80)

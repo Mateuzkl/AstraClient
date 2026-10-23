@@ -351,7 +351,7 @@ void RmlManager::registerWidget(UIRmlWidget* widget)
 {
     m_widgets.emplace_back(widget);
     if (!m_tickEvent)
-        m_tickEvent = g_dispatcher.cycleEvent([this] { tick(); }, 16);
+        m_tickEvent = g_dispatcher.cycleEventEx("RmlManager::tick", [this] { tick(); }, 16);
 }
 
 void RmlManager::unregisterWidget(UIRmlWidget* widget)
@@ -384,7 +384,9 @@ void RmlManager::retireRenderer(const std::shared_ptr<RmlRenderer>& renderer)
 void RmlManager::tick()
 {
     releasePendingContexts();
-    if (m_widgets.empty()) {
+    // Unloading one document can destroy another host and queue its release.
+    // Keep the next tick alive until that reentrant cleanup has also drained.
+    if (m_widgets.empty() && m_pendingContextReleases.empty()) {
         m_tickEvent->cancel();
         m_tickEvent = nullptr;
         return;

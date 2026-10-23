@@ -128,8 +128,26 @@ local steps={
     function(next) assert(points() == 9999,'reopening lost the local allocation');click('close-tree');next() end,
     function()
         assert(window:isDestroyed() and g_rml.getContextCount() == 0)
-        print('[RMLUI TEST] PASS: skill tree render, 9999 points, connected allocation, glowing edges, build info, refunds and safe close/reopen')
-        g_app.exit()
+        -- Empty contexts/Lua models do not exercise cached atlas textures. Let
+        -- the real document render on each reopen before retiring its renderer.
+        local cycle = 0
+        local function reopen()
+            cycle = cycle+1
+            toggle()
+            window = assert(rootWidget:getChildById('rmlSkillTreeDemo'))
+            scheduleEvent(function()
+                assert(window:getDocument() and Rml.element(window,'skill-22'))
+                click('close-tree')
+                scheduleEvent(function()
+                    assert(window:isDestroyed() and g_rml.getContextCount() == 0, 'reopen retained a context')
+                    if cycle < 30 then reopen() else
+                        print('[RMLUI TEST] PASS: skill tree render, 9999 points, connected allocation, build info, refunds and 30 rendered atlas reopens')
+                        g_app.exit()
+                    end
+                end,40)
+            end,120)
+        end
+        reopen()
     end,
 }
 local function run(index)

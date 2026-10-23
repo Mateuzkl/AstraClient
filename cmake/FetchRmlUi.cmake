@@ -18,5 +18,9 @@ function(astra_fetch_rmlui)
         GIT_REPOSITORY https://github.com/mikke89/RmlUi.git
         GIT_TAG ba95ffe8bfb6370efb2cdcca927eaad4710c5413) # 6.3
     FetchContent_MakeAvailable(rmlui)
+    include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/PatchRmlUiLua.cmake)
+    astra_patch_rmlui_lua("${rmlui_SOURCE_DIR}")
+    include(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/PatchRmlUiTextures.cmake)
+    astra_patch_rmlui_textures("${rmlui_SOURCE_DIR}")
 endfunction()
 astra_fetch_rmlui()
