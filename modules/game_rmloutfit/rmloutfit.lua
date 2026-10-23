@@ -141,7 +141,7 @@ function init()
 end
 
 function terminate()
-    g_keyboard.unbindKeyDown('Ctrl+Shift+F')
+    g_keyboard.unbindKeyDown('Ctrl+Shift+F', toggle)
     if M.window then M.window:destroy() M.window = nil end
     palette = nil
 end

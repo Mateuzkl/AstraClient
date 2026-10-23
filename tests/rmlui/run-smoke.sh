@@ -2,7 +2,7 @@
 set -euo pipefail
 binary=$(realpath "${1:?Pass the RmlUi-enabled native client}")
 scenario=${2:-core}
-case "$scenario" in core|skilltree) ;; *) printf 'Unknown RmlUi scenario: %s\n' "$scenario" >&2; exit 2;; esac
+case "$scenario" in core|skilltree|otui) ;; *) printf 'Unknown RmlUi scenario: %s\n' "$scenario" >&2; exit 2;; esac
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 fixture=$(mktemp -d "${ASTRA_SMOKE_TEMP:-${TMPDIR:-/tmp}}/astra-rmlui-XXXXXXXX")
 mkdir -p "$fixture/modules" "$fixture/data/fonts" "$fixture/data/styles" "$fixture/profile"
@@ -22,6 +22,9 @@ if [[ "$scenario" == skilltree ]]; then
   cp "$repo/data/images/game/tutorial/backdrop_knight.png" "$fixture/data/images/game/tutorial/"
   cp "$repo/modules/gamelib/spells.lua" "$fixture/spell-catalog.lua"
   cp "$repo/tests/rmlui/skilltree.lua" "$fixture/test.lua"
+fi
+if [[ "$scenario" == otui ]]; then
+  cp "$repo/tests/rmlui/otui.lua" "$fixture/test.lua"
 fi
 cd "$fixture"
 set +e

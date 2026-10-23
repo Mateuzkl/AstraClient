@@ -171,6 +171,6 @@ function init()
 end
 
 function terminate()
-    g_keyboard.unbindKeyDown('Ctrl+Shift+O')
+    g_keyboard.unbindKeyDown('Ctrl+Shift+O', toggle)
     if M.window then M.window:destroy() M.window = nil end
 end

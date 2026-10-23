@@ -39,6 +39,7 @@ env.Rml = {
 assert(setfenv(assert(loadfile('modules/client_rmlshowcase/showcase.lua')), env))()
 env.toggle()
 local s = created[#created]
+assert(#s.w.updates == 1, 'showcase registered redundant update callbacks')
 assert(#s.model.items == 0 and #s.model.bigItems == 0 and #s.model.slides == 0 and #s.model.examples == 0,
     'unopened tabs eagerly instantiated lists')
 update(s.w)
@@ -141,3 +142,41 @@ assert(saved.vsync == true, 'RmlUi did not apply through client_settings')
 settings.model.OpenClassic()
 assert(classic == 1)
 print('RmlUi opening: PASS (lazy tabs, rebuild bounds, outfit fields, shortcuts and settings API)')
+
+-- Real signal and keyboard implementations: a module must not erase another
+-- owner's binding on the same key, including after repeated load/unload.
+dofile('modules/corelib/table.lua')
+dofile('modules/corelib/string.lua')
+local keys = setmetatable({rootWidget={}, g_logger={error=error, log=function() end}}, {__index=_G})
+assert(setfenv(assert(loadfile('modules/corelib/util.lua')), keys))()
+assert(setfenv(assert(loadfile('modules/corelib/keyboard.lua')), keys))()
+for _, spec in ipairs({
+    {'modules/client_rmldemo/rmldemo.lua','Ctrl+Shift+R'},
+    {'modules/client_rmloptions/rmloptions.lua','Ctrl+Shift+O'},
+    {'modules/client_rmlshowcase/showcase.lua','Ctrl+Shift+U'},
+    {'modules/game_rmloutfit/rmloutfit.lua','Ctrl+Shift+F'},
+    {'modules/game_rmlminimap/rmlminimap.lua','Ctrl+Shift+J'},
+}) do
+    local foreignCalls,moduleCalls=0,0
+    local foreign=function() foreignCalls=foreignCalls+1 end
+    keys.g_keyboard.bindKeyDown(spec[2],foreign)
+    local module=setmetatable({
+        g_keyboard=keys.g_keyboard, Rml={isAvailable=function() return true end}, g_rml={},
+        modules={client_topmenu={addLeftButton=function() return {destroy=function() end} end}},
+    },{__index=keys})
+    assert(setfenv(assert(loadfile(spec[1])),module))()
+    module.toggle=function() moduleCalls=moduleCalls+1 end
+    local function fire()
+        local signal=keys.rootWidget.boundKeyDownCombos[keys.retranslateKeyComboDesc(spec[2])]
+        if type(signal)=='table' then for _,f in ipairs(signal) do f() end
+        elseif signal then signal() end
+    end
+    for cycle=1,2 do
+        module.init(); fire()
+        assert(moduleCalls==cycle, spec[1]..': duplicate module callback')
+        module.terminate(); fire()
+        assert(moduleCalls==cycle and foreignCalls==cycle*2, spec[1]..': removed foreign shortcut')
+    end
+    keys.g_keyboard.unbindKeyDown(spec[2],foreign)
+end
+print('RmlUi hotkeys: PASS (real keyboard/signals, five modules, shared shortcuts, two reloads)')

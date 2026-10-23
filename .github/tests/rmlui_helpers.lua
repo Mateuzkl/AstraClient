@@ -71,4 +71,18 @@ assert(Rml.createPanel(nil, '/missing.rml') == nil)
 assert(destroyed == before + 1, 'failed panel retained its widget')
 g_rml=nil
 assert(not Rml.isAvailable())
+local watched=widget()
+local values={a=1,b=2}
+local model=setmetatable({}, {__index=function(_,key)
+  assert(not watched:isDestroyed(), 'watch read a retired model after onChange destroyed its owner')
+  return values[key]
+end})
+local changes=0
+Rml.watch(watched,model,{'a','b'},function()
+  changes=changes+1
+  watched:destroy()
+end)
+values.a,values.b=3,4
+watched.onRmlUpdate()
+assert(changes == 1, 'watch dispatched another callback after destroy')
 print('RmlUi helpers: PASS')

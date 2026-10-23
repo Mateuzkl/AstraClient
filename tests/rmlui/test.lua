@@ -10,6 +10,34 @@ for i=1,20 do
 end
 local initialContexts = g_rml.getContextCount()
 local initialWidgets = g_rml.getWidgetCount()
+local function testUnloadReentrancy(done)
+    local w = Rml.createWindow {
+        document='/smoke.rml', model='smoke', width=420, height=280,
+        data={title='Unload replacement', shown=true, name=''},
+    }
+    local old = w:getDocument()
+    local unloaded = 0
+    old:AddEventListener('unload', function()
+        unloaded=unloaded+1
+        assert(w:getDocument() == nil, 'unload exposed a document being closed')
+        w:unloadDocument() -- Nested unload must not dispatch the old document again.
+        assert(w:loadDocument('/smoke.rml'), 'unload listener could not load its replacement')
+    end, false)
+    w:unloadDocument()
+    assert(unloaded == 1 and w:hasDocument(), 'outer unload discarded the replacement document')
+    w:destroy()
+    local closing = Rml.createWindow {
+        document='/smoke.rml', model='smoke', width=420, height=280,
+        data={title='Destroy during unload', shown=true, name=''},
+    }
+    closing:getDocument():AddEventListener('unload', function() closing:destroy() end, false)
+    assert(not closing:loadDocument('/smoke.rml'), 'load continued after unload destroyed the host')
+    scheduleEvent(function()
+        assert(g_rml.getContextCount() == initialContexts and g_rml.getWidgetCount() == initialWidgets)
+        print('[RMLUI TEST] reentrant unload preserved replacement/retired destroyed host')
+        done()
+    end, 100)
+end
 local function testDestroyFromUnload(done)
     local first = Rml.createWindow {
         document='/smoke.rml', model='smoke', width=420, height=280,
@@ -163,10 +191,10 @@ scheduleEvent(function()
                     testDestroyDuringUpdate(function()
                         testDestroyFromUnload(function()
                             testModelLifetime(function()
-                                testRenderPooling(function()
+                                testUnloadReentrancy(function() testRenderPooling(function()
                                     print('[RMLUI TEST] PASS: render, models, reload, host visibility, reentrant destruction, timers and 30 close cycles')
                                     g_app.exit()
-                                end)
+                                end) end)
                             end)
                         end)
                     end)

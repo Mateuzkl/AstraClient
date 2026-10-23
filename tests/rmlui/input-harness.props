@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Real engine/RmlUi handlers, replacing only main. No production input API. -->
+  <ItemGroup>
+    <ClCompile Remove="..\src\main.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)input_lifetime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)rml_input_lifetime.obj</ObjectFileName>
+    </ClCompile>
+  </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link><SubSystem>Console</SubSystem><EntryPointSymbol>mainCRTStartup</EntryPointSymbol></Link>
+  </ItemDefinitionGroup>
+</Project>

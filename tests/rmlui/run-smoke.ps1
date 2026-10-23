@@ -1,8 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$Binary,
     [string]$TempRoot = [IO.Path]::GetTempPath(),
-    [ValidateSet('core', 'skilltree')][string]$Scenario = 'core',
-    [ValidateSet('', '-warp', '-dx11', '-opengl')][string]$GraphicsBackend = '',
+    [ValidateSet('core', 'skilltree', 'otui')][string]$Scenario = 'core',
+    [ValidateSet('', '-warp', '-dx11', '-dx9', '-opengl')][string]$GraphicsBackend = '',
     [string]$GraphicsRuntimeDir
 )
 $ErrorActionPreference = 'Stop'
@@ -18,6 +18,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'data\fonts\rml') -Destination (Join-Pat
 Copy-Item -LiteralPath (Join-Path $repo 'data\styles\rml') -Destination (Join-Path $fixture 'data\styles') -Recurse
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bootstrap.lua') -Destination (Join-Path $fixture 'init.lua')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'test.lua'), (Join-Path $PSScriptRoot 'smoke.rml') -Destination $fixture
+if ($Scenario -eq 'otui') {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'otui.lua') -Destination (Join-Path $fixture 'test.lua')
+}
 if ($Scenario -eq 'skilltree') {
     Copy-Item -LiteralPath (Join-Path $repo 'modules\game_rmlskilltree') -Destination (Join-Path $fixture 'modules') -Recurse
     foreach ($folder in @('spells', 'tutorial')) { New-Item -ItemType Directory -Path (Join-Path $fixture "data\images\game\$folder") -Force | Out-Null }
@@ -30,7 +33,7 @@ $stdout = Join-Path $fixture 'stdout.log'
 $stderr = Join-Path $fixture 'stderr.log'
 $launchBinary = $binaryPath
 if ($GraphicsRuntimeDir) {
-    if ($GraphicsBackend -in @('-warp', '-dx11')) { throw 'An OpenGL runtime cannot replace the ANGLE backend.' }
+    if ($GraphicsBackend -in @('-warp', '-dx11', '-dx9')) { throw 'An OpenGL runtime cannot replace the ANGLE backend.' }
     $runtimePath = (Resolve-Path -LiteralPath $GraphicsRuntimeDir).Path
     if (-not (Test-Path -LiteralPath (Join-Path $runtimePath 'opengl32.dll'))) { throw 'Missing test OpenGL runtime.' }
     # Keep software GL out of the release package and the real client directory.
@@ -61,7 +64,16 @@ if ($process.ExitCode -ne 0 -or $log -notmatch '\[RMLUI TEST\] PASS:') {
     throw "RmlUi smoke failed (exit $($process.ExitCode)). Artifacts: $fixture"
 }
 if ($log -match 'ERROR:|FreeType error') { throw "RmlUi logged an error. Artifacts: $fixture" }
-if ($GraphicsBackend -in @('-warp', '-dx11') -and $log -notmatch 'backend ANGLE ES') {
+if ($Scenario -ne 'otui' -and $GraphicsBackend -in @('-warp', '-dx11') -and $log -notmatch 'backend ANGLE ES') {
     throw "DirectX smoke did not initialize the ANGLE backend. Artifacts: $fixture"
+}
+if ($Scenario -ne 'otui' -and $GraphicsBackend -in @('-warp', '-dx11')) {
+    $backendPattern = '\[EGL\] requested=' + [regex]::Escape($GraphicsBackend) + '; display=' + [regex]::Escape($GraphicsBackend) + '; requested ES=3; context client=3'
+    if ($log -notmatch $backendPattern -or $log -notmatch 'OpenGL OpenGL ES 3\.') {
+        throw "Requested ANGLE backend/ES3 was not actually selected. Artifacts: $fixture"
+    }
+}
+if ($GraphicsBackend -eq '-dx9' -and $log -notmatch '\[EGL\] requested=-dx9; display=-dx9;') {
+    throw "Requested ES2/DX9 backend fell back to another display. Artifacts: $fixture"
 }
 "RmlUi smoke artifacts: $fixture"

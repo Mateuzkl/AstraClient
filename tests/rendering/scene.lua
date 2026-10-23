@@ -33,13 +33,11 @@ function testRenderPooling(done)
         assert(attempts > 0, 'screenshot did not complete: ' .. file)
         scheduleEvent(function() waitFile(file, callback, attempts-1) end, 100)
     end
-    local prefix = 'render-' .. tostring(g_clock.millis())
+    local prefix = 'render-' .. g_crypt.genUUID()
     print('[RENDER POOL TEST] scene ready')
-    local heap, pool = prefix .. '-heap.png', prefix .. '-pool.png'
+    local pool = prefix .. '-pool.png'
     g_app.setDrawCommandPooling(false)
-    scheduleEvent(function()
-        g_app.doScreenshot(heap)
-        waitFile(heap, function(original)
+    local function comparePool(original)
             g_app.setDrawCommandPooling(true)
             scheduleEvent(function()
                 g_app.doScreenshot(pool)
@@ -62,6 +60,18 @@ function testRenderPooling(done)
                     end,150)
                 end, 50)
             end, 350)
-        end, 50)
-    end, 350)
+    end
+    -- Startup resize/viewport events can reach the graphics thread after the
+    -- first UI queue. Require two identical heap frames before changing mode;
+    -- otherwise a projection change is falsely attributed to command pooling.
+    local function stableHeap(previous, attempts)
+        local heap=prefix .. '-heap-' .. attempts .. '.png'
+        g_app.doScreenshot(heap)
+        waitFile(heap,function(frame)
+            if previous == frame then comparePool(frame); return end
+            assert(attempts > 0, 'heap scene did not stabilize before pooling comparison')
+            scheduleEvent(function() stableHeap(frame,attempts-1) end,350)
+        end,50)
+    end
+    scheduleEvent(function() stableHeap(nil,4) end,350)
 end

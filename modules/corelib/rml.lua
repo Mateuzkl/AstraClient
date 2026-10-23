@@ -436,6 +436,7 @@ function Rml.watch(window, model, keys, onChange, kinds)
     connect(window, {
         onRmlUpdate = function()
             for _, key in ipairs(keys) do
+                if window:isDestroyed() then return end
                 local value = read(key)
                 if value ~= last[key] then
                     local old = last[key]

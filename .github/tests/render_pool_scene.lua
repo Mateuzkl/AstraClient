@@ -1,10 +1,13 @@
 -- Execute the real smoke scene against a deliberately incomplete async PNG writer.
+local sequence=0
 local function run(missing)
   local tasks, files, reads, modes, completed = {}, {}, {}, {}, false
   local widget = setmetatable({}, {__index=function() return function() end end})
   rootWidget = widget
   g_ui = {createWidget=function() return widget end}
   g_clock = {millis=function() return 42 end}
+  sequence=sequence+1
+  g_crypt={genUUID=function() return 'fixture-'..sequence end}
   local visible=true
   g_window={hide=function() visible=false end,show=function() visible=true end,isVisible=function() return visible end}
   g_app = {

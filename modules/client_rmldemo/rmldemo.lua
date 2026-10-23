@@ -156,6 +156,6 @@ function init()
 end
 
 function terminate()
-    g_keyboard.unbindKeyDown('Ctrl+Shift+R')
+    g_keyboard.unbindKeyDown('Ctrl+Shift+R', toggle)
     close()
 end

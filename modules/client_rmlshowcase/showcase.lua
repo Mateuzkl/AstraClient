@@ -313,6 +313,9 @@ local function open()
     }
     if not window then return nil end
 
+    local nativeItem, nativeCreature = createNativeWidgets(window)
+    fillNativeWidgets(nativeItem, nativeCreature)
+
     -- valores derivados calculados no Lua (o documento só exibe)
     connect(window, {
         onRmlUpdate = function()
@@ -340,6 +343,10 @@ local function open()
                 if spritesReady then model.items, model.bigItems = spriteData() end
             end
             if model.online ~= g_game.isOnline() then model.online = g_game.isOnline() end
+            if loaded and not nativeCreature.filled then
+                nativeCreature.filled = true
+                fillNativeWidgets(nativeItem, nativeCreature)
+            end
         end
     })
 
@@ -362,16 +369,6 @@ local function open()
         Rml.setText(window, 'mouse-info', string.format('x = %d, y = %d', p.mouse_x or 0, p.mouse_y or 0))
     end)
 
-    local nativeItem, nativeCreature = createNativeWidgets(window)
-    fillNativeWidgets(nativeItem, nativeCreature)
-    connect(window, {
-        onRmlUpdate = function()
-            if thingsLoaded() and not nativeCreature.filled then
-                nativeCreature.filled = true
-                fillNativeWidgets(nativeItem, nativeCreature)
-            end
-        end
-    })
     return window
 end
 
@@ -387,7 +384,7 @@ function init()
 end
 
 function terminate()
-    g_keyboard.unbindKeyDown('Ctrl+Shift+U')
+    g_keyboard.unbindKeyDown('Ctrl+Shift+U', toggle)
     if M.window then M.window:destroy() M.window = nil end
     if M.button then M.button:destroy() M.button = nil end
 end

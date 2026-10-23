@@ -141,6 +141,7 @@ UIRmlWidget::CallScope::~CallScope() = default;
 
 void UIRmlWidget::onDestroy()
 {
+    m_dragging = false;
     // Lua may retain a destroyed widget indefinitely; it must not keep the tick alive.
     g_rml.unregisterWidget(this);
     if (m_context && !m_releaseQueued) {
@@ -223,11 +224,14 @@ bool UIRmlWidget::loadDocument(const std::string& path)
         CallScope scope(*this);
 
         if (m_document) {
-            m_document->Close();
-            m_document = nullptr;
+            auto* previous = std::exchange(m_document, nullptr);
+            previous->Close();
+            // Unload listeners can destroy the host or load a replacement.
+            if (isDestroyed() || !m_context || m_document) return false;
         }
 
         m_document = m_context->LoadDocument(path);
+        if (isDestroyed() || !m_context) return false;
         if (!m_document) {
             g_logger.error(stdext::format("[rmlui] unable to load '%s'", path));
             m_documentPath.clear();
@@ -243,22 +247,22 @@ bool UIRmlWidget::loadDocument(const std::string& path)
         m_document->Show();
     }
 
-    if (isDestroyed()) return false;
+    if (isDestroyed() || !m_document) return false;
     callLuaField("onRmlDocumentLoaded", path);
     return true;
 }
 
 void UIRmlWidget::unloadDocument()
 {
-    if (!m_document)
+    if (isDestroyed() || !m_document)
         return;
 
     CallScope scope(*this);
-    m_document->Close();
-    m_document = nullptr;
+    auto* document = std::exchange(m_document, nullptr);
     m_baseStyleSheet = nullptr;
     m_documentPath.clear();
-    if (m_context)
+    document->Close();
+    if (!isDestroyed() && m_context)
         m_context->Update();
 }
 
@@ -432,7 +436,7 @@ std::string UIRmlWidget::findDragMode() const
 void UIRmlWidget::onHoverChange(const bool hovered)
 {
     UIWidget::onHoverChange(hovered);
-    if (!hovered && m_context && !m_dragging) {
+    if (!isDestroyed() && !hovered && m_context && !m_dragging) {
         CallScope scope(*this);
         m_context->ProcessMouseLeave();
     }
@@ -441,7 +445,7 @@ void UIRmlWidget::onHoverChange(const bool hovered)
 void UIRmlWidget::onFocusChange(const bool focused, const Fw::FocusReason reason)
 {
     UIWidget::onFocusChange(focused, reason);
-    if (!focused && m_context) {
+    if (!isDestroyed() && !focused && m_context) {
         CallScope scope(*this);
         if (auto* focus = m_context->GetFocusElement())
             focus->Blur();
@@ -450,10 +454,12 @@ void UIRmlWidget::onFocusChange(const bool focused, const Fw::FocusReason reason
 
 bool UIRmlWidget::onMousePress(const Point& mousePos, const Fw::MouseButton button)
 {
+    if (isDestroyed()) return true;
     bool consumed = false;
     if (m_context) {
         CallScope scope(*this);
         m_context->ProcessMouseMove(localX(mousePos), localY(mousePos), 0);
+        if (isDestroyed() || !m_context) return true;
         consumed = !m_context->ProcessMouseButtonDown(toRmlButton(button), 0);
         if (isDestroyed()) return true;
 
@@ -473,10 +479,12 @@ bool UIRmlWidget::onMousePress(const Point& mousePos, const Fw::MouseButton butt
 
 bool UIRmlWidget::onMouseRelease(const Point& mousePos, const Fw::MouseButton button)
 {
+    if (isDestroyed()) return true;
     bool consumed = false;
     if (m_context) {
         CallScope scope(*this);
         consumed = !m_context->ProcessMouseButtonUp(toRmlButton(button), 0);
+        if (isDestroyed() || !m_context) return true;
     }
 
     if (button == Fw::MouseLeftButton && m_dragging) {
@@ -490,8 +498,10 @@ bool UIRmlWidget::onMouseRelease(const Point& mousePos, const Fw::MouseButton bu
 
 bool UIRmlWidget::onMouseMove(const Point& mousePos, const Point& mouseMoved)
 {
+    if (isDestroyed()) return true;
     if (m_dragging) {
         setPosition(mousePos - m_dragOffset);
+        if (isDestroyed()) return true; // onGeometryChange can close the host.
         bindRectToParent();
         return true;
     }
@@ -499,6 +509,7 @@ bool UIRmlWidget::onMouseMove(const Point& mousePos, const Point& mouseMoved)
     if (m_context) {
         CallScope scope(*this);
         m_context->ProcessMouseMove(localX(mousePos), localY(mousePos), 0);
+        if (isDestroyed() || !m_context) return true;
     }
 
     return UIWidget::onMouseMove(mousePos, mouseMoved);
@@ -506,22 +517,28 @@ bool UIRmlWidget::onMouseMove(const Point& mousePos, const Point& mouseMoved)
 
 bool UIRmlWidget::onMouseWheel(const Point& mousePos, const Fw::MouseWheelDirection direction)
 {
+    if (isDestroyed()) return true;
     if (m_context && direction != Fw::MouseNoWheel) {
         CallScope scope(*this);
         m_context->ProcessMouseMove(localX(mousePos), localY(mousePos), 0);
+        if (isDestroyed() || !m_context) return true;
         if (!m_context->ProcessMouseWheel(direction == Fw::MouseWheelUp ? -1.f : 1.f, 0))
             return true;
+        if (isDestroyed() || !m_context) return true;
     }
     return UIWidget::onMouseWheel(mousePos, direction);
 }
 
 bool UIRmlWidget::onKeyText(const std::string& keyText)
 {
+    if (isDestroyed()) return true;
     if (m_context && !keyText.empty() && static_cast<uint8_t>(keyText.front()) >= 32 && static_cast<uint8_t>(keyText.front()) != 127) {
         CallScope scope(*this);
         if (auto* focus = m_context->GetFocusElement()) {
+            // Input can remove the focused element or replace the entire document.
+            const bool textField = isTextField(focus);
             const bool notConsumed = m_context->ProcessTextInput(RmlManager::utf8(keyText));
-            if (!notConsumed || isTextField(focus))
+            if (isDestroyed() || !m_context || !notConsumed || textField)
                 return true;
         }
     }
@@ -530,6 +547,7 @@ bool UIRmlWidget::onKeyText(const std::string& keyText)
 
 bool UIRmlWidget::onKeyDown(const uint8_t keyCode, const int keyboardModifiers)
 {
+    if (isDestroyed()) return true;
     // Astra's walking/spell hotkeys run on key-down, before key-press.
     if (m_context && keyCode != Fw::KeyEscape) {
         CallScope scope(*this);
@@ -540,12 +558,14 @@ bool UIRmlWidget::onKeyDown(const uint8_t keyCode, const int keyboardModifiers)
 
 bool UIRmlWidget::onKeyPress(const uint8_t keyCode, const int keyboardModifiers, const int autoRepeatTicks)
 {
+    if (isDestroyed()) return true;
     if (m_context) {
         CallScope scope(*this);
         const auto key = toRmlKey(keyCode);
         if (auto* focus = m_context->GetFocusElement(); focus && key != Rml::Input::KI_UNKNOWN) {
+            const bool textField = isTextField(focus);
             const bool notConsumed = m_context->ProcessKeyDown(key, toRmlModifiers(keyboardModifiers));
-            if (!notConsumed || (isTextField(focus) && key != Rml::Input::KI_ESCAPE))
+            if (isDestroyed() || !m_context || !notConsumed || (textField && key != Rml::Input::KI_ESCAPE))
                 return true;
         }
     }
@@ -554,11 +574,13 @@ bool UIRmlWidget::onKeyPress(const uint8_t keyCode, const int keyboardModifiers,
 
 bool UIRmlWidget::onKeyUp(const uint8_t keyCode, const int keyboardModifiers)
 {
+    if (isDestroyed()) return true;
     if (m_context) {
         CallScope scope(*this);
         const auto key = toRmlKey(keyCode);
         if (key != Rml::Input::KI_UNKNOWN)
             m_context->ProcessKeyUp(key, toRmlModifiers(keyboardModifiers));
+        if (isDestroyed() || !m_context) return true;
     }
     return UIWidget::onKeyUp(keyCode, keyboardModifiers);
 }

@@ -23,6 +23,7 @@
 #ifdef WIN32
 
 #include "win32window.h"
+#include "eglcontext.h"
 #include <framework/graphics/image.h>
 #include <framework/core/application.h>
 #include <framework/core/resourcemanager.h>
@@ -374,6 +375,8 @@ void WIN32Window::internalCreateGLContext()
         return false;
     };
 
+    const char* requestedName = "auto";
+    const char* selectedName = "default";
     if (eglGetPlatformDisplayEXT) {
         const std::array<std::pair<const char*, size_t>, 5> rendererOptions = {{
             {"-dx11", 1},
@@ -387,16 +390,19 @@ void WIN32Window::internalCreateGLContext()
         for (const auto& [option, index] : rendererOptions) {
             if (g_app.hasStartupOption(option)) {
                 requestedBackend = index;
+                requestedName = option;
                 break;
             }
         }
 
-        const auto tryBackend = [&](size_t index) {
-            return setupDisplay(eglGetPlatformDisplayEXT(
-                EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[index]));
+        const auto tryBackend = [&](const char* option, size_t index) {
+            if (!setupDisplay(eglGetPlatformDisplayEXT(
+                EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[index]))) return false;
+            selectedName = option;
+            return true;
         };
 
-        if (requestedBackend && !tryBackend(*requestedBackend)) {
+        if (requestedBackend && !tryBackend(requestedName, *requestedBackend)) {
             g_logger.warning("Requested graphics backend is unavailable, trying automatic fallback.");
         }
 
@@ -404,7 +410,7 @@ void WIN32Window::internalCreateGLContext()
             for (const auto& [option, index] : rendererOptions) {
                 if (requestedBackend && index == *requestedBackend)
                     continue;
-                if (tryBackend(index))
+                if (tryBackend(option, index))
                     break;
             }
         }
@@ -414,35 +420,39 @@ void WIN32Window::internalCreateGLContext()
         g_logger.fatal("No supported graphics backend was found. Update your graphics drivers and make sure libEGL.dll, libGLESv2.dll and d3dcompiler_47.dll are present.");
     }
 
-    static int configList[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_NONE
+    const auto tryContext = [&](const int version) {
+        const EGLint configList[] = {
+            EGL_RENDERABLE_TYPE, version == 3 ? EGL_OPENGL_ES3_BIT_KHR : EGL_OPENGL_ES2_BIT,
+            EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE
+        };
+        EGLConfig config{};
+        EGLint count = 0;
+        if (!eglChooseConfig(m_eglDisplay, configList, &config, 1, &count) || count == 0) return false;
+        const EGLint attributes[] = { EGL_CONTEXT_CLIENT_VERSION, version, EGL_NONE };
+        const EGLContext context = eglCreateContext(m_eglDisplay, config, EGL_NO_CONTEXT, attributes);
+        if (context == EGL_NO_CONTEXT) return false;
+        m_eglConfig = config;
+        m_eglContext = context;
+        return true;
     };
-
-    EGLint numConfig;
-
-    if(!eglGetConfigs(m_eglDisplay, NULL, 0xFFFF, &numConfig)) // it must have 0xFFFF to work
-        g_logger.fatal("No valid GL configurations");
-
-    if(!eglChooseConfig(m_eglDisplay, configList, &m_eglConfig, 1, &numConfig))
-        g_logger.fatal("Failed to choose EGL config");
-
-    EGLint contextAtrrList[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
-        EGL_NONE
-    };
+#ifdef FW_RMLUI
+    constexpr bool preferEs3 = true;
+#else
+    constexpr bool preferEs3 = false;
+#endif
+    const int requestedVersion = AstraEgl::negotiateContext(preferEs3, tryContext);
+    if (!requestedVersion)
+        g_logger.fatal(stdext::format("Unable to create EGL ES2/ES3 context: %i", eglGetError()));
+    if (preferEs3 && requestedVersion == 2)
+        g_logger.warning("[EGL] ES3 unavailable; using the OTUI ES2 fallback (RmlUi requires ES3).");
+    EGLint clientVersion = 0;
+    eglQueryContext(m_eglDisplay, m_eglContext, EGL_CONTEXT_CLIENT_VERSION, &clientVersion);
+    g_logger.info(stdext::format("[EGL] requested=%s; display=%s; requested ES=%d; context client=%d",
+        requestedName, selectedName, requestedVersion, clientVersion));
 
     m_eglSurface = eglCreateWindowSurface(m_eglDisplay, m_eglConfig, m_window, NULL);
     if(m_eglSurface == EGL_NO_SURFACE)
         g_logger.fatal(stdext::format("Unable to create EGL surface: %i", eglGetError()));
-
-    m_eglContext = eglCreateContext(m_eglDisplay, m_eglConfig, EGL_NO_CONTEXT, contextAtrrList);
-    if(m_eglContext == EGL_NO_CONTEXT )
-        g_logger.fatal(stdext::format("Unable to create EGL context: %i", eglGetError()));
 
 #else
     uint pixelFormat;

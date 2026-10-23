@@ -1,0 +1,12 @@
+-- Unsupported GL/GLES or explicitly disabled RmlUi must leave OTUI operational.
+assert(not Rml.isAvailable(), 'fallback fixture unexpectedly enabled RmlUi')
+local panel=g_ui.createWidget('UIWidget',rootWidget)
+panel:setRect({x=20,y=20,width=120,height=80})
+panel:setBackgroundColor('#314159')
+assert(panel:isVisible() and not panel:isDestroyed(), 'OTUI unavailable without RmlUi')
+dofile('/render-scene.lua')
+testRenderPooling(function()
+    panel:destroy()
+    print('[RMLUI TEST] PASS: OTUI-only fallback and identical rendered pixels')
+    g_app.exit()
+end)

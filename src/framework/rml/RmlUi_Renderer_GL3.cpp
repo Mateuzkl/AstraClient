@@ -801,6 +801,8 @@ RenderInterface_GL3::RenderInterface_GL3()
 			});
 			s_sharedProgramData = program_data;
 		}
+		else
+			Gfx::DestroyShaders(*mut_program_data); // Includes partially compiled programs/shaders.
 	}
 
 	if (program_data)
