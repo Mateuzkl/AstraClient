@@ -30,9 +30,14 @@ function Chat.new(consolePanel, maxMessages)
 end
 
 function Chat:terminate()
-    for _, tab in ipairs(self.tabs) do
-        tab:stopSlowMode()
-    end
+    self.tabBar.onTabChange = nil
+    for i = #self.tabs, 1, -1 do self.tabs[i]:destroy() end
+    self.tabs = {}
+    self.tabsById = {}
+    self.tabsByName = {}
+    self.tabsServerLog = {}
+    self.readOnlyTabMessage = nil
+    self.readOnly.tab = nil
 end
 
 function Chat:setOwnPrivateChat(v)
@@ -209,9 +214,11 @@ function Chat:getTabsName()
 end
 
 function Chat:offline()
-    for _, tab in ipairs(self.tabs) do
+    -- offline() can remove the tab from this array; forward iteration skips
+    -- every second removable channel and retains its messages/timer.
+    for i = #self.tabs, 1, -1 do
+        local tab = self.tabs[i]
         tab:offline()
-        tab:clearMessages()
     end
 
     self:closeReadOnly()
@@ -328,6 +335,7 @@ function Chat:removeTabById(id)
     local tab = self:getTabById(id)
     local isOwnerPrivate = tab and tab:isOwnerPrivate()
     if tab then
+        if self.readOnlyTabMessage == tab then self:closeReadOnly() end
         self.tabsServerLog[tab:getName()] = nil
         self.tabsByName[tab:getName()] = nil
         tab:destroy()
@@ -372,6 +380,7 @@ function Chat:removeTabByName(name)
     local isOwnerPrivate = tab and tab:isOwnerPrivate()
 
     if tab then
+        if self.readOnlyTabMessage == tab then self:closeReadOnly() end
         tab:destroy()
     end
     self.tabsByName[name] = nil
@@ -1055,6 +1064,8 @@ function Chat:closeReadOnly(name)
         self.readOnlyTabMessage:setReadOnlyFixed(false)
     end
 
+    self.readOnlyTabMessage = nil
+    self.readOnly.tab = nil
     self.readOnly:setText('')
     self.readOnly:setImageSource("/images/ui/console")
     self.readOnly:setImageClip("64 0 96 16")
