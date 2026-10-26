@@ -1,9 +1,11 @@
 # Local data-model reference fixes for the pinned RmlUi 6.3 Lua plugin.
-# Applied to the fetched sources in both CMake and vc23 builds, never to
-# installed dependency headers. The Lua data model roots every child reference
-# in its value store and only ever frees the three top-level stores, so each
-# render pass over a table used to leak one registry slot and one proxy per
-# child. Chat republishes its message list on every new line, which made that
+# Applied to the fetched sources during configure in both the CMake and the vc23
+# builds: the vc23 RmlUi dependency target configures cmake/rmlui, which pulls in
+# cmake/FetchRmlUi.cmake and therefore runs this function too. Installed
+# dependency headers are never modified. The Lua data model roots every child
+# reference in its value store and only ever frees the three top-level stores, so
+# every update that replaced a table used to leak one registry slot and one proxy
+# per child. Chat republishes its message list on every new line, which made that
 # leak visible as unbounded memory growth.
 function(astra_patch_rmlui_data_model source_dir)
     set(lua_dir "${source_dir}/Source/Lua")
