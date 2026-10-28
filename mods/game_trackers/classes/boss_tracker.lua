@@ -50,15 +50,15 @@ function BossTracker.resetWindow()
 end
 
 function BossTracker.showTrackerData()
-	-- Same as the bestiary tracker: this is driven by a server push and only builds widgets,
-	-- so skip it entirely while the window is closed. toggleBossTracker() re-renders on open.
-	if not bossTrackerWindow or not bossTrackerWindow:isVisible() then
+	-- Cache server pushes while hidden/minimized; visibility callbacks and
+	-- moveTracker() refresh these rows when the contents become visible again.
+	if not bossTrackerWindow or not bossTrackerWindow:isVisible() or
+	   not bossTrackerWindow.contentsPanel:isVisible() then
 		return
 	end
 
-	bossTrackerWindow.contentsPanel:destroyChildren()
-
 	if not BossTrackerList or #BossTrackerList == 0 then
+		bossTrackerWindow.contentsPanel:destroyChildren()
 		return
 	end
 
@@ -97,6 +97,8 @@ function BossTracker.showTrackerData()
 	end)
 	local layout = bossTrackerWindow.contentsPanel:getLayout()
 	layout:disableUpdates()
+	local activeWidgets = {}
+	local index = 0
 	for _, data in ipairs(BossTrackerList) do
 		local creature = monsterList[data[1]]
 		if not creature then
@@ -104,9 +106,22 @@ function BossTracker.showTrackerData()
 			goto continue
 		end
 
-		local widget = g_ui.createWidget('BossPanel', bossTrackerWindow.contentsPanel)
+		local widget = bossTrackerWindow.contentsPanel:getChildById(creature[1])
+		if not widget then
+			widget = g_ui.createWidget('BossPanel', bossTrackerWindow.contentsPanel)
+			widget:setId(creature[1])
+			widget.cooldown:insertLuaCall("onDestroy")
+			widget.cooldown.onDestroy = function(self)
+				if self.eventCooldown then
+					removeEvent(self.eventCooldown)
+					self.eventCooldown = nil
+				end
+			end
+		end
+		activeWidgets[widget:getId()] = true
+		index = index + 1
+		bossTrackerWindow.contentsPanel:moveChildToIndex(widget, index)
 		widget.creature:setOutfit({type = creature[2], auxType = creature[3], head = creature[4], body = creature[5], legs = creature[6], feet = creature[7], addons = creature[8]})
-		widget:setId(creature[1])
 
 		local bossName = string.capitalize(creature[1])
 		widget.bossName:setText(short_text(bossName, 16))
@@ -119,6 +134,18 @@ function BossTracker.showTrackerData()
 		local firstUnlock = data[3]
 		local secondUnlock = data[4]
 		local thirdUnlock = data[5]
+		-- Reused rows must also handle lower/reset progress from a fresh snapshot.
+		widget.trackerContainer1.killsBar1:setPercent(0)
+		widget.trackerContainer2.killsBar2:setPercent(0)
+		local completed = currentKills >= thirdUnlock
+		if widget.trackerCompleted ~= completed then
+			local image = completed and '/game_cyclopedia/images/ui/monster-bar-green' or
+			    '/game_cyclopedia/images/ui/mosnter-bar'
+			widget.trackerContainer.killsBar:setImageSource(image)
+			widget.trackerContainer1.killsBar1:setImageSource(image)
+			widget.trackerContainer2.killsBar2:setImageSource(image)
+			widget.trackerCompleted = completed
+		end
 
 		local bossName, bossCooldown = modules.game_analyser.BossCooldown:hasCooldown(data[1])
 		if not string.empty(bossName) and bossCooldown ~= -1 then
@@ -167,15 +194,12 @@ function BossTracker.showTrackerData()
       		end
     	end
 
-		widget.cooldown:insertLuaCall("onDestroy")
-		widget.cooldown.onDestroy = function(self)
-			if self.eventCooldown then
-				removeEvent(self.eventCooldown)
-				self.eventCooldown = nil
-			end
-		end
-
 		:: continue ::
+	end
+	for _, widget in ipairs(bossTrackerWindow.contentsPanel:getChildren()) do
+		if not activeWidgets[widget:getId()] then
+			widget:destroy()
+		end
 	end
 
 	layout:enableUpdates()

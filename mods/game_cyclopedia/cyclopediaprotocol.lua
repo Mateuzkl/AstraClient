@@ -513,9 +513,15 @@ function CyclopediaProtocol.search(query)
   sendMessage(msg)
 end
 
+function CyclopediaProtocol.onGameStart()
+  CyclopediaProtocol.register()
+  -- Race 0 requests the persisted list without toggling any tracked creature.
+  CyclopediaProtocol.tracker(0)
+end
+
 function initCyclopediaProtocol()
   connect(g_game, {
-    onGameStart = CyclopediaProtocol.register,
+    onGameStart = CyclopediaProtocol.onGameStart,
     onGameEnd = CyclopediaProtocol.unregister
   })
 
@@ -531,13 +537,13 @@ function initCyclopediaProtocol()
   g_game.bestiarySearch = CyclopediaProtocol.search
 
   if g_game.isOnline() then
-    CyclopediaProtocol.register()
+    CyclopediaProtocol.onGameStart()
   end
 end
 
 function terminateCyclopediaProtocol()
   disconnect(g_game, {
-    onGameStart = CyclopediaProtocol.register,
+    onGameStart = CyclopediaProtocol.onGameStart,
     onGameEnd = CyclopediaProtocol.unregister
   })
   CyclopediaProtocol.unregister()

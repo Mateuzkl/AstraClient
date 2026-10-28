@@ -194,6 +194,7 @@ function Bosstiary.onBosstiaryBaseData(killData, rewardData)
 	for i = 1, #rewardData do
 		baseRewardData[i] = {firstUnlock = rewardData[i][1], secondUnlock = rewardData[i][2], thirdUnlock = rewardData[i][3]}
 	end
+	Bosstiary.updateTracker()
 end
 
 function Bosstiary.onBosstiaryWindowData(data)
@@ -202,6 +203,8 @@ function Bosstiary.onBosstiaryWindowData(data)
 	local alreadyOpened = rawBosstiaryData ~= nil
 	creatureRenderGeneration = creatureRenderGeneration + 1
 	rawBosstiaryData = data
+	-- Tracker state belongs to the packet, not to cancellable Cyclopedia panel work.
+	Bosstiary.updateTracker()
 	if not alreadyOpened then
 		sortFields = {}
 	end
@@ -217,7 +220,6 @@ function Bosstiary.onBosstiaryWindowData(data)
 
 		local panel = VisibleCyclopediaPanel
 		if not panel or panel:isDestroyed() then
-			Bosstiary.updateTracker()
 			return
 		end
 
@@ -227,7 +229,6 @@ function Bosstiary.onBosstiaryWindowData(data)
 		nextButton = panel:recursiveGetChildById('nextListButton')
 		searchField = panel:recursiveGetChildById('searchBosstiary')
 		if not bosstiaryMonsterPanel or not pageCounter or not previousButton or not nextButton then
-			Bosstiary.updateTracker()
 			return
 		end
 
@@ -236,7 +237,6 @@ function Bosstiary.onBosstiaryWindowData(data)
 			Bosstiary.configureBossList(rawBosstiaryData, activeSearch)
 			bosstiaryCurrentPage = math.max(1, math.min(bosstiaryCurrentPage, #bosstiaryCreatures))
 			Bosstiary.showCreatures()
-			Bosstiary.updateTracker()
 			return
 		end
 
@@ -256,7 +256,6 @@ function Bosstiary.onBosstiaryWindowData(data)
 		if searchField then
 			searchField:focus()
 		end
-		Bosstiary.updateTracker()
 	end, 1)
 end
 

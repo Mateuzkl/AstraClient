@@ -12,6 +12,19 @@ imbuementTrackerWindow = nil
 
 local openWindowEvent = nil
 
+local function onBestiaryVisibilityChange(_, visible)
+	if visible then
+		BestiaryTracker.showTrackerData()
+	else
+		BestiaryTracker.cancelRender()
+	end
+end
+
+local function onBossVisibilityChange(_, visible)
+	if visible then
+		BossTracker.showTrackerData()
+	end
+end
 
 function init()
 	connect(g_game, {
@@ -48,6 +61,12 @@ function init()
 
 	bestiaryTrackerWindow:setup()
 	bestiaryTrackerWindow:close()
+	-- The contents visibility also changes on minimize/maximize. Keep the native
+	-- MiniWindow visibility handler through connect(), including parent-panel restores.
+	connect(bestiaryTrackerWindow, { onVisibilityChange = onBestiaryVisibilityChange })
+	connect(bestiaryTrackerWindow.contentsPanel, { onVisibilityChange = onBestiaryVisibilityChange })
+	connect(bossTrackerWindow, { onVisibilityChange = onBossVisibilityChange })
+	connect(bossTrackerWindow.contentsPanel, { onVisibilityChange = onBossVisibilityChange })
 
 	-- init imbuement tracker
 	imbuementTrackerWindow = g_ui.loadUI('styles/imbui_tracker', m_interface.getRightPanel())
@@ -64,6 +83,10 @@ end
 function terminate()
 	offline()
 	BestiaryTracker.cancelRender()
+	disconnect(bestiaryTrackerWindow, { onVisibilityChange = onBestiaryVisibilityChange })
+	disconnect(bestiaryTrackerWindow.contentsPanel, { onVisibilityChange = onBestiaryVisibilityChange })
+	disconnect(bossTrackerWindow, { onVisibilityChange = onBossVisibilityChange })
+	disconnect(bossTrackerWindow.contentsPanel, { onVisibilityChange = onBossVisibilityChange })
 	disconnect(g_game, {
 		onMonsterTrackerData = Trackers.onMonsterTrackerData,
 		onUpdateImbuementTracker = ImbuementTracker.onReceiveData,
@@ -81,14 +104,16 @@ end
 function online()
 	local benchmark = g_clock.millis()
 	ImbuementTracker.online()
-	if g_game.isOnline() then
-		g_game.openBosstiaryWindow()
-	end
 	consoleln("Trackers loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
 	BestiaryTracker.cancelRender()
+	BestiaryTrackerList = {}
+	BossTrackerList = {}
+	if bestiaryTrackerWindow then
+		bestiaryTrackerWindow.contentsPanel:destroyChildren()
+	end
 	ImbuementTracker.offline()
 	BossTracker.resetWindow()
 	if openWindowEvent then
@@ -190,7 +215,11 @@ function moveTracker(type, panel, height, minimized)
     window:setHeight(height)
   end
 
-  if type == "imbuementTracker" then
+  if type == "bestiaryTracker" then
+    BestiaryTracker.showTrackerData()
+  elseif type == "bosstiaryTracker" then
+    BossTracker.showTrackerData()
+  elseif type == "imbuementTracker" then
     ImbuementTracker.initSortFields()
     g_game.doThing(false)
     g_game.imbuementDurations(true)

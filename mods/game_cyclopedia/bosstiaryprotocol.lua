@@ -188,9 +188,14 @@ function BosstiaryProtocol.tracker(raceId, enabled)
   sendMessage(msg)
 end
 
+function BosstiaryProtocol.onGameStart()
+  BosstiaryProtocol.register()
+  BosstiaryProtocol.openWindow()
+end
+
 function initBosstiaryProtocol()
   connect(g_game, {
-    onGameStart = BosstiaryProtocol.register,
+    onGameStart = BosstiaryProtocol.onGameStart,
     onGameEnd = BosstiaryProtocol.unregister
   })
 
@@ -200,13 +205,13 @@ function initBosstiaryProtocol()
   g_game.sendBosstiaryTracker = BosstiaryProtocol.tracker
 
   if g_game.isOnline() then
-    BosstiaryProtocol.register()
+    BosstiaryProtocol.onGameStart()
   end
 end
 
 function terminateBosstiaryProtocol()
   disconnect(g_game, {
-    onGameStart = BosstiaryProtocol.register,
+    onGameStart = BosstiaryProtocol.onGameStart,
     onGameEnd = BosstiaryProtocol.unregister
   })
   BosstiaryProtocol.unregister()

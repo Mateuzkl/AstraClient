@@ -40,6 +40,11 @@ on:
       - 'src/framework/platform/win32platform.cpp'
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
+      - '.github/tests/tracker_sync.lua'
+      - 'mods/game_trackers/**'
+      - 'mods/game_cyclopedia/cyclopediaprotocol.lua'
+      - 'mods/game_cyclopedia/bosstiaryprotocol.lua'
+      - 'mods/game_cyclopedia/classes/bosstiary.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - '.github/tests/game_bot_scheduler.lua'
       - '.github/tests/item_details_opcode_framing.lua'
@@ -100,6 +105,11 @@ on:
       - 'src/framework/platform/win32platform.cpp'
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
+      - '.github/tests/tracker_sync.lua'
+      - 'mods/game_trackers/**'
+      - 'mods/game_cyclopedia/cyclopediaprotocol.lua'
+      - 'mods/game_cyclopedia/bosstiaryprotocol.lua'
+      - 'mods/game_cyclopedia/classes/bosstiary.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - '.github/tests/game_bot_scheduler.lua'
       - '.github/tests/item_details_opcode_framing.lua'
@@ -249,6 +259,9 @@ jobs:
             src/client/protocolgameparse.cpp \
             src/client/protocolgamesend.cpp \
             src/client/const.h
+
+      - name: Test tracker synchronization and window lifecycle
+        run: luajit .github/tests/tracker_sync.lua
 
       - name: Test spell cooldown packets
         run: |

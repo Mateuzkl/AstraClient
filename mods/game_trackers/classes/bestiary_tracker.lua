@@ -47,6 +47,9 @@ local function scheduleRender(generation, callback)
 		if generation ~= renderGeneration or not bestiaryTrackerWindow or bestiaryTrackerWindow:isDestroyed() then
 			return
 		end
+		if not bestiaryTrackerWindow:isVisible() or not bestiaryTrackerWindow.contentsPanel:isVisible() then
+			return
+		end
 		callback()
 	end, 1)
 end
@@ -218,9 +221,10 @@ function BestiaryTracker.showTrackerData(update)
 	BestiaryTracker.cancelRender()
 
 	-- The server resends the whole tracker list every time a tracked creature is killed, so
-	-- this runs per kill. Everything below only produces widgets, so with the window closed it
-	-- is pure waste; toggleBestiaryTracker() re-renders from BestiaryTrackerList on open.
-	if not bestiaryTrackerWindow or not bestiaryTrackerWindow:isVisible() then
+	-- this runs per kill. Hidden/minimized contents keep the cached list; visibility
+	-- callbacks and moveTracker() render it when the contents become visible again.
+	if not bestiaryTrackerWindow or not bestiaryTrackerWindow:isVisible() or
+	   not bestiaryTrackerWindow.contentsPanel:isVisible() then
 		return
 	end
 
@@ -265,18 +269,14 @@ function BestiaryTracker.showTrackerData(update)
 		end
 	end)
 
-	local reuseWidgets = #BestiaryTrackerList == bestiaryTrackerWindow.contentsPanel:getChildCount()
-	if reuseWidgets then
-		for _, data in ipairs(BestiaryTrackerList) do
-			if not bestiaryTrackerWindow.contentsPanel:getChildById(data[1]) then
-				reuseWidgets = false
-				break
-			end
-		end
+	local trackedIds = {}
+	for _, data in ipairs(BestiaryTrackerList) do
+		trackedIds[tostring(data[1])] = true
 	end
-
-	if not reuseWidgets then
-		bestiaryTrackerWindow.contentsPanel:destroyChildren()
+	for _, widget in ipairs(bestiaryTrackerWindow.contentsPanel:getChildren()) do
+		if not trackedIds[widget:getId()] then
+			widget:destroy()
+		end
 	end
 
 	local generation = renderGeneration
@@ -291,11 +291,8 @@ function BestiaryTracker.showTrackerData(update)
 			return
 		end
 
-		if reuseWidgets then
-			local widget = bestiaryTrackerWindow.contentsPanel:getChildById(data[1])
-			if not widget then
-				return
-			end
+		local widget = bestiaryTrackerWindow.contentsPanel:getChildById(data[1])
+		if widget then
 			bestiaryTrackerWindow.contentsPanel:moveChildToIndex(widget, nextIndex)
 			BestiaryTracker.updateWidgetTracker(data, widget)
 		else
