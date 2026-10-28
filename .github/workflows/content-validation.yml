@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/scripts/native-changes.sh'
+      - '.github/tests/native_changes.sh'
       - '.github/tests/rmlui_helpers.lua'
       - '.github/tests/rmlui_assets.lua'
       - '.github/tests/rmlui_opening.lua'
@@ -70,6 +72,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/scripts/native-changes.sh'
+      - '.github/tests/native_changes.sh'
       - '.github/tests/rmlui_helpers.lua'
       - '.github/tests/rmlui_assets.lua'
       - '.github/tests/rmlui_opening.lua'
@@ -145,21 +149,37 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Test native build selection
+        run: bash .github/tests/native_changes.sh
+
+      - name: Detect native changes
+        id: native
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash .github/scripts/native-changes.sh
+
       - name: Install LuaJIT
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends luajit
 
       - name: Verify C++23 build policy and compiler features
+        if: steps.native.outputs.build == 'true'
         run: |
           c++ -std=c++23 -Isrc tests/cpp23/standard.cpp -o /tmp/astra-cxx23-probe
           /tmp/astra-cxx23-probe
           c++ -std=c++23 -Isrc tests/cpp23/utf8_path.cpp -o /tmp/astra-utf8-path
           /tmp/astra-utf8-path
 
+      - name: Test render pool Lua scene
+        run: luajit .github/tests/render_pool_scene.lua
+
       - name: Test render command ownership and line bounds
+        if: steps.native.outputs.build == 'true'
         run: |
-          luajit .github/tests/render_pool_scene.lua
           cmake -P tests/rmlui/cmake-fallback.cmake
           c++ -std=c++23 -O2 -Wall -Wextra -Werror -Isrc tests/rendering/command_pool.cpp -o /tmp/render-command-pool
           /tmp/render-command-pool
@@ -217,6 +237,10 @@ jobs:
           luajit .github/tests/item_details_opcode_framing.lua \
             modules/game_protocol/protocol.lua \
             src/client/protocolgameparse.cpp
+
+      - name: Test native item framing and walk trace budget
+        if: steps.native.outputs.build == 'true'
+        run: |
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -Werror -pedantic -I. \
             .github/tests/item_details_framing.cpp -o /tmp/item_details_framing
           /tmp/item_details_framing
@@ -264,6 +288,7 @@ jobs:
         run: luajit .github/tests/tracker_sync.lua
 
       - name: Test spell cooldown packets
+        if: steps.native.outputs.build == 'true'
         run: |
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
             .github/tests/spell_cooldown.cpp -I. \
@@ -271,6 +296,7 @@ jobs:
           /tmp/spell_cooldown_test
 
       - name: Test streaming sprite decoder
+        if: steps.native.outputs.build == 'true'
         run: |
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/sprite_decoder.cpp -I. \
@@ -281,11 +307,14 @@ jobs:
         run: luajit .github/tests/startup_lifecycle.lua
 
       - name: Test indexed sprite selection and lifecycle
+        run: luajit .github/tests/indexed_spr_lifecycle.lua
+
+      - name: Test native indexed sprite selection
+        if: steps.native.outputs.build == 'true'
         run: |
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/indexed_spr.cpp -I. -o /tmp/indexed_spr_test
           /tmp/indexed_spr_test
-          luajit .github/tests/indexed_spr_lifecycle.lua
 
       - name: Test native splash configuration
         run: luajit .github/tests/native_splash_config.lua
@@ -297,8 +326,11 @@ jobs:
         run: luajit .github/tests/camviewer_files.lua
 
       - name: Test optional memory monitor history and lifecycle
+        run: luajit .github/tests/memleak_lifecycle.lua
+
+      - name: Test native memory monitor history and metrics
+        if: steps.native.outputs.build == 'true'
         run: |
-          luajit .github/tests/memleak_lifecycle.lua
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -DNDEBUG -Wall -Wextra -pedantic \
             .github/tests/memleak_history.cpp -o /tmp/memleak_history_test
           /tmp/memleak_history_test
@@ -313,11 +345,15 @@ jobs:
         run: luajit .github/tests/wheel_lifecycle.lua
 
       - name: Test negative DAT offsets
+        if: steps.native.outputs.build == 'true'
         run: |
           c++ -std=c++23 -include src/framework/stdext/cxx23.h -Wall -Wextra -pedantic \
             .github/tests/negative_offset.cpp -I. \
             -o /tmp/negative_offset_test
           /tmp/negative_offset_test
+
+      - name: Test Lua DAT offset feature and spinbox
+        run: |
           luajit .github/tests/negative_offset.lua \
             modules/game_features/features.lua
           luajit .github/tests/dat_offset_spinbox.lua \
