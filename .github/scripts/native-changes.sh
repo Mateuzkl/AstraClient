@@ -4,6 +4,7 @@ set -euo pipefail
 # PRs compare the full branch; pushes compare only the pushed commits.
 # Manual runs and unavailable history always retain the native build.
 build=true
+bundle=true
 event=${EVENT_NAME:-workflow_dispatch}
 head=${HEAD_SHA:-$(git rev-parse HEAD)}
 base=${BASE_SHA:-}
@@ -18,6 +19,7 @@ if [[ $event != workflow_dispatch ]]; then
     trap 'rm -f "$changed"' EXIT
     if git diff --no-renames --name-only -z "$base" "$head" -- > "$changed"; then
       build=false
+      bundle=false
       while IFS= read -r -d '' path; do
         case "$path" in
           *.lua) continue ;;
@@ -25,7 +27,11 @@ if [[ $event != workflow_dispatch ]]; then
           src/*|CMakeLists.txt|*/CMakeLists.txt|CMakePresets.json|cmake/*|vcpkg*.json|vcpkg-overlays/*|\
           Dockerfile|.dockerignore|build.sh|browser/*|vc18/*|vc23/*|tools/patches/*)
             build=true
+            bundle=true
             break
+            ;;
+          data/*|layouts/*|mods/*|modules/*|tools/check_browser_assets.py|tools/normalize_browser_text_assets.py|tools/browser_manifest.py|tools/browser_bundle.cjs)
+            bundle=true
             ;;
         esac
       done < "$changed"
@@ -33,6 +39,8 @@ if [[ $event != workflow_dispatch ]]; then
   fi
 fi
 echo "Native compilation required: $build"
+echo "Browser bundle required: $bundle"
 if [[ -n ${GITHUB_OUTPUT:-} ]]; then
   echo "build=$build" >> "$GITHUB_OUTPUT"
+  echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 fi

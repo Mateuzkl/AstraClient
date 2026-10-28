@@ -17,9 +17,11 @@ commit_file() {
 }
 check() {
   local expected=$1 event=$2 base=$3 head=$4
+  local bundle=${5:-$expected}
   : > output
   EVENT_NAME=$event BASE_SHA=$base HEAD_SHA=$head DEFAULT_BRANCH=main GITHUB_OUTPUT="$PWD/output" bash "$script" > /dev/null
   grep -qx "build=$expected" output || { echo "Unexpected build decision: $event $base..$head"; exit 1; }
+  grep -qx "bundle=$bundle" output || { echo "Unexpected bundle decision: $event $base..$head"; exit 1; }
 }
 
 commit_file notes.txt base
@@ -35,6 +37,14 @@ check true push unavailable "$lua"
 commit_file .github/workflows/example.yml 'name: fixture'
 workflow=$(git rev-parse HEAD)
 check false pull_request "$base" "$workflow"
+for path in data/cursors/cip-default.png layouts/retro/ui.rml modules/example/example.otmod tools/browser_manifest.py tools/normalize_browser_text_assets.py tools/check_browser_assets.py tools/browser_bundle.cjs; do
+  before=$(git rev-parse HEAD)
+  commit_file "$path" fixture
+  check false push "$before" "$(git rev-parse HEAD)" true
+done
+before=$(git rev-parse HEAD)
+commit_file modules/example/native.cpp '// native inside a bundled directory'
+check true push "$before" "$(git rev-parse HEAD)"
 commit_file 'src/path with spaces.cpp' '// native'
 native=$(git rev-parse HEAD)
 check true pull_request "$base" "$native"
@@ -55,4 +65,4 @@ check true push "$before" "$(git rev-parse HEAD)"
 before=$(git rev-parse HEAD)
 commit_file vcpkg.json '{}'
 check true push "$before" "$(git rev-parse HEAD)"
-echo 'PASS: Lua-only, mixed PR, push ranges, native renames, build inputs, manual runs and missing history'
+echo 'PASS: Lua-only, browser assets/tools, mixed PR, push ranges, native renames, build inputs and manual runs'

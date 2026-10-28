@@ -2,12 +2,14 @@
 local root = arg[1] or '.'
 local function loadSource(path) assert(loadfile(root .. '/' .. path))() end
 local events, created, sent, opcodes = {}, 0, {}, {}
+local barWrites = 0
 function scheduleEvent(callback)
   local event = {callback = callback}
   events[#events + 1] = event
   return event
 end
 function removeEvent(event) if event then event.cancelled = true end end
+function cycleEvent(callback) return scheduleEvent(callback) end
 local function flush()
   local count = 0
   while #events > 0 do
@@ -83,7 +85,7 @@ function Node:getId() return self.id end
 function Node:setText(value) self.text = value end
 function Node:setTooltip(value) self.tooltip = value end
 function Node:getTooltip() return self.tooltip end
-function Node:setPercent(value) self.percent = value end
+function Node:setPercent(value) self.percent = value; barWrites = barWrites + 1 end
 function Node:setImageSource(value) self.image = value end
 function Node:setOutfit(value) self.outfit = value end
 function Node:setAnimate() end
@@ -97,6 +99,7 @@ function Node:destroy()
     for i, child in ipairs(self.parent.children) do
       if child == self then table.remove(self.parent.children, i); break end
     end
+    self.parent = nil
   end
 end
 function Node:destroyChildren() for _, child in ipairs(self:getChildren()) do child:destroy() end end
@@ -141,18 +144,24 @@ g_ui = {
   createWidget = function(_, parent)
     created = created + 1
     local widget = node(parent)
-    widget.creature, widget.bossName, widget.redirect, widget.cooldown = node(), node(), node(), node()
-    widget.trackerContainer = {killsBar = node()}
-    widget.trackerContainer1 = {killsBar1 = node(), countLabel = node()}
-    widget.trackerContainer2 = {killsBar2 = node()}
+    widget.creature, widget.bossName, widget.redirect, widget.cooldown = node(widget), node(widget), node(widget), node(widget)
+    widget.cooldown.visible = false
+    widget.trackerContainer, widget.trackerContainer1, widget.trackerContainer2 = node(widget), node(widget), node(widget)
+    widget.trackerContainer.killsBar = node(widget.trackerContainer)
+    widget.trackerContainer1.killsBar1, widget.trackerContainer1.countLabel = node(widget.trackerContainer1), node(widget.trackerContainer1)
+    widget.trackerContainer2.killsBar2 = node(widget.trackerContainer2)
     return widget
   end,
 }
 m_interface = {getRightPanel = function() return panel end, addToPanels = function() return false end}
 ImbuementTracker = {onReceiveData = function() end, online = function() end, offline = function() end}
+local cooldowns = {}
 modules = {
   game_cyclopedia = {getCyclopediaMonsterList = function() return monsters end},
-  game_analyser = {BossCooldown = {hasCooldown = function() return '', -1 end}},
+  game_analyser = {BossCooldown = {hasCooldown = function(_, race)
+    if cooldowns[race] then return monsters[race][1], cooldowns[race] end
+    return '', -1
+  end}},
   game_sidebuttons = {setButtonVisible = function() end},
 }
 modules.game_trackers = setmetatable({}, {__index = _G, __newindex = function(_, key, value) _G[key] = value end})
@@ -177,6 +186,8 @@ loadSource('mods/game_trackers/classes/bestiary_tracker.lua')
 loadSource('mods/game_trackers/classes/boss_tracker.lua')
 loadSource('mods/game_trackers/game_trackers.lua')
 init()
+bestiaryTrackerWindow.nativeVisibilityCalls = 0
+bossTrackerWindow.nativeVisibilityCalls = 0
 BestiaryTracker.initSortFields()
 BossTracker.initSortFields()
 local function data(...) local list = {}; for _, id in ipairs({...}) do list[#list + 1] = {id, 2, 5, 10, 20} end; return list end
@@ -185,12 +196,41 @@ assert(created == 0, 'hidden Bestiary allocated widgets')
 moveTracker('bestiaryTracker', panel, 150, false); flush()
 assert(bestiaryTrackerWindow.contentsPanel:getChildCount() == 2, 'restored Bestiary stayed empty')
 local kept = bestiaryTrackerWindow.contentsPanel:getChildById(2)
+local function progress(kills, first, second, third)
+  Trackers.onMonsterTrackerData(0, {{1, 2, 5, 10, 20}, {2, kills, first or 5, second or 10, third or 20}})
+  flush()
+  assert(bestiaryTrackerWindow.contentsPanel:getChildById(2) == kept, 'progress refresh recreated the row')
+end
+progress(20)
+assert(kept.trackerContainer2.killsBar2.percent == 100 and
+       kept.trackerContainer.killsBar.image:find('green', 1, true), 'completed Bestiary progress missing')
+progress(2)
+assert(kept.trackerContainer1.killsBar1.percent == 0 and kept.trackerContainer2.killsBar2.percent == 0,
+       'Bestiary kept later bars after lower progress')
+for _, bar in ipairs({kept.trackerContainer.killsBar, kept.trackerContainer1.killsBar1, kept.trackerContainer2.killsBar2}) do
+  assert(bar.image == '/game_cyclopedia/images/ui/mosnter-bar' and not bar.tooltip:find('fully unlocked', 1, true),
+         'Bestiary retained completion image or tooltip')
+end
+progress(15)
+progress(15, 20, 30, 40)
+assert(kept.trackerContainer.killsBar.percent == 75 and kept.trackerContainer1.killsBar1.percent == 0 and
+       kept.trackerContainer2.killsBar2.percent == 0, 'increased Bestiary thresholds retained old progress')
 local oldCreated = created
 Trackers.onMonsterTrackerData(0, data(2, 3)); flush()
 assert(created == oldCreated + 1 and bestiaryTrackerWindow.contentsPanel:getChildById(2) == kept, 'Bestiary recreated unchanged rows')
 assert(not bestiaryTrackerWindow.contentsPanel:getChildById(1), 'Bestiary removal was delayed')
 Trackers.onMonsterTrackerData(0, data(2, 4))
-Trackers.onMonsterTrackerData(0, data(2, 5)); flush()
+local firstBatch = table.remove(events, 1)
+assert(firstBatch and not firstBatch.cancelled, 'first snapshot did not schedule a batch')
+firstBatch.callback()
+local staleBatch = table.remove(events, 1)
+assert(staleBatch and not staleBatch.cancelled, 'first snapshot did not schedule its continuation')
+Trackers.onMonsterTrackerData(0, data(2, 5))
+assert(staleBatch.cancelled, 'pending Bestiary batch was not cancelled')
+local beforeStale = barWrites
+staleBatch.callback() -- Model an old callback already dequeued when cancellation happened.
+assert(barWrites == beforeStale, 'stale Bestiary callback rendered after replacement')
+flush()
 assert(not bestiaryTrackerWindow.contentsPanel:getChildById(4), 'cancelled batch rendered stale data')
 assert(bestiaryTrackerWindow.contentsPanel:getChildById(5), 'latest rapid update was lost')
 bestiaryTrackerWindow:close()
@@ -216,22 +256,47 @@ Bosstiary.cancelPendingEvents()
 assert(#BossTrackerList == 2, 'tab cancellation discarded Boss Tracker state')
 moveTracker('bosstiaryTracker', panel, 150, false)
 assert(bossTrackerWindow.contentsPanel:getChildCount() == 2, 'restored Boss Tracker stayed empty')
+assert(bossTrackerWindow.nativeVisibilityCalls > 0, 'native Boss visibility handler was replaced')
 local keptBoss = bossTrackerWindow.contentsPanel:getChildById('Creature 2')
 oldCreated = created
 Bosstiary.onBosstiaryWindowData(bosses(2, 3)); Bosstiary.cancelPendingEvents()
 assert(created == oldCreated + 1 and bossTrackerWindow.contentsPanel:getChildById('Creature 2') == keptBoss, 'Boss Tracker recreated unchanged rows')
 assert(keptBoss.cooldown.destroyHooks == 1, 'Boss Tracker accumulated destroy callbacks')
 assert(not bossTrackerWindow.contentsPanel:getChildById('Creature 1'), 'Boss Tracker removal was delayed')
+local function refreshBossCooldown(value)
+  cooldowns[2] = value
+  Bosstiary.onBosstiaryWindowData(bosses(2, 3)); Bosstiary.cancelPendingEvents()
+  assert(bossTrackerWindow.contentsPanel:getChildById('Creature 2') == keptBoss, 'cooldown refresh recreated the row')
+end
+refreshBossCooldown(os.time() + 60)
+local activeTimer = assert(keptBoss.cooldown.eventCooldown)
+assert(keptBoss.cooldown:isVisible(), 'active boss cooldown is hidden')
+activeTimer.callback()
+refreshBossCooldown(os.time() - 1)
+assert(activeTimer.cancelled and not keptBoss.cooldown.eventCooldown, 'expired replacement retained the old cooldown timer')
+assert(keptBoss.cooldown.image == '/images/icons/icon-cooldown-finished', 'expired cooldown state missing')
+refreshBossCooldown(os.time() + 120)
+local removedTimer = assert(keptBoss.cooldown.eventCooldown)
+removedTimer.callback()
+refreshBossCooldown(nil)
+assert(removedTimer.cancelled and not keptBoss.cooldown.eventCooldown, 'removed boss cooldown retained its timer')
+assert(not keptBoss.cooldown:isVisible() and not keptBoss.cooldown:getTooltip(), 'removed boss cooldown remains visible')
 bossTrackerWindow:minimize()
 oldCreated = created
 Bosstiary.onBosstiaryWindowData(bosses(4)); Bosstiary.cancelPendingEvents()
 assert(created == oldCreated, 'minimized Boss Tracker rendered')
 bossTrackerWindow:maximize()
 assert(bossTrackerWindow.contentsPanel:getChildById('Creature 4'), 'maximize did not refresh Boss Tracker')
+cooldowns[4] = os.time() + 60
+BossTracker.showTrackerData()
+local removedBoss = bossTrackerWindow.contentsPanel:getChildById('Creature 4')
+local rowTimer = assert(removedBoss.cooldown.eventCooldown)
 bossTrackerWindow:close()
 Bosstiary.onBosstiaryWindowData(bosses(5)); Bosstiary.cancelPendingEvents()
 bossTrackerWindow:open()
 assert(bossTrackerWindow.contentsPanel:getChildById('Creature 5'), 'open did not refresh cached Boss Tracker')
+assert(removedBoss:isDestroyed() and rowTimer.cancelled and not removedBoss.cooldown.eventCooldown,
+       'removed Boss row retained its cooldown timer')
 Bosstiary.onBosstiaryWindowData({}); Bosstiary.cancelPendingEvents()
 assert(bossTrackerWindow.contentsPanel:getChildCount() == 0, 'empty Boss snapshot did not clear rows')
 panel:hide()
@@ -255,7 +320,12 @@ Bosstiary.reset()
 assert(#BestiaryTrackerList == 0 and #BossTrackerList == 0, 'logout retained previous character tracker lists')
 signalcall(g_game.onGameStart)
 assert(#sent == 4 and sent[3][2] == 0, 'relogin did not resynchronize trackers')
+local bestiaryWindow, bossWindow = bestiaryTrackerWindow, bossTrackerWindow
 terminateCyclopediaProtocol(); terminateBosstiaryProtocol(); terminate()
 flush()
 assert(not bestiaryTrackerWindow and not bossTrackerWindow, 'tracker teardown retained windows')
-print('PASS: tracker login/relogin, restore, visibility, minimize/maximize, rapid snapshots, tab cancellation and row reuse')
+for _, window in ipairs({bestiaryWindow, bossWindow}) do
+  assert(window:isDestroyed() and window:getParent() == nil, 'tracker teardown did not destroy and detach its window')
+  for _, child in ipairs(panel:getChildren()) do assert(child ~= window, 'destroyed tracker remains attached to sidebar') end
+end
+print('PASS: tracker progress/cooldown resets, stale callback cancellation, native handlers, teardown, login and row reuse')

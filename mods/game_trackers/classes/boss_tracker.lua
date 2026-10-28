@@ -125,6 +125,7 @@ function BossTracker.showTrackerData()
 
 		local bossName = string.capitalize(creature[1])
 		widget.bossName:setText(short_text(bossName, 16))
+		widget.bossName:setTooltip(nil)
 		widget.redirect:setId(bossName)
 		if #bossName >= 16 then
 			widget.bossName:setTooltip(bossName)
@@ -154,6 +155,13 @@ function BossTracker.showTrackerData()
 			if #bossName >= 14 then
 				widget.bossName:setTooltip(bossName)
 			end
+		else
+			if widget.cooldown.eventCooldown then
+				removeEvent(widget.cooldown.eventCooldown)
+				widget.cooldown.eventCooldown = nil
+			end
+			widget.cooldown:hide()
+			widget.cooldown:setTooltip(nil)
 		end
 
 		widget.trackerContainer.killsBar:setTooltip(tr("%s / %s", comma_value(currentKills), comma_value(firstUnlock)))
@@ -331,6 +339,11 @@ function BossTracker.checkTrackerCooldown(name, cooldown)
 		return true
 	end
 
+	-- Cancel the previous timer even if the replacement cooldown has expired.
+	if widget.cooldown.eventCooldown then
+		removeEvent(widget.cooldown.eventCooldown)
+		widget.cooldown.eventCooldown = nil
+	end
 	widget.cooldown:setVisible(true)
 
 	widget.bossName:setText(short_text(name, 14))
@@ -344,10 +357,6 @@ function BossTracker.checkTrackerCooldown(name, cooldown)
 		widget.cooldown:setImageSource("/images/icons/icon-cooldown-finished")
 		widget.cooldown:setTooltip("No cooldown")
 		return true
-	end
-
-	if widget.cooldown.eventCooldown then
-		removeEvent(widget.cooldown.eventCooldown)
 	end
 
 	widget.cooldown:setImageSource("/images/icons/icon-cooldown-running")
