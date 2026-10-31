@@ -361,6 +361,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "editText", &Game::editText, &g_game);
     g_lua.bindSingletonFunction("g_game", "editList", &Game::editList, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestQuestLog", &Game::requestQuestLog, &g_game);
+    g_lua.bindSingletonFunction("g_game", "requestCyclopediaData", &Game::requestCyclopediaData, &g_game);
+    g_lua.bindSingletonFunction("g_game", "updateCharacterTitle", &Game::updateCharacterTitle, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestQuestLine", &Game::requestQuestLine, &g_game);
     g_lua.bindSingletonFunction("g_game", "equipItem", &Game::equipItem, &g_game);
     g_lua.bindSingletonFunction("g_game", "equipItemId", &Game::equipItemId, &g_game);
