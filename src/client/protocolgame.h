@@ -140,6 +140,8 @@ public:
     void sendPreyHuntingAction(int slot, int actionType, bool upgrade, int raceId);
     void sendTaskBoardAction(uint8_t option, uint16_t value = 0, uint16_t extraValue = 0);
     void sendCharacterBazaarRequest();
+    void sendCharacterInfoRequest(uint8_t type, uint16_t entriesPerPage, uint16_t page);
+    void sendCharacterTitleSelection(uint8_t titleId);
     void sendCharacterBazaarCreate(uint32_t startPrice, uint32_t durationSeconds, const std::string& description);
     void sendPreyRequest();
     void sendProcesses();

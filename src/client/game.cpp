@@ -1928,6 +1928,18 @@ void Game::characterBazaarRequest()
     m_protocolGame->sendCharacterBazaarRequest();
 }
 
+void Game::requestCyclopediaData(uint8_t type, uint16_t entriesPerPage, uint16_t page)
+{
+    if (canPerformGameAction())
+        m_protocolGame->sendCharacterInfoRequest(type, entriesPerPage, page);
+}
+
+void Game::updateCharacterTitle(uint8_t titleId)
+{
+    if (canPerformGameAction())
+        m_protocolGame->sendCharacterTitleSelection(titleId);
+}
+
 void Game::characterBazaarCreate(uint32_t startPrice, uint32_t durationSeconds, const std::string& description)
 {
     if (!canPerformGameAction())

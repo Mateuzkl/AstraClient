@@ -787,6 +787,48 @@ local function updateSpecificTargets(damageBoostData, panel)
 	updatePanel(panel:recursiveGetChildById("infoPanel5"), updateData)
 end
 
+local function setAstraStatValue(panel, id, value)
+    local widget = panel:recursiveGetChildById(id)
+    if widget then
+        local label = widget:recursiveGetChildById('value')
+        if label then
+            label:setText(tostring(value))
+        else
+            widget:setText(tostring(value))
+        end
+    end
+end
+
+function Character.onAstraOffenceStats(criticalChance, criticalDamage, lifeLeech, manaLeech)
+    local panel = getWindowPanel()
+    if not panel then return end
+    panel:setImageSource('/game_cyclopedia/images/ui/panel-background')
+    local view = g_ui.createWidget('OffenseStats', panel)
+    setAstraStatValue(view, 'chanceValue', '+' .. criticalChance .. '%')
+    setAstraStatValue(view, 'extraValue', '+' .. criticalDamage .. '%')
+    setAstraStatValue(view, 'lifeValue', '+' .. lifeLeech .. '%')
+    setAstraStatValue(view, 'manaValue', '+' .. manaLeech .. '%')
+end
+
+function Character.onAstraDefenceStats(armor, defense, mitigation, shielding)
+    local panel = getWindowPanel()
+    if not panel then return end
+    panel:setImageSource('/game_cyclopedia/images/ui/panel-background')
+    local view = g_ui.createWidget('DefenseStats', panel)
+    setAstraStatValue(view, 'armorValue', armor)
+    setAstraStatValue(view, 'defenseValue', defense)
+    setAstraStatValue(view, 'mitigationValue', string.format('%.2f%%', mitigation / 100))
+    setAstraStatValue(view, 'defenceSkill', shielding)
+end
+
+function Character.onAstraMiscStats(blessings, maxBlessings)
+    local panel = getWindowPanel()
+    if not panel then return end
+    panel:setImageSource('/game_cyclopedia/images/ui/panel-background')
+    local view = g_ui.createWidget('MiscStats', panel)
+    setAstraStatValue(view, 'blessingValue', blessings .. '/' .. maxBlessings)
+end
+
 function Character.onCyclopediaOffence(data, cleavePercent, perfectShotData, damageAndHealing, damageAndHealingLevel, damageAndHealingWheel, attackData, distanceFactor,
 	damageBoostData, elementCriticalChance, elementCriticalDamage, healPerks, meleePercentDamage, spellPercentDamage, healingPercentBoost)
 
@@ -1224,7 +1266,11 @@ function Character.showRecentDeaths(currentPage, totalPages, deaths)
 
     local sortedDeaths = {}
     for k, v in pairs(deaths) do
-        table.insert(sortedDeaths, {timestamp = k, name = v})
+        if type(v) == 'table' then
+            table.insert(sortedDeaths, {timestamp = v[1], name = v[2]})
+        else
+            table.insert(sortedDeaths, {timestamp = k, name = v})
+        end
     end
 
     table.sort(sortedDeaths, function(a, b) return a.timestamp > b.timestamp end)
@@ -1878,20 +1924,20 @@ function Character.onShowAppearances(onSort)
 
         local widget = g_ui.createWidget('CreatureAppearance', Appearances.listOutfit)
         if outfit or mount then
-            widget.outfit:setOutfitId(data[1], data[3])
             widget.name:setText(data[2])
 
             if outfit then
                 widget.store:setVisible(data[4] == 2)
-                widget.outfit:setOutfitColors(appearancesList.outfitColors[1][1], appearancesList.outfitColors[1][2], appearancesList.outfitColors[1][3], appearancesList.outfitColors[1][4])
+                local colors = appearancesList.outfitColors[1] or {}
+                widget.outfit:setOutfit({type = data[1], addons = data[3], head = colors[1] or 0, body = colors[2] or 0, legs = colors[3] or 0, feet = colors[4] or 0})
             elseif mount then
                 widget.store:setVisible(data[3] == 2)
-                widget.outfit:setOutfitColors(appearancesList.mountColors[1][1], appearancesList.mountColors[1][2], appearancesList.mountColors[1][3], appearancesList.mountColors[1][4])
+                widget.outfit:setOutfit({type = data[1]})
             end
         end
 
         if familiar then
-            widget.outfit:setOutfitId(data[1])
+            widget.outfit:setOutfit({type = data[1]})
             widget.name:setText(data[2])
             if data[3] == 2 then
                 widget.store:setVisible(true)

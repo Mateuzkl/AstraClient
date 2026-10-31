@@ -3772,7 +3772,190 @@ void ProtocolGame::parseImbuementDurations(const InputMessagePtr& msg)
 
 void ProtocolGame::parseCyclopedia(const InputMessagePtr& msg)
 {
-    msg->getU16(); // race id
+    const uint8_t type = msg->getU8();
+    const uint8_t error = msg->getU8();
+    if (error != 0)
+        return;
+
+    switch (type) {
+    case 3: // Recent deaths
+    case 4: { // Recent PvP kills
+        const uint16_t page = msg->getU16();
+        const uint16_t totalPages = msg->getU16();
+        const uint16_t count = msg->getU16();
+        std::vector<uint32_t> timestamps;
+        std::vector<std::string> descriptions;
+        std::vector<uint8_t> statuses;
+        timestamps.reserve(count);
+        descriptions.reserve(count);
+        statuses.reserve(count);
+        for (uint16_t i = 0; i < count; ++i) {
+            timestamps.push_back(msg->getU32());
+            descriptions.push_back(msg->getString());
+            if (type == 4)
+                statuses.push_back(msg->getU8());
+        }
+        g_lua.callGlobalField("g_game", type == 3 ? "onAstraRecentDeaths" : "onAstraRecentPvPKills",
+                              page, totalPages, timestamps, descriptions, statuses);
+        break;
+    }
+    case 5: { // Achievements
+        const uint16_t points = msg->getU16();
+        const uint16_t secretsUnlocked = msg->getU16();
+        const uint16_t count = msg->getU16();
+        std::vector<uint16_t> ids;
+        std::vector<uint32_t> timestamps;
+        std::vector<uint8_t> secrets;
+        std::vector<std::string> names;
+        std::vector<std::string> descriptions;
+        std::vector<uint8_t> grades;
+        for (uint16_t i = 0; i < count; ++i) {
+            ids.push_back(msg->getU16());
+            timestamps.push_back(msg->getU32());
+            const uint8_t secret = msg->getU8();
+            secrets.push_back(secret);
+            if (secret) {
+                names.push_back(msg->getString());
+                descriptions.push_back(msg->getString());
+                grades.push_back(msg->getU8());
+            } else {
+                names.emplace_back();
+                descriptions.emplace_back();
+                grades.push_back(0);
+            }
+        }
+        g_lua.callGlobalField("g_game", "onAstraAchievements", points, secretsUnlocked,
+                              ids, timestamps, secrets, names, descriptions, grades);
+        break;
+    }
+    case 6: { // Item summary: inventory, store inbox, stash, depot, inbox
+        std::vector<std::vector<std::vector<uint32_t>>> categories(5);
+        for (auto& category : categories) {
+            const uint16_t count = msg->getU16();
+            category.reserve(count);
+            for (uint16_t i = 0; i < count; ++i) {
+                const uint16_t id = msg->getU16();
+                const uint8_t tier = msg->getU8();
+                const uint32_t amount = msg->getU32();
+                msg->getString(); // The Astra view resolves item names from its item data.
+                category.push_back({ id, tier, amount });
+            }
+        }
+        g_lua.callGlobalField("g_game", "onCyclopediaItemSummary", categories[0], categories[1],
+                              categories[2], categories[3], categories[4]);
+        break;
+    }
+    case 7: { // Outfits, mounts, familiars
+        const uint16_t outfitCount = msg->getU16();
+        std::vector<std::vector<uint32_t>> outfits;
+        std::vector<std::string> outfitNames;
+        outfits.reserve(outfitCount);
+        for (uint16_t i = 0; i < outfitCount; ++i) {
+            const uint16_t id = msg->getU16();
+            outfitNames.push_back(msg->getString());
+            const uint8_t addons = msg->getU8();
+            const uint8_t source = msg->getU8();
+            const uint32_t current = msg->getU32();
+            outfits.push_back({ id, addons, source, current });
+        }
+        std::vector<uint8_t> outfitColors;
+        if (outfitCount)
+            for (int i = 0; i < 4; ++i)
+                outfitColors.push_back(msg->getU8());
+
+        const uint16_t mountCount = msg->getU16();
+        std::vector<std::vector<uint32_t>> mounts;
+        std::vector<std::string> mountNames;
+        mounts.reserve(mountCount);
+        for (uint16_t i = 0; i < mountCount; ++i) {
+            const uint16_t id = msg->getU16();
+            mountNames.push_back(msg->getString());
+            const uint8_t source = msg->getU8();
+            const uint32_t current = msg->getU32();
+            mounts.push_back({ id, source, current });
+        }
+        std::vector<uint8_t> mountColors;
+        if (mountCount)
+            for (int i = 0; i < 4; ++i)
+                mountColors.push_back(msg->getU8());
+
+        const uint16_t familiarCount = msg->getU16();
+        std::vector<std::vector<uint32_t>> familiars;
+        std::vector<std::string> familiarNames;
+        familiars.reserve(familiarCount);
+        for (uint16_t i = 0; i < familiarCount; ++i) {
+            const uint16_t id = msg->getU16();
+            familiarNames.push_back(msg->getString());
+            const uint8_t source = msg->getU8();
+            const uint32_t current = msg->getU32();
+            familiars.push_back({ id, source, current });
+        }
+        g_lua.callGlobalField("g_game", "onAstraAppearances", outfits, outfitNames, outfitColors,
+                              mounts, mountNames, mountColors, familiars, familiarNames);
+        break;
+    }
+    case 8: { // Store summary (no Astra view yet, but consume the complete packet).
+        msg->getU32();
+        msg->getU32();
+        const uint8_t blessingCount = msg->getU8();
+        for (uint8_t i = 0; i < blessingCount; ++i) {
+            msg->getString();
+            msg->getU8();
+        }
+        for (int i = 0; i < 5; ++i)
+            msg->getU8();
+        const uint8_t skillCount = msg->getU8();
+        for (uint8_t i = 0; i < skillCount; ++i)
+            msg->getU8();
+        const uint8_t outfitCount = msg->getU8();
+        for (uint8_t i = 0; i < outfitCount; ++i)
+            msg->getU8();
+        const uint16_t itemCount = msg->getU16();
+        for (uint16_t i = 0; i < itemCount; ++i) {
+            msg->getU16();
+            msg->getString();
+            msg->getU8();
+        }
+        break;
+    }
+    case 11: { // Character titles
+        const uint8_t current = msg->getU8();
+        const uint8_t count = msg->getU8();
+        std::vector<uint8_t> ids;
+        std::vector<std::string> names;
+        std::vector<std::string> descriptions;
+        std::vector<uint8_t> permanents;
+        std::vector<uint8_t> unlockeds;
+        for (uint8_t i = 0; i < count; ++i) {
+            ids.push_back(msg->getU8());
+            names.push_back(msg->getString());
+            descriptions.push_back(msg->getString());
+            permanents.push_back(msg->getU8());
+            unlockeds.push_back(msg->getU8());
+        }
+        g_lua.callGlobalField("g_game", "onAstraTitles", current, ids, names, descriptions, permanents, unlockeds);
+        break;
+    }
+    case 13:
+    case 14: {
+        const uint16_t first = msg->getU16();
+        const uint16_t second = msg->getU16();
+        const uint16_t third = msg->getU16();
+        const uint16_t fourth = msg->getU16();
+        g_lua.callGlobalField("g_game", type == 13 ? "onAstraOffenceStats" : "onAstraDefenceStats",
+                              first, second, third, fourth);
+        break;
+    }
+    case 15: {
+        const uint8_t blessings = msg->getU8();
+        const uint8_t maxBlessings = msg->getU8();
+        g_lua.callGlobalField("g_game", "onAstraMiscStats", blessings, maxBlessings);
+        break;
+    }
+    default:
+        g_logger.warning(std::string("Unhandled Cyclopedia character info type ") + std::to_string(type));
+        break;
+    }
 }
 
 void ProtocolGame::parseCyclopediaNewDetails(const InputMessagePtr& msg)
@@ -5568,18 +5751,17 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
     // 5 preferred slots
     std::vector<std::map<std::string, std::string>> preferreds;
     const uint8_t preferredCount = msg->getU8();
-    preferreds.reserve(std::max<uint8_t>(preferredCount, 5));
+    preferreds.reserve(5);
     for (uint8_t i = 0; i < 5; ++i) {
         std::map<std::string, std::string> entry;
-        if (i < preferredCount) {
-            entry["enabled"] = stringifyTaskValue(msg->getU8());
-            entry["preferredRaceId"] = stringifyTaskValue(msg->getU16());
-            entry["unwantedRaceId"] = stringifyTaskValue(msg->getU16());
-        } else {
-            entry["enabled"] = "0";
-            entry["preferredRaceId"] = "0";
-            entry["unwantedRaceId"] = "0";
-        }
+        // The wire format always includes all five slots. preferredCount only
+        // reports how many slots the character has unlocked.
+        const uint8_t enabled = msg->getU8();
+        const uint16_t preferredRace = msg->getU16();
+        const uint16_t unwantedRace = msg->getU16();
+        entry["enabled"] = stringifyTaskValue(i < preferredCount ? enabled : 0);
+        entry["preferredRaceId"] = stringifyTaskValue(preferredRace);
+        entry["unwantedRaceId"] = stringifyTaskValue(unwantedRace);
         preferreds.emplace_back(std::move(entry));
     }
 
@@ -5597,11 +5779,13 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
             availableCreatures.emplace_back(std::move(entry));
         }
 
+        msg->getU32(); // Timed bounty boost remaining, always appended by the server.
         g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds,
                               availableCreatures, preferredClearCost);
         return;
     }
 
+    msg->getU32(); // Timed bounty boost remaining.
     g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds);
 }
 
@@ -5674,6 +5858,9 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     header["soulsealsBalance"] = stringifyTaskValue(msg->getU32());
     header["needsReward"] = stringifyTaskValue(msg->getU8());
     header["hasExpansion"] = stringifyTaskValue(msg->getU8());
+    // The server appends both timed weekly boost counters to every reply.
+    msg->getU32();
+    msg->getU32();
 
     // Compute derived header fields (keep backward compat with Lua UI)
     header["remainingDays"] = "7";
