@@ -3,6 +3,8 @@ storeXPButton = nil
 
 local storeBoostTimerEvent = nil
 local storeBoostTime = 0
+local superUpXpBonus, guildXpBonus, guildLevel, castle24XpBonus = 0, 0, 0, 0
+local SUPERUP_OPCODE, GUILD_XP_BONUS_OPCODE, CASTLE24_XP_BONUS_OPCODE = 221, 222, 223
 
 local healthUpdateEvent = nil
 local manaUpdateEvent = nil
@@ -235,6 +237,7 @@ function init()
     onTemporaryBonusChange = onTemporaryBonusChange,
     onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
+    onPremiumChange = onPremiumChange,
   })
   connect(g_game, {
     onGameStart = onGameStart,
@@ -244,6 +247,9 @@ function init()
   skillsWindow = g_ui.loadUI('skills')
   ProtocolGame.registerExtendedJSONOpcode(ExtendedIds.WheelSkills, onWheelSkillStats)
   ProtocolGame.registerExtendedJSONOpcode(ExtendedIds.MonkData, onMonkData)
+  ProtocolGame.registerExtendedOpcode(SUPERUP_OPCODE, onSuperUpOpcode)
+  ProtocolGame.registerExtendedOpcode(GUILD_XP_BONUS_OPCODE, onGuildXpBonus)
+  ProtocolGame.registerExtendedOpcode(CASTLE24_XP_BONUS_OPCODE, onCastle24XpBonus)
   storeXPButton = skillsWindow:recursiveGetChildById('boostButton')
   skillsWindow:hide()
 
@@ -298,6 +304,7 @@ function terminate()
     onTemporaryBonusChange = onTemporaryBonusChange,
     onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
+    onPremiumChange = onPremiumChange,
   })
   disconnect(g_game, {
     onGameStart = onGameStart,
@@ -306,6 +313,9 @@ function terminate()
 
   ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.WheelSkills)
   ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.MonkData)
+  ProtocolGame.unregisterExtendedOpcode(SUPERUP_OPCODE)
+  ProtocolGame.unregisterExtendedOpcode(GUILD_XP_BONUS_OPCODE)
+  ProtocolGame.unregisterExtendedOpcode(CASTLE24_XP_BONUS_OPCODE)
 
   skillsWindow:destroy()
 end
@@ -761,6 +771,7 @@ function refresh()
 end
 
 function offline()
+  superUpXpBonus, guildXpBonus, guildLevel, castle24XpBonus = 0, 0, 0, 0
   if healthUpdateEvent then
     removeEvent(healthUpdateEvent)
     healthUpdateEvent = nil
@@ -1083,6 +1094,43 @@ local function getXpBoostPurchaseData()
   return offer.id, selectedOffer.price
 end
 
+local function refreshXpGainRate()
+  local player = g_game.getLocalPlayer()
+  if player then
+    onUpdateGainRate(player, player:getBaseExpRate(), player:getLowLevelRate(),
+      player:getExpBoostRate(), player:getStaminaRate())
+  end
+end
+
+function onSuperUpOpcode(protocol, opcode, buffer)
+  if modules.game_superup and modules.game_superup.onExtendedOpcode then
+    modules.game_superup.onExtendedOpcode(protocol, opcode, buffer)
+  end
+  local value = tostring(buffer or ''):match('^bonus|(%d+)$')
+  if not value then return end
+  local bonus = math.max(0, tonumber(value) or 0)
+  if superUpXpBonus ~= bonus then superUpXpBonus = bonus refreshXpGainRate() end
+end
+
+function onGuildXpBonus(protocol, opcode, buffer)
+  local levelText, bonusText = tostring(buffer or ''):match('^(%d+)|(%d+)$')
+  if not levelText then return end
+  local level, bonus = tonumber(levelText) or 0, tonumber(bonusText) or 0
+  if guildLevel ~= level or guildXpBonus ~= bonus then
+    guildLevel, guildXpBonus = level, bonus
+    refreshXpGainRate()
+  end
+end
+
+function onCastle24XpBonus(protocol, opcode, buffer)
+  local bonus = math.max(0, tonumber(buffer) or 0)
+  if castle24XpBonus ~= bonus then castle24XpBonus = bonus refreshXpGainRate() end
+end
+
+function onPremiumChange(localPlayer, premium)
+  refreshXpGainRate()
+end
+
 function onUpdateGainRate(localPlayer, baseRate, lowLevelBonus, expBoost, staminaMulti)
   if not g_game.isOnline() then
     return
@@ -1093,11 +1141,20 @@ function onUpdateGainRate(localPlayer, baseRate, lowLevelBonus, expBoost, stamin
 	return
   end
 
+  local premiumXpBonus = localPlayer:isPremium() and 25 or 0
   local totalGainRate = (baseRate + lowLevelBonus + expBoost) * staminaMulti / 100
+  totalGainRate = totalGainRate * (100 + superUpXpBonus) / 100
+    * (100 + guildXpBonus) / 100 * (100 + castle24XpBonus) / 100
+    * (100 + premiumXpBonus) / 100
+  totalGainRate = math.floor(totalGainRate * 100 + 0.5) / 100
   local tooltip = tr("Your current XP gain rate amounts to %s%s.", totalGainRate, "%") .. "\nYour XP gain rate is calculated as follows:\n" .. tr("- Base XP gain rate: %s%s", baseRate, "%")
   if lowLevelBonus ~= 0 then
     tooltip = tr("%s\n- Low level bonus: +%s%s ", tooltip, lowLevelBonus, "%") .. "(until level 50)"
   end
+  if superUpXpBonus > 0 then tooltip = tooltip .. "\n- Bonus SuperUP: +" .. superUpXpBonus .. "%" end
+  if guildXpBonus > 0 then tooltip = tooltip .. "\n- Guild Level: +" .. guildXpBonus .. "% de XP (nivel " .. guildLevel .. "/50)" end
+  if castle24XpBonus > 0 then tooltip = tooltip .. "\n- Bonus Castle24: +" .. castle24XpBonus .. "%" end
+  if premiumXpBonus > 0 then tooltip = tooltip .. "\n- Bonus Premium/VIP: +25%" end
 
   local formattedTime = formatTimeBySeconds(storeBoostTime)
 

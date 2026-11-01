@@ -311,6 +311,13 @@ local function parseAstraBoostedInfo(msg, account)
 
   account.boostedCreature = readLoginBoostedEntry(msg)
   account.boostedBoss = readLoginBoostedEntry(msg)
+  if msg:getUnreadSize() >= 2 and msg:getU8() == 0xA3 then
+    account.boostedCreatures = {}
+    local count = math.min(msg:getU8(), 4)
+    for i = 1, count do
+      account.boostedCreatures[i] = readLoginBoostedEntry(msg)
+    end
+  end
 end
 
 function ProtocolLogin:parseCharacterList(msg)

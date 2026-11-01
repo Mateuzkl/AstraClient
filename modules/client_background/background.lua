@@ -127,6 +127,8 @@ function onRun()
 end
 
 function showPanel()
+  local login = modules.client_entergame and RmlLogin
+  if login and login.isVisible and login.isVisible() then return end
   background.loadAfter:setVisible(true)
   applyBoostedInfo()
 end
@@ -155,6 +157,25 @@ end
 
 function onGameEnd()
   if Cast then Cast.onGameEnd() end
+  if LoginEvent and LoginEvent.switchingCharacter then return end
+  local login = modules.client_entergame and RmlLogin
+  if login and login.prepare and login.prepare() then
+    -- Let CharacterList process the disconnect first. If it does not reopen
+    -- the selector, restore the new login scene instead of the legacy art.
+    scheduleEvent(function()
+      if g_game.isOnline() then return end
+      if CharacterList and CharacterList.isVisible and CharacterList.isVisible() then
+        if RmlLogin and not RmlLogin.isVisible() then
+          RmlLogin.showSelection()
+          CharacterList.show()
+        end
+        return
+      end
+      if RmlLogin and RmlLogin.isVisible() then return end
+      if EnterGame then EnterGame.show() end
+    end, 250)
+    return
+  end
   show()
 end
 
@@ -163,6 +184,11 @@ function hide()
 end
 
 function show()
+  local login = modules.client_entergame and RmlLogin
+  -- The Rml scene is deliberately hidden while a character connects.  The
+  -- game interface may call show() before the character list restores it;
+  -- never flash the legacy artwork during that transition.
+  if login and login.prepare and login.prepare() then return end
   if background:isVisible() then return end
   background:show()
   applyBoostedInfo()

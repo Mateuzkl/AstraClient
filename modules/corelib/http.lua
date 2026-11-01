@@ -156,18 +156,30 @@ function HTTP.onGet(operationId, url, err, data)
   -- terminal callback: release the entry (and the closure it holds) before
   -- dispatching, so a throwing callback cannot leak the operation
   HTTP.operations[operationId] = nil
+  if type(data) == "table" then
+    local responseStatus = tonumber(data.status)
+    if (not err or err == "") and responseStatus and
+        (responseStatus < 200 or responseStatus >= 300) then
+      err = "HTTP " .. responseStatus
+    end
+    data = data.body
+  end
   if err and err:len() == 0 then
     err = nil
   end
   if not err and operation.json then
-    if data:len() == 0 then
+    if type(data) ~= "string" then
+      err = "HTTP response body is missing"
+    elseif data:len() == 0 then
       data = "null"
     end
-    local status, result = pcall(function() return json.decode(data) end)
-    if not status then
-      err = "JSON ERROR: invalid server response"
+    if not err then
+      local status, result = pcall(function() return json.decode(data) end)
+      if not status then
+        err = "JSON ERROR: invalid server response"
+      end
+      data = status and result or nil
     end
-    data = status and result or nil
   end
   if operation.callback then
     operation.callback(data, err)
@@ -188,18 +200,30 @@ function HTTP.onPost(operationId, url, err, data)
     return
   end
   HTTP.operations[operationId] = nil
+  if type(data) == "table" then
+    local responseStatus = tonumber(data.status)
+    if (not err or err == "") and responseStatus and
+        (responseStatus < 200 or responseStatus >= 300) then
+      err = "HTTP " .. responseStatus
+    end
+    data = data.body
+  end
   if err and err:len() == 0 then
     err = nil
   end
   if not err and operation.json then
-    if data:len() == 0 then
+    if type(data) ~= "string" then
+      err = "HTTP response body is missing"
+    elseif data:len() == 0 then
       data = "null"
     end
-    local status, result = pcall(function() return json.decode(data) end)
-    if not status then
-      err = "JSON ERROR: invalid server response"
+    if not err then
+      local status, result = pcall(function() return json.decode(data) end)
+      if not status then
+        err = "JSON ERROR: invalid server response"
+      end
+      data = status and result or nil
     end
-    data = status and result or nil
   end
   if operation.callback then
     operation.callback(data, err)

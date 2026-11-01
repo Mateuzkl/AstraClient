@@ -625,43 +625,10 @@ local function getOrderedMissions(missions)
         missions = {}
     end
 
-    local bronzeMissions = {}
-    local silverMissions = {}
-    local goldMissions = {}
     local orderedWithIndex = {}
-
-    for _, mission in ipairs(missions) do
-        if mission.rewardPoints == 100 then
-            table.insert(bronzeMissions, mission)
-        elseif mission.rewardPoints == 200 then
-            table.insert(silverMissions, mission)
-        elseif mission.rewardPoints == 300 then
-            table.insert(goldMissions, mission)
-        end
-    end
-
-    local bronzeIndex = 1
-    local silverIndex = 1
-    local goldIndex = 1
-
-    for i, missionType in ipairs(MissionTypesOrder) do
-        local indexDestino = MissionsDisplacement[i]
-        local mission = nil
-
-        if missionType == "bronze" and bronzeMissions[bronzeIndex] then
-            mission = bronzeMissions[bronzeIndex]
-            bronzeIndex = bronzeIndex + 1
-        elseif missionType == "silver" and silverMissions[silverIndex] then
-            mission = silverMissions[silverIndex]
-            silverIndex = silverIndex + 1
-        elseif missionType == "gold" and goldMissions[goldIndex] then
-            mission = goldMissions[goldIndex]
-            goldIndex = goldIndex + 1
-        end
-
-        if mission then
-            table.insert(orderedWithIndex, { data = mission, index = indexDestino })
-        end
+    for index, mission in ipairs(missions) do
+        if index > 26 then break end
+        table.insert(orderedWithIndex, { data = mission, index = index })
     end
     return orderedWithIndex
 end
@@ -800,7 +767,7 @@ local function prepareBattlePassWindowForSession()
     end
 
     local dailyMissionsPanel = BattlePass.window:recursiveGetChildById('dailyMissionsBg')
-    for i = 1, 2 do
+    for i = 1, 3 do
         local widget = dailyMissionsPanel:getChildByIndex(i) or g_ui.createWidget('DailyMissionWidget', dailyMissionsPanel)
         local fields = cacheMissionWidget(widget, true)
         local image = i == 1 and 'daily-free-icon' or 'daily-vip-icon'
@@ -1634,12 +1601,12 @@ function BattlePass:configureMissionPanel()
     local dailyMissionsPanel = BattlePass.window:recursiveGetChildById('dailyMissionsBg')
 
     for k, v in ipairs(BattlePass.dailyMissions) do
-        if k > 2 then
-            print(string.format("[WARNING] Daily mission count is higher than 2 missions. (%s)", #BattlePass.dailyMissions))
+        if k > 3 then
+            print(string.format("[WARNING] Daily mission count is higher than 3 missions. (%s)", #BattlePass.dailyMissions))
             break
         end
 
-        local widget = dailyMissionsPanel:getChildByIndex(getMissionIndex(k))
+        local widget = dailyMissionsPanel:getChildByIndex(k)
         local currentProgress = tonumber(v.currentProgress) or 0
         local maxProgress = tonumber(v.maxProgress) or 0
         local completed = maxProgress > 0 and currentProgress >= maxProgress

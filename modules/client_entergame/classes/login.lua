@@ -23,6 +23,7 @@ function LoginEvent:reset()
     self.event = nil
   end
   self.charInfo = {}
+  self.switchingCharacter = false
   self.internalTries = 1
   if self.loadBox then
     self:destroyLoadBox()
@@ -31,7 +32,7 @@ end
 
 function LoginEvent:tryLogin()
   consoleln("[+] LoginEvent.tryLogin()")
-    local autoReconnect = g_settings.getBoolean('autoReconnect', false)
+    local autoReconnect = g_settings.getBoolean('autoReconnect', true)
 
     -- Validate and sanitize character info
     local function validateField(field, fieldName)
@@ -149,8 +150,10 @@ function LoginEvent:tryLogin()
 end
 
 function LoginEvent:setNewEvent(charInfo)
+    local switchingCharacter = g_game.isOnline()
     self:reset()
     self.charInfo = charInfo
+    self.switchingCharacter = switchingCharacter
     self:tryLogin()
 end
 
@@ -160,6 +163,7 @@ function LoginEvent:cancelLogin()
         removeEvent(self.event)
         self.event = nil
     end
+    self.switchingCharacter = false
 
     if self.loadBox then
         self:destroyLoadBox()

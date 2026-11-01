@@ -552,7 +552,7 @@ MissionPanel < Panel
 
   Panel
     id: dailyBg
-    size: 220 225
+    size: 325 225
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 7
@@ -569,7 +569,7 @@ MissionPanel < Panel
       text-auto-resize: true
     Panel
       id: dailyMissionsBg
-      size: 210 164
+      size: 315 164
       image-source: /images/game/destiny_wheel/menuBg
       image-border: 1
       anchors.top: parent.top
@@ -583,11 +583,15 @@ MissionPanel < Panel
         cell-size: 100 154
         cell-spacing: 4
         num-lines: 1
-        num-columns: 2
+        num-columns: 3
       DailyMissionWidget
         @onSetup: |
           local imageBackground = self:recursiveGetChildById('dailyMissionIconImage')
           imageBackground:setImageSource('/images/game/battlepass/daily-free-icon')
+      DailyMissionWidget
+        @onSetup: |
+          local imageBackground = self:recursiveGetChildById('dailyMissionIconImage')
+          imageBackground:setImageSource('/images/game/battlepass/daily-vip-icon')
       DailyMissionWidget
         @onSetup: |
           local imageBackground = self:recursiveGetChildById('dailyMissionIconImage')

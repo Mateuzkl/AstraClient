@@ -326,6 +326,12 @@ StaticMainWindow
   id: charactersWindow
   !text: tr('Select Character')
   font: $var-cip-font
+  image-source: /images/ui/panel_flat
+  image-border: 6
+  image-color: #473247
+  border-width: 1
+  border-color: #b97796
+  color: #f0c4d3
   visible: false
   size: 745 447
   $mobile:
@@ -339,7 +345,7 @@ StaticMainWindow
   TextList
     id: characters
     height: 278
-    background-color: #565656
+    background-color: #1b1521
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
@@ -361,7 +367,7 @@ StaticMainWindow
     border-color-left: #1B1B1A
     border-color-right: #6b6b6b
     border-color-bottom: #6b6b6b
-    background-color: #363636
+    background-color: #342631
     UIButton
       id: characterSort
       size: 277 14

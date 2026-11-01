@@ -117,6 +117,17 @@ ConsolePanel < Panel
       margin-bottom: 1
       @onClick: toggleChat()
 
+    Button
+      id: chatFontButton
+      !tooltip: tr('Choose chat font')
+      !text: 'Aa'
+      size: 22 16
+      anchors.right: toggleChat.left
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      margin-bottom: 1
+      @onClick: modules.game_console.showChatFontMenu()
+
     TextEditCipsoft
       id: consoleTextEdit
       anchors.top: sayModeButton.top

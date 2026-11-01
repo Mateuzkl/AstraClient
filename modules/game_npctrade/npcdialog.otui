@@ -111,7 +111,7 @@ Window
   TextEdit
     id: npcDialogInput
     anchors.left: parent.left
-    anchors.right: npcDialogChatMode.left
+    anchors.right: npcDialogSendButton.left
     anchors.bottom: parent.bottom
     margin-right: 5
     margin-bottom: 2
@@ -123,14 +123,14 @@ Window
     @onEnter: modules.game_npctrade.sendNpcDialogInput()
 
   Button
-    id: npcDialogChatMode
+    id: npcDialogSendButton
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 2
     width: 80
     height: 16
-    !text: tr('Chat On')
-    @onClick: modules.game_npctrade.toggleNpcDialogChatMode()
+    !text: tr('Enviar')
+    @onClick: modules.game_npctrade.sendNpcDialogInput()
 
   UIWidget
     id: npcDialogBackdrop

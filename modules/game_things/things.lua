@@ -26,6 +26,21 @@ function getLoadedDatPath()
   return loadedDatPath
 end
 
+function restoreLoadedFeatures()
+  if not loaded or not successfulLoad then return end
+  if successfulLoad.spritesU32 then g_game.enableFeature(GameSpritesU32) end
+  if successfulLoad.modernAssets then
+    g_game.enableFeature(GameSpritesU32)
+    g_game.enableFeature(GameIdleAnimations)
+    g_game.enableFeature(GameEnhancedAnimations)
+  end
+  if successfulLoad.spritesAlphaChannel then
+    g_game.enableFeature(GameSpritesAlphaChannel)
+  else
+    g_game.disableFeature(GameSpritesAlphaChannel)
+  end
+end
+
 function getMissing860Message()
   return tr('Please place the Tibia 8.60 asset files in data/things/860 (Tibia.dat and Tibia.spr).')
 end
@@ -49,6 +64,13 @@ local function hasModernAssetFeatures(datPath)
   return otfi:find('frame%-groups:%s*true') ~= nil or otfi:find('sprite%-data%-size:%s*4096') ~= nil
 end
 
+local function hasTransparentSprites(datPath)
+  local otfiPath = datPath .. '.otfi'
+  if not g_resources.fileExists(otfiPath) then return false end
+  local otfi = g_resources.readFileContents(otfiPath)
+  return otfi ~= nil and otfi:find('transparency:%s*true') ~= nil
+end
+
 local function enableModernAssetFeatures()
   g_game.enableFeature(GameSpritesU32)
   g_game.enableFeature(GameIdleAnimations)
@@ -68,6 +90,7 @@ local function isSameLoad(left, right)
     left.datPath == right.datPath and
     left.sprPath == right.sprPath and
     left.modernAssets == right.modernAssets and
+    left.spritesAlphaChannel == right.spritesAlphaChannel and
     left.indexedAssets == right.indexedAssets and
     left.resourceGeneration == right.resourceGeneration and
     -- A loaded U32 asset remains valid after a feature-table reset and can
@@ -116,6 +139,7 @@ function load()
   local protocolVersion = g_game.getProtocolVersion()
   local assetVersion = getVersionFromPath(datPath) or version
   local modernAssets = hasModernAssetFeatures(datPath)
+  local spritesAlphaChannel = hasTransparentSprites(datPath)
   local indexedAssets = g_sprites.isIndexedSource and g_sprites.isIndexedSource(sprPath) or false
 
   -- Only undo a flag that this module enabled for an indexed pack. Never
@@ -131,6 +155,7 @@ function load()
     datPath = datPath,
     sprPath = sprPath,
     modernAssets = modernAssets,
+    spritesAlphaChannel = spritesAlphaChannel,
     indexedAssets = indexedAssets,
     resourceGeneration = getResourceGeneration(),
     spritesU32 = g_game.getFeature(GameSpritesU32)
@@ -145,6 +170,11 @@ function load()
     end
     if modernAssets then
       enableModernAssetFeatures()
+    end
+    if spritesAlphaChannel then
+      g_game.enableFeature(GameSpritesAlphaChannel)
+    else
+      g_game.disableFeature(GameSpritesAlphaChannel)
     end
     loaded = true
     loading = false
@@ -183,6 +213,11 @@ function load()
       errorMessage = errorMessage .. tr("Unable to load dat file, please place a valid dat in '%s'", datPath) .. '\n'
     end
   end
+  if spritesAlphaChannel then
+    g_game.enableFeature(GameSpritesAlphaChannel)
+  else
+    g_game.disableFeature(GameSpritesAlphaChannel)
+  end
   if not g_sprites.loadSpr(sprPath) then
     errorMessage = errorMessage .. tr("Unable to load spr file, please place a valid spr in '%s'", sprPath)
   end
@@ -195,6 +230,11 @@ function load()
   if assetVersion ~= version then
     g_game.setClientVersion(version)
     g_game.setProtocolVersion(protocolVersion)
+    if spritesAlphaChannel then
+      g_game.enableFeature(GameSpritesAlphaChannel)
+    else
+      g_game.disableFeature(GameSpritesAlphaChannel)
+    end
     -- setClientVersion reapplies the protocol profile. Any U32 flag enabled
     -- for the temporary asset version no longer owns that restored flag.
     indexedSpritesBaseline = nil

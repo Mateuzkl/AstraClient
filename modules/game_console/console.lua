@@ -21,6 +21,13 @@ local chatToggleLocked
 local gameChannelInitEvent
 local temporaryChatEnableEvent
 
+local CHAT_FONT_SETTING = 'game-console-font'
+local CHAT_FONTS = {
+  { name = 'Classica', value = 'verdana-11px-monochrome' },
+  { name = 'Arredondada', value = 'verdana-11px-rounded' },
+  { name = 'Compacta', value = 'verdana-9px' },
+  { name = 'Terminal', value = 'terminus-10px' },
+}
 GameChannelInialized = false
 
 g_chat = nil
@@ -45,6 +52,11 @@ function init()
   -- create default channels
   g_chat = Chat.new(consolePanel, MAX_LINES)
   g_channel = Channel.new()
+  -- Keep the original pixel font as the default. A custom TrueType font is
+  -- available from the font menu, but must never replace the classic chat
+  -- typography automatically.
+  local savedChatFont = g_settings.get(CHAT_FONT_SETTING) or CHAT_FONTS[1].value
+  applyChatFont(savedChatFont)
 
   consoleTabBar.onIndexChange = function(oldIndex, newIndex)
     Options.swapChannel(oldIndex, newIndex)
@@ -130,6 +142,36 @@ end
 
 function getConsole()
   return consolePanel:recursiveGetChildById('consoleTextEdit')
+end
+
+function applyChatFont(font)
+  if not consolePanel or not g_chat then return end
+  local selected = CHAT_FONTS[1].value
+  for _, entry in ipairs(CHAT_FONTS) do
+    if entry.value == font then
+      selected = entry.value
+      break
+    end
+  end
+
+  local input = getConsole()
+  if input then input:setFont(selected) end
+  for _, label in ipairs(g_chat:getLabels()) do label:setFont(selected) end
+  for _, label in ipairs(g_chat:getReadOnlyLabels()) do label:setFont(selected) end
+  g_settings.set(CHAT_FONT_SETTING, selected)
+  g_settings.save()
+end
+
+function showChatFontMenu()
+  local menu = g_ui.createWidget('PopupMenu')
+  menu:setGameMenu(true)
+  local current = g_settings.get(CHAT_FONT_SETTING) or CHAT_FONTS[1].value
+  for _, entry in ipairs(CHAT_FONTS) do
+    local label = entry.name
+    if entry.value == current then label = '[x] ' .. label end
+    menu:addOption(label, function() applyChatFont(entry.value) end)
+  end
+  menu:display(g_window.getMousePosition())
 end
 
 function sendCurrentMessage(defaultKeybind)

@@ -1,0 +1,73 @@
+MainWindow
+  id: superUpWindow
+  !text: tr('Cave Exclusiva - SuperUP')
+  size: 560 430
+  @onEscape: modules.game_superup.close()
+
+  UIWidget
+    height: 3
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    background-color: #c28b39
+    phantom: true
+
+  Label
+    id: remaining
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 17
+    margin-left: 18
+    margin-right: 18
+    text-align: center
+    font: $var-cip-main-font
+    color: #e3c78e
+
+  ScrollablePanel
+    id: huntList
+    anchors.top: remaining.bottom
+    anchors.left: parent.left
+    anchors.right: superUpScroll.left
+    anchors.bottom: enterButton.top
+    margin-top: 12
+    margin-left: 18
+    margin-right: 3
+    margin-bottom: 12
+    clipping: true
+    vertical-scrollbar: superUpScroll
+    layout:
+      type: verticalBox
+
+  VerticalScrollBar
+    id: superUpScroll
+    anchors.top: remaining.bottom
+    anchors.bottom: enterButton.top
+    anchors.right: parent.right
+    margin-top: 12
+    margin-bottom: 12
+    margin-right: 18
+    step: 40
+    pixels-scroll: true
+
+  Button
+    id: enterButton
+    !text: tr('Entrar na hunt')
+    width: 180
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 65
+    margin-bottom: 16
+    image-color: #c28b39
+    color: #f8e9c5
+    @onClick: modules.game_superup.confirm()
+
+  Button
+    id: closeButton
+    !text: tr('Fechar')
+    width: 140
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 65
+    margin-bottom: 16
+    @onClick: modules.game_superup.close()

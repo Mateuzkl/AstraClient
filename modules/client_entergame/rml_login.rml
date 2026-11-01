@@ -1,0 +1,21 @@
+<rml>
+<head><title>Baiak Black · Entrada</title><link type="text/rcss" href="rml_login.rcss"/></head>
+<body><div class="scene" data-model="baiaklogin">
+  <div class="veil"></div>
+  <div class="topline"><span class="online-dot"></span><span class="top-value">{{playersOnline}}</span><span class="top-label">PLAYERS ONLINE</span><span class="top-spacer"></span><span class="top-motto">BAIAK BLACK · TIBIA 8.60</span><span class="top-spacer"></span><span class="cast-dot"></span><span class="top-value">{{castsActive}}</span><span class="top-label">CASTS AO VIVO</span><button id="login-watch" class="watch" data-event-click="Watch()">ASSISTIR &gt;</button></div>
+  <div id="main-box" class="main" data-class-connecting="loggingIn">
+    <div id="left-box" class="left">
+      <div class="brand"><img src="login-emblem-transparent.png"/><div class="brand-caption">UM MUNDO PARA CONQUISTAR</div></div>
+      <div class="news panel"><div class="panel-kicker"><span class="red-line"></span><span>ÚLTIMAS ATUALIZAÇÕES</span><span class="news-date">{{newsDate}}</span></div><div class="news-meta">{{newsCategory}}</div><h2>{{newsTitle}}</h2><div class="news-items"><div class="news-line" data-for="line : newsLines"><span class="news-bullet">›</span><span>{{line.text}}</span></div></div><div class="offline" data-if="newsOffline">Histórico local · site temporariamente offline</div><button id="login-news" class="text-link" data-event-click="News()">VER CHANGELOG COMPLETO &gt;</button></div>
+    </div>
+    <div id="access-box" class="access panel" data-if="!loggingIn"><div class="panel-kicker"><span class="red-line"></span><span>PORTAL DO JOGADOR</span></div><h1>Bem-vindo de volta.</h1><p class="intro">Entre para continuar sua jornada.</p>
+      <div class="form-label">CONTA OU E-MAIL</div><input id="login-account" class="input" type="text" data-value="account" maxlength="49" placeholder="Sua conta"/>
+      <div class="form-label field-gap">SENHA</div><input id="login-password" class="input" type="password" data-value="password" maxlength="49" placeholder="Sua senha"/>
+      <div class="extras"><div class="remember-choice"><input class="remember-box" type="checkbox" data-checked="remember"/><span>Lembrar senha</span></div><button data-event-click="Recover()">Esqueceu a senha?</button></div>
+      <button id="login-submit" class="enter" data-event-click="Login()">ENTRAR NO JOGO</button><button class="create" data-event-click="Create()">CRIAR CONTA</button>
+      <div class="accounts-head"><span>MINHAS CONTAS</span><button id="login-save" data-if="canSave" data-event-click="Save()">+ SALVAR ATUAL</button></div><div class="accounts"><button class="account" data-for="a : accounts" data-class-selected="selected == a.id" data-event-click="Select(a.id)"><span class="account-mark">●</span><span>{{a.name}}</span><span class="account-arrow">&gt;</span></button><div class="no-account" data-if="!hasAccounts">Nenhuma conta salva neste dispositivo.</div></div>
+      <div class="account-footer"><button class="remove" data-if="canSave" data-attrif-disabled="selected == 0" data-event-click="Remove()">Remover selecionada</button><div class="token-row"><span>TOKEN</span><input class="token-input" type="text" data-value="token" maxlength="6" placeholder="000000"/></div></div><p class="status">{{status}}</p>
+    </div>
+  </div>
+  <div class="bottom"><div class="bottom-title"><span class="red-line"></span><span>DESTAQUES DE HOJE</span><span class="bottom-hint">ATUALIZADOS PELO SERVIDOR</span></div><div id="login-boosts" class="boosts"><div class="boost-card" data-for="c : creatures" data-class-active="c.active"><div class="portrait"><img data-if="c.hasImage" data-attr-src="c.image"/><span data-if="!c.hasImage">{{c.number}}</span></div><div class="boost-copy"><span class="boost-type">CRIATURA BOOSTED</span><strong>{{c.name}}</strong></div></div><div class="boss-card"><div class="portrait boss-portrait"><img data-if="bossHasImage" data-attr-src="bossImage"/><span data-if="!bossHasImage">B</span></div><div class="boost-copy"><span class="boost-type">BOSS BOOSTED</span><strong>{{bossName}}</strong></div></div></div></div>
+</div></body></rml>

@@ -212,7 +212,7 @@ end
 
 local function updateAutoReconnectButton()
   if not autoReconnectButton then return end
-  local enabled = g_settings.getBoolean('autoReconnect', false)
+  local enabled = g_settings.getBoolean('autoReconnect', true)
   autoReconnectButton:setOn(enabled)
   local status = enabled and 'On' or 'Off'
   if GameEnterGameShowAppearance and not g_game.getFeature(GameEnterGameShowAppearance) then
@@ -524,6 +524,10 @@ local function onGameEnd()
   if background and background.isReturningToCastList and background.isReturningToCastList() then
     return
   end
+  if LoginEvent.switchingCharacter then
+    if RmlLogin then RmlLogin.suspend() end
+    return
+  end
   CharacterList.destroyLoadBox()
   removeAutoReconnectEvent()
   CharacterList.showAgain()
@@ -539,7 +543,7 @@ end
 
 function scheduleAutoReconnect()
   removeAutoReconnectEvent()
-  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+  if not g_settings.getBoolean('autoReconnect', true) or recentlyLoggedOut()
       or autoReconnectBlocked or g_game.isOnline() or waitingWindow
       or LoginEvent.event or LoginEvent:getLoadBox() then
     return
@@ -549,7 +553,7 @@ end
 
 function executeAutoReconnect()
   autoReconnectEvent = nil
-  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+  if not g_settings.getBoolean('autoReconnect', true) or recentlyLoggedOut()
       or autoReconnectBlocked or g_game.isOnline() or g_game.isLogging()
       or waitingWindow or LoginEvent.event or LoginEvent:getLoadBox() then
     return
@@ -573,6 +577,13 @@ end
 function CharacterList.init()
   if USE_NEW_ENERGAME then return end
   g_settings.remove('autoReconnectSettings')
+  -- Astra reconnects after a network/idle disconnect by default. A manual
+  -- logout emits onLogout and sets autoReconnectBlocked, so it is never
+  -- treated as a connection failure.
+  if g_settings.get('autoReconnect') == nil then
+    g_settings.set('autoReconnect', true)
+    g_settings.save()
+  end
   connect(g_game, { onLoginError = onGameLoginError })
   connect(g_game, { onLoginToken = onGameLoginToken })
   connect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
@@ -722,6 +733,7 @@ function CharacterList.show()
 
   if LoginEvent:getLoadBox() or errorBox or not charactersWindow then return end
 
+  if RmlLogin then RmlLogin.showSelection() end
   g_client.setInputLockWidget(nil)
   charactersWindow:show()
   charactersWindow:raise()
@@ -796,6 +808,7 @@ function CharacterList.doLogin()
                        worldName = selected.gameworldName,
                        vocation = selected.vocationName,
                        characterName = selected.characterName, }
+    if RmlLogin then RmlLogin.suspend() end
     CharacterList.hide()
     autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
@@ -815,6 +828,7 @@ function CharacterList.doLoginExtended(options)
                        characterName = options.characterName, }
 
 
+    if RmlLogin then RmlLogin.suspend() end
     CharacterList.hide()
     autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
@@ -841,13 +855,18 @@ function CharacterList.destroyLoadBox()
 end
 
 function CharacterList.onGameStart()
+  if RmlLogin then
+    RmlLogin.suspend()
+    RmlLogin.hide()
+  end
+  LoginEvent.switchingCharacter = false
   autoReconnectBlocked = false
   removeAutoReconnectEvent()
   CharacterList.destroyLoadBox()
 end
 
 function CharacterList.toggleAutoReconnect()
-  local enabled = not g_settings.getBoolean('autoReconnect', false)
+  local enabled = not g_settings.getBoolean('autoReconnect', true)
   g_settings.set('autoReconnect', enabled)
   updateAutoReconnectButton()
   if not enabled then removeAutoReconnectEvent() end
@@ -875,7 +894,7 @@ function onUpdateOnStates(self)
     return
   end
 
-  self:setBackgroundColor("#585858")
+  self:setBackgroundColor("#63435a")
   local children = self:getChildren()
   for i=1,#children do
     children[i]:setColor("#f4f4f4")

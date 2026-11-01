@@ -3,6 +3,8 @@ Module
   description: Game Daily Reward
   author: ZLukSrT#8740
   sandboxed: true
+  autoload: true
+  dependencies: [ game_protocol, game_sidebuttons ]
   scripts: [ dailyreward, classes/DailyReward ]
   @onLoad: init()
   @onUnload: terminate()

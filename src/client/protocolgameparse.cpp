@@ -68,6 +68,23 @@ constexpr uint8 CreatureMarkPlayerAttack = 3;
 // weaponType 1-6 maps to sword, club, axe, fist, monk staff and monk dagger effects.
 constexpr uint16 MeleeAttackEffectIds[] = { 0, 304, 305, 306, 309, 307, 308 };
 
+void orientReceivedMeleeEffect(const EffectPtr& effect, const Position& position, int effectId)
+{
+    if (effectId < 304 || effectId > 309)
+        return;
+
+    const auto& localPlayer = g_game.getLocalPlayer();
+    const auto& target = g_game.getAttackingCreature();
+    if (!localPlayer || !target || target->getPosition() != position ||
+        !position.isInRange(localPlayer->getPosition(), 1, 1) ||
+        position == localPlayer->getPosition())
+        return;
+
+    // The server sends these as ordinary magic effects, without a direction.
+    // Their 3x3 sprite patterns point inward, so select the reverse vector.
+    effect->setDirection(position.getDirectionFromPosition(localPlayer->getPosition()));
+}
+
 void playMeleeAttackEffect(const CreaturePtr& target, uint8 weaponType)
 {
 
@@ -88,7 +105,9 @@ void playMeleeAttackEffect(const CreaturePtr& target, uint8 weaponType)
 
     const auto& effect = std::make_shared<Effect>();
     effect->setId(effectId);
-    effect->setDirection(localPlayer->getPosition().getDirectionFromPosition(target->getPosition()));
+    // The melee sprite patterns face back toward the attacker. Choose the
+    // opposite vector so the weapon points outward at the target instead.
+    effect->setDirection(target->getPosition().getDirectionFromPosition(localPlayer->getPosition()));
     g_map.addThing(effect, target->getPosition());
 }
 
@@ -1734,6 +1753,7 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
                     auto effect = std::make_shared<Effect>();
                     effect->setId(effectId);
                     effect->setSource(static_cast<Otc::MagicEffectSources>(effectSource));
+                    orientReceivedMeleeEffect(effect, pos, effectId);
                     g_map.addThing(effect, pos);
                 }
             }
@@ -1758,6 +1778,7 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
 
     auto effect = std::make_shared<Effect>();
     effect->setId(effectId);
+    orientReceivedMeleeEffect(effect, pos, effectId);
     g_map.addThing(effect, pos);
 }
 

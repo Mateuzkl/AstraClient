@@ -15,6 +15,7 @@ Cast.list = {}
 Cast.serverInfo = nil
 Cast.watching = nil
 Cast.loadBox = nil
+Cast.totalViewers = 0
 
 local castStatusEvent
 local castWindow
@@ -37,6 +38,9 @@ local function castBox()
 end
 
 local function setCounts(casters, viewers)
+  Cast.totalViewers = viewers
+  local login = modules.client_entergame and modules.client_entergame.RmlLogin
+  if login and login.updateCasts then login.updateCasts(casters, viewers) end
   local box = castBox()
   if not box then return end
   box.castCount:setText(string.format('%d %s', casters, casters == 1 and 'Player Casting' or 'Players Casting'))
@@ -74,7 +78,7 @@ function Cast.updateStatus(serverInfo)
   if serverInfo then Cast.serverInfo = serverInfo end
   serverInfo = Cast.serverInfo
 
-  if not castBox() then return end
+  if not castBox() and not (modules.client_entergame and modules.client_entergame.RmlLogin) then return end
   if g_game.isOnline() then return end
   local host, port = getLoginEndpoint(serverInfo)
   if not host then return end

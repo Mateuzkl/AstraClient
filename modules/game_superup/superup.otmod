@@ -1,0 +1,11 @@
+Module
+  name: game_superup
+  description: SuperUP exclusive hunt selection
+  author: Projeto Baiak
+  sandboxed: true
+  autoload: true
+  scripts: [ superup ]
+  dependencies:
+    - game_skills
+  @onLoad: init()
+  @onUnload: terminate()

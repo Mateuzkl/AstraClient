@@ -111,4 +111,13 @@ function openWindow(deathType, penalty)
 
   okButton.onClick = okFunc
   cancelButton.onClick = cancelFunc
+
+  -- The Astra client resumes the same selected character after a death.  Defer
+  -- it by one frame so the death packet/window setup completes before the
+  -- connection is restarted.
+  scheduleEvent(function()
+    if deathWindow and g_game.isOnline() then
+      okFunc()
+    end
+  end, 1)
 end

@@ -45,9 +45,12 @@ MissionTypesOrder = {
 
 MissionRankIcons = {
     [100] = "bronze-icon",
-    [150] = "silver-icon",
+    [150] = "bronze-icon",
     [200] = "silver-icon",
+    [250] = "silver-icon",
     [300] = "gold-icon",
+    [350] = "gold-icon",
+    [500] = "gold-icon",
 }
 
 BattleRewardTypes = {

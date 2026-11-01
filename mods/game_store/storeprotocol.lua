@@ -11,6 +11,7 @@ local RESP_CATALOG = 1
 local RESP_SUCCESS = 2
 local RESP_HISTORY = 3
 local RESP_CATALOG_CHUNK = 4
+local CATALOG_PAGE_TIMEOUT = 10000
 
 local CATALOG_CHUNK_START = 1
 local CATALOG_CHUNK_END = 2
@@ -37,6 +38,8 @@ local catalogChunkStartedAt = nil
 local catalogChunkCoins = nil
 local catalogBalanceChangedDuringTransfer = false
 local catalogChunkTimeoutEvent = nil
+local catalogPageState = nil
+local catalogPageTimeoutEvent = nil
 local catalogCategoriesByName = {}
 local catalogOfferIndexesByCategory = {}
 
@@ -62,6 +65,9 @@ local function resetCatalogCache()
   highlightRefreshEvent = nil
   removeEvent(catalogChunkTimeoutEvent)
   catalogChunkTimeoutEvent = nil
+  removeEvent(catalogPageTimeoutEvent)
+  catalogPageTimeoutEvent = nil
+  catalogPageState = nil
   categories = {}
   offersByCategory = {}
   offersById = {}
@@ -251,6 +257,17 @@ end
 
 local function buildHomeOffers()
   refreshHighlightStates()
+  -- The 8.60 server sends recently added offers as a separate category.
+  local recent = offersByCategory["Recently Added"] or {}
+  if #recent > 0 then
+    local offers = {}
+    for index = 1, math.min(#recent, HOME_OFFER_LIMIT) do
+      local offer = recent[index]
+      offer.state = OFFER_STATE_NEW
+      offers[#offers + 1] = offer
+    end
+    return offers
+  end
   local offers = {}
   for _, category in ipairs(categories) do
     local categoryOffers = offersByCategory[category.name] or {}
@@ -271,6 +288,22 @@ end
 
 local function buildDailyOffers()
   refreshHighlightStates()
+  local daily = offersByCategory["Daily Offers"] or {}
+  if #daily > 0 then
+    local brasilia = os.date("!*t", os.time() - 3 * 3600)
+    local secondsSinceMidnight = brasilia.hour * 3600 + brasilia.min * 60 + brasilia.sec
+    local expiresAt = os.time() + 86400 - secondsSinceMidnight
+    local offers = {}
+    for index = 1, math.min(#daily, DAILY_OFFER_LIMIT) do
+      local offer = daily[index]
+      offer.state = OFFER_STATE_SALE
+      offer.highlightState = OFFER_STATE_SALE
+      offer.expireTime = expiresAt
+      offer.offers[1].saleValidUntilTimestamp = expiresAt
+      offers[#offers + 1] = offer
+    end
+    return offers
+  end
   local offers = {}
   local now = os.time()
   for _, category in ipairs(categories) do
@@ -351,6 +384,9 @@ end
 local function beginCatalog(coins)
   removeEvent(catalogChunkTimeoutEvent)
   catalogChunkTimeoutEvent = nil
+  removeEvent(catalogPageTimeoutEvent)
+  catalogPageTimeoutEvent = nil
+  catalogPageState = nil
   categories = {}
   offersByCategory = {}
   offersById = {}
@@ -379,10 +415,9 @@ local function parseCatalogCategory(msg)
   local icon = msg:getString()
   local parent = msg:getString()
   local description = msg:getString()
+  -- The Baiak custom Store packet has no category highlight byte, even when
+  -- the base game negotiated native Store highlights for other packets.
   local highlightState = OFFER_STATE_NONE
-  if g_game.getFeature(GameIngameStoreHighlights) then
-    highlightState = msg:getU8()
-  end
 
   local category = catalogCategoriesByName[name]
   if not category then
@@ -411,21 +446,12 @@ local function parseCatalogCategory(msg)
     }
     -- The extra original price has its own negotiated capability. Reusing
     -- the highlights flag would desynchronize mixed client/server versions.
-    if g_game.getFeature(GameAstraStoreBasePrice) then
-      rawOffer.basePrice = msg:getU32()
-    else
-      rawOffer.basePrice = rawOffer.price
-    end
+    rawOffer.basePrice = rawOffer.price
     rawOffer.eid = msg:getU16()
     rawOffer.count = msg:getU16()
     rawOffer.description = msg:getString()
     rawOffer.oftype = msg:getString()
-    if g_game.getFeature(GameIngameStoreHighlights) then
-      rawOffer.state = msg:getU8()
-      if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then
-        rawOffer.saleValidUntilTimestamp = msg:getU32()
-      end
-    end
+    -- No per-offer highlight fields are serialized by gamestore.lua.
     local categoryOffers = offersByCategory[name]
     local offerIndexes = catalogOfferIndexesByCategory[name]
     local offer = buildOffer(rawOffer, name)
@@ -455,6 +481,9 @@ end
 local function finishCatalog(coins, startedAt)
   removeEvent(catalogChunkTimeoutEvent)
   catalogChunkTimeoutEvent = nil
+  removeEvent(catalogPageTimeoutEvent)
+  catalogPageTimeoutEvent = nil
+  catalogPageState = nil
   if not catalogBalanceChangedDuringTransfer then
     currentCoins = coins
   end
@@ -555,6 +584,53 @@ local function parseCatalogChunk(msg)
   finishCatalog(coins, catalogChunkStartedAt)
 end
 
+-- The Baiak 8.60 server uses opcode 4 with pageIndex/pageCount, while newer
+-- Astra servers use opcode 4 with start/end chunk flags. Select the layout
+-- negotiated by the server; never guess from packet contents.
+local function parseCatalogPage(msg)
+  local pageIndex = msg:getU16()
+  local pageCount = msg:getU16()
+  local coins = msg:getU32()
+  local categoryPartCount = msg:getU16()
+
+  if pageIndex == 1 then
+    if pageCount < 1 then
+      rejectCatalogChunk(msg, "Invalid Store catalog page count.")
+      return
+    end
+    beginCatalog(coins)
+    catalogPageState = { expected = 1, total = pageCount,
+      coins = coins, startedAt = g_clock.millis() }
+  end
+
+  local page = catalogPageState
+  if not page or pageIndex ~= page.expected or pageCount ~= page.total or
+      coins ~= page.coins then
+    rejectCatalogChunk(msg, "The Store catalog pages arrived out of order.")
+    return
+  end
+
+  for i = 1, categoryPartCount do
+    parseCatalogCategory(msg)
+  end
+  page.expected = pageIndex + 1
+  if pageIndex ~= pageCount then
+    removeEvent(catalogPageTimeoutEvent)
+    catalogPageTimeoutEvent = scheduleEvent(function()
+      catalogPageTimeoutEvent = nil
+      if catalogPageState == page then
+        resetCatalogCache()
+        signalcall(g_game.onStoreError, 0,
+          "The Store catalog did not finish loading. Please reopen it.")
+      end
+    end, CATALOG_PAGE_TIMEOUT)
+    return
+  end
+
+  parseCatalogBanners(msg)
+  finishCatalog(coins, page.startedAt)
+end
+
 local function parseHistory(msg)
   local history = {}
   local count = msg:getU16()
@@ -586,7 +662,8 @@ local function onStoreMessage(protocolGame, msg)
   elseif response == RESP_CATALOG then
     parseCatalog(msg)
   elseif response == RESP_CATALOG_CHUNK then
-    parseCatalogChunk(msg)
+    -- This server's opcode 4 is a numbered catalog page, not a chunk flag.
+    parseCatalogPage(msg)
   elseif response == RESP_SUCCESS then
     msg:getU32() -- offer id
     local message = msg:getString()

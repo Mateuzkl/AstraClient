@@ -192,6 +192,12 @@ local function finishCharacterList(characters, account, otui)
   if account.boostedCreature or account.boostedBoss then
     modules.client_background.updateBoostedInfo(account.boostedCreature, account.boostedBoss)
   end
+  if RmlLogin and account.boostedCreatures then
+    RmlLogin.cacheBoosted(account.boostedCreatures, account.boostedBoss)
+  end
+  -- Keep the new scene behind character selection; the old background must
+  -- not flash back after authentication.
+  EnterGame.hide(RmlLogin and RmlLogin.isVisible())
   CharacterList.create(characters, account, otui)
   CharacterList.show()
 
@@ -447,9 +453,14 @@ end
 -- public functions
 function EnterGame.init()
   if USE_NEW_ENERGAME then return end
+  local useRmlLogin = RmlLogin and RmlLogin.prepare()
   enterGame = g_ui.displayUI('entergame')
+  -- The OTUI widgets still drive the legacy login protocol, but must never
+  -- flash on screen before the RmlUi scene is created by startupEvent.
+  if useRmlLogin then enterGame:hide() end
   if LOGPASS ~= nil then
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
+    if useRmlLogin then logpass:hide() end
   end
 
   keybindChangeChar:active(rootWidget)
@@ -532,7 +543,11 @@ function EnterGame.init()
       return
     end
     EnterGame.show()
-    if not ClientSecurity.isBrowser() and #account > 0 and #password > 0 and g_settings.getBoolean('autologin') then
+    -- The new portal has its own saved-account flow. Legacy autologin would
+    -- immediately close it and leave only the old background/loading box.
+    if not (RmlLogin and RmlLogin.isVisible()) and
+        not ClientSecurity.isBrowser() and #account > 0 and #password > 0 and
+        g_settings.getBoolean('autologin') then
       autoLoginEvent = addEvent(function()
         autoLoginEvent = nil
         if #g_crypt.decrypt(g_settings.get('account')) == 0
@@ -574,6 +589,7 @@ function EnterGame.onGameEnd(...)
 end
 
 function EnterGame.terminate()
+  if RmlLogin then RmlLogin.terminate() end
   if ClientSecurity.isBrowser() and not g_game.isOnline() and not g_game.isLogging() then
     G.password, G.gtoken, G.authenticatorToken, G.sessionKey = '', '', '', ''
   end
@@ -664,6 +680,17 @@ function EnterGame.terminate()
   EnterGame = nil
 end
 
+function EnterGame.getLoginWidgets()
+  if not enterGame then return nil end
+  return {
+    account = enterGame:getChildById('accountNameTextEdit'),
+    password = enterGame:getChildById('accountPasswordTextEdit'),
+    token = enterGame:getChildById('accountTokenTextEdit'),
+    rememberAccount = rememberEmailBox,
+    rememberPassword = rememberPasswordBox,
+  }
+end
+
 function EnterGame.show()
   G.characters = nil
   -- Uma nova tela de login encerra a tentativa anterior. Reconnect/character list
@@ -672,6 +699,11 @@ function EnterGame.show()
     G.password, G.gtoken, G.authenticatorToken, G.sessionKey = '', '', '', ''
   end
   if not enterGame then return end
+  if RmlLogin and RmlLogin.show() then
+    enterGame:hide()
+    return
+  end
+  if RmlLogin then RmlLogin.hide() end
   enterGame:show()
   enterGame:raise()
   enterGame:focus()
@@ -683,9 +715,10 @@ function EnterGame.show()
   end
 end
 
-function EnterGame.hide()
+function EnterGame.hide(keepRmlLogin)
   if not enterGame then return end
-  if not rememberPasswordBox:isChecked() then
+  if RmlLogin and not keepRmlLogin then RmlLogin.hide() end
+  if not keepRmlLogin and not rememberPasswordBox:isChecked() then
     enterGame:getChildById('accountPasswordTextEdit'):clearText()
     g_settings.remove('password')
   end
@@ -823,7 +856,7 @@ local function performLogin(account, password, token, host, gtoken)
   protocolLogin.onUpdateNeeded = onUpdateNeeded
   protocolLogin.onProxyList = onProxyList
 
-  EnterGame.hide()
+  EnterGame.hide(true)
   -- capture THIS attempt's protocol. Reading the `protocolLogin` upvalue at
   -- click time would cancel whatever login happens to be current, which after a
   -- retry is a different connection than the one this box belongs to.
@@ -848,6 +881,11 @@ local function performLogin(account, password, token, host, gtoken)
   g_game.setStringVersion(GameInfo.strVersion)
   g_game.setProtocolVersion(g_game.getClientProtocolVersion(G.clientVersion))
   g_game.setCustomProtocolVersion(0)
+  -- setClientVersion reapplies the protocol feature table; keep the alpha
+  -- format required by this server's transparent 8.60 SPR pack.
+  if modules.game_things and modules.game_things.restoreLoadedFeatures then
+    modules.game_things.restoreLoadedFeatures()
+  end
   g_game.setCustomOs(-1) -- disable
   g_game.chooseRsa(G.host)
   if #server_params <= 3 and not g_game.getFeature(GameExtendedOpcode) then
@@ -941,7 +979,7 @@ function EnterGame.doLoginHttp()
       onHTTPResult(result, err)
     end)
   end
-  EnterGame.hide()
+  EnterGame.hide(true)
 end
 
 function EnterGame.onError(err)
@@ -1177,7 +1215,7 @@ function EnterGame.onGoogleClick()
   if not googleSession then
     return EnterGame.onError('Secure randomness is unavailable. Google login was not started.')
   end
-  EnterGame.hide()
+  EnterGame.hide(true)
 
   loadBox = displayCancelBox(tr('Google Authorization'), tr('Awaiting authorization in browser...'))
   connect(loadBox, {

@@ -9,6 +9,48 @@ editableGroupCount = nil
 
 -- cache
 vipCache = {}
+local VIP_ACTIVITY_OPCODE = 225
+local vipActivities = {}
+local activityPollEvent = nil
+local vipStateNames
+
+local function activityTooltip(id, name, state)
+  local activity = state ~= VipState.Offline and vipActivities[tostring(id)] or nil
+  local status = activity == 'e' and 'Treinando com exercise'
+    or activity == 'm' and 'Minerando'
+    or vipStateNames[state] or 'Online'
+  return tr('Nome: %s\nStatus: %s', name, status)
+end
+
+local function updateActivityLabels()
+  if not vipWindow then return end
+  local list = vipWindow:getChildById('contentsPanel')
+  for id, vip in pairs(vipCache) do
+    local label = list:recursiveGetChildById('vip' .. id)
+    if label then
+      setVipState(label, vip.vipState)
+      label:setTooltip(activityTooltip(id, vip.playerName, vip.vipState))
+    end
+  end
+end
+
+local function onVipActivity(protocol, opcode, buffer)
+  vipActivities = {}
+  for guid, activity in buffer:gmatch('(%d+):([em])') do
+    vipActivities[guid] = activity
+  end
+  updateActivityLabels()
+end
+
+local function pollVipActivity()
+  activityPollEvent = nil
+  if not g_game.isOnline() then return end
+  local ids = {}
+  for id in pairs(g_game.getVips()) do ids[#ids + 1] = tostring(id) end
+  local protocol = g_game.getProtocolGame()
+  if protocol then protocol:sendExtendedOpcode(VIP_ACTIVITY_OPCODE, table.concat(ids, ',')) end
+  activityPollEvent = scheduleEvent(pollVipActivity, 5000)
+end
 
 local settings = {
   ["contentHeight"] = 0,
@@ -18,7 +60,7 @@ local settings = {
   ["vipSortOrder"] = {}
 }
 
-local vipStateNames = {
+vipStateNames = {
   [VipState.Online] = "Online",
   [VipState.Offline] = "Offline",
   [VipState.Pending] = "Pending",
@@ -49,6 +91,7 @@ local function cancelAllBlinks()
 end
 
 function init()
+  ProtocolGame.registerExtendedOpcode(VIP_ACTIVITY_OPCODE, onVipActivity)
   connect(g_game, {
     onGameStart = onGameStart,
     onGameEnd = clear,
@@ -74,6 +117,8 @@ function init()
 end
 
 function terminate()
+  if activityPollEvent then removeEvent(activityPollEvent) activityPollEvent = nil end
+  ProtocolGame.unregisterExtendedOpcode(VIP_ACTIVITY_OPCODE)
   cancelAllBlinks()
   keybindOpenVip:deactive()
   disconnect(g_game, {
@@ -111,6 +156,8 @@ end
 function onGameStart()
   local benchmark = g_clock.millis()
   refresh()
+  if activityPollEvent then removeEvent(activityPollEvent) end
+  activityPollEvent = scheduleEvent(pollVipActivity, 1000)
   consoleln("VIP list loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
@@ -138,6 +185,10 @@ function refresh()
 end
 
 function clear()
+  if not g_game.isOnline() then
+    if activityPollEvent then removeEvent(activityPollEvent) activityPollEvent = nil end
+    vipActivities = {}
+  end
   cancelAllBlinks()
   local vipList = vipWindow:getChildById('contentsPanel')
   vipList:destroyChildren()
@@ -444,7 +495,7 @@ function onAddVip(id, name, state, description, iconId, notify, partyPending, gr
 				setVipState(child, state, step)
         child.partyPending = partyPending
         child.vipState = state 
-        child:setTooltip(tr("Name: %s\nStatus: %s", name, vipStateNames[state]))
+        child:setTooltip(activityTooltip(id, name, state))
         if state == VipState.Online then
           child:setVisible(true)
         elseif state == VipState.Offline and settings["hideOfflineVips"] then
@@ -469,7 +520,7 @@ function onAddVip(id, name, state, description, iconId, notify, partyPending, gr
       child:setText(short_text(name, 17))
       child.realName = name
       child.partyPending = partyPending
-      child:setTooltip(tr("Name: %s\nStatus: %s", name, vipStateNames[state]))
+      child:setTooltip(activityTooltip(id, name, state))
       setVipState(child, state, step)
       return
     end
@@ -480,7 +531,7 @@ function onAddVip(id, name, state, description, iconId, notify, partyPending, gr
 	label:setId("vip" .. id)
 	label:setText(short_text(name, 17))
   label.realName = name
-  label:setTooltip(tr("Name: %s\nStatus: %s", name, vipStateNames[state]))
+  label:setTooltip(activityTooltip(id, name, state))
   label:setImageClip(torect(iconId * 12 .. " 0 12 12"))
   label.iconId = iconId
   label.notifyLogin = notify
@@ -550,7 +601,7 @@ function onVipStateChange(id, state, groups)
   local function updateVipLabel(label)
     if label then
       setVipState(label, state)
-      label:setTooltip(tr("Name: %s\nStatus: %s", name, vipStateNames[state]))
+      label:setTooltip(activityTooltip(id, name, state))
     end
   end
   
@@ -600,6 +651,12 @@ function setVipState(label, state, step)
     label:setColor('#9966CC')
   elseif state == VipState.Prestige then
     label:setColor("#00ffff")
+  end
+  if state ~= VipState.Offline then
+    local id = label:getId():match('^vip(%d+)$')
+    local activity = id and vipActivities[id]
+    if activity == 'e' then label:setColor('#b58cff')
+    elseif activity == 'm' then label:setColor('#5ad4df') end
   end
 
 end
@@ -752,7 +809,7 @@ function showGroups()
       label.onMousePress = onVipListLabelMousePress
       label:setId("vip" .. k.playerId)
       label:setText(short_text(k.playerName, 17))
-      label:setTooltip(tr("Name: %s\nStatus: %s", k.playerName, vipStateNames[k.vipState]))
+      label:setTooltip(activityTooltip(k.playerId, k.playerName, k.vipState))
       label:setImageClip(torect(k.icon * 12 .. " 0 12 12"))
       label.iconId = k.icon
       label.notifyLogin = k.hasNotify
@@ -824,7 +881,7 @@ function showGroups()
     label.onMousePress = onVipListLabelMousePress
     label:setId("vip" .. k.playerId)
     label:setText(short_text(k.playerName, 17))
-    label:setTooltip(tr("Name: %s\nStatus: %s", k.playerName, vipStateNames[k.vipState]))
+    label:setTooltip(activityTooltip(k.playerId, k.playerName, k.vipState))
     label:setImageClip(torect(k.icon * 12 .. " 0 12 12"))
     label.iconId = k.icon
     label.notifyLogin = k.hasNotify

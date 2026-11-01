@@ -3,7 +3,7 @@ Module
   description: Manages enter game and character list windows
   author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
-  scripts: [ entergame, characterlist, classes/login, classes/proxy, classes/world ]
+  scripts: [ entergame, rml_login, characterlist, classes/login, classes/proxy, classes/world ]
   @onLoad: EnterGame.init() CharacterList.init()
   @onUnload: EnterGame.terminate() CharacterList.terminate()
 

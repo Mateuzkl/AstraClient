@@ -1,6 +1,6 @@
 -- CONFIG
 APP_NAME = "otclientv8" -- important, change it, it's name for config dir and files in appdata
-APP_VERSION = 1341       -- client version for updater and login to identify outdated client
+APP_VERSION = 860       -- client version for updater and login to identify outdated client
 DEFAULT_LAYOUT = "" -- on android it's forced to "mobile", check code bellow
 ENABLE_NATIVE_SPLASH = false -- Windows startup splash: true = enabled, false = disabled
 ASTRA_ALLOW_LOCAL_HTTP_LOGIN = false -- Development only: allow HTTP login JSON to loopback, never a remote server.
@@ -11,12 +11,16 @@ end
 
 -- If you don't use updater or other service, set it to updater = ""
 Services = {
-  website = "", -- currently not used
+  website = "https://www.baiak-black.online",
+  createAccount = "https://www.baiak-black.online/?subtopic=createaccount",
+  recoveryPassword = "https://www.baiak-black.online/?subtopic=lostaccount",
   updater = "",
   stats = "",
   crash = "",
   feedback = "",
   status = "",
+  -- HTTPS endpoint in this project's html/client_home.php (news and daily boosts).
+  clientHome = "https://www.baiak-black.online/client_home.php",
   -- Direct HTTPS URL to a compatible OTMM file. The minimap download button
   -- stays hidden while this value is empty.
   minimap = ""
@@ -24,9 +28,9 @@ Services = {
 
 -- Direct connection to the TFS login server (no HTTP service required).
 Servers = {
-  LocalTestServ = {
-    name = "LocalTestServ",
-    host = "127.0.0.1",
+  BaiakBlack = {
+    name = "Baiak Black",
+    host = "85.31.61.139",
     port = 7171,
     version = 860
   }

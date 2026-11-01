@@ -1,0 +1,65 @@
+SuperUpHunt < UIButton
+  height: 82
+  margin-bottom: 8
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 2
+  background-color: #171c26
+  border-width: 1
+  border-color: #45404a
+  focusable: true
+
+  $hover:
+    background-color: #252b36
+    border-color: #927142
+
+  $checked:
+    background-color: #30291f
+    border-color: #c28b39
+
+  Label
+    id: selected
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 8
+    margin-right: 11
+    !text: tr('SELECIONADO')
+    font: $var-cip-small-font
+    color: #e3c78e
+    visible: false
+    phantom: true
+
+  UICreature
+    id: creature
+    size: 62 62
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 10
+    phantom: true
+    idle-animate: true
+
+  Label
+    id: name
+    anchors.left: creature.right
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-left: 12
+    margin-top: 11
+    margin-right: 115
+    font: $var-cip-main-font
+    color: #f0dfbd
+    phantom: true
+
+  Label
+    id: description
+    anchors.left: creature.right
+    anchors.top: name.bottom
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-left: 12
+    margin-top: 4
+    margin-right: 12
+    margin-bottom: 6
+    font: $var-cip-small-font
+    color: #b8b1a7
+    text-wrap: true
+    phantom: true

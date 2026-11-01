@@ -34,6 +34,7 @@
 #include <framework/platform/platformwindow.h>
 #include <framework/stdext/string.h>
 #include <framework/stdext/time.h>
+#include <framework/input/mouse.h>
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Debugger.h>
@@ -80,6 +81,18 @@ namespace
 
         void SetClipboardText(const Rml::String& text) override { g_window.setClipboardText(text); }
         void GetClipboardText(Rml::String& text) override { text = g_window.getClipboardText(); }
+        void SetMouseCursor(const Rml::String& cursor_name) override
+        {
+            const char* cursor = cursor_name == "text" ? "text" :
+                cursor_name == "pointer" ? "pointer" : "native";
+            const int cursor_id = g_mouse.getCursorId(cursor);
+            if (cursor_id >= 0)
+                g_window.setMouseCursor(cursor_id);
+            else if (cursor_name == "text" || cursor_name == "pointer")
+                g_window.setSystemCursor(cursor_name);
+            else
+                g_window.restoreMouseCursor();
+        }
     };
 
     // Reads through g_resources, so documents, stylesheets and fonts come from the same

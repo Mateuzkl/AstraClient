@@ -11,6 +11,7 @@ local npcDialogWindow
 local npcDialogBuffer
 local npcDialogInput
 local npcDialogName
+local npcDialogActionButton
 local npcDialogPendingMessages = {}
 local npcDialogSuppressed = false
 local npcDialogPositioning = false
@@ -31,6 +32,19 @@ local npcDialogButtons = {
   { text = 'bye', sprite = 9 },
   { text = 'trade', sprite = 0 }
 }
+
+local function updateNpcDialogAction(name)
+  if not npcDialogActionButton or npcDialogActionButton:isDestroyed() then return end
+  local promotion = type(name) == 'string' and name:lower() == 'promotion'
+  local icon = npcDialogActionButton:getChildById('icon')
+  npcDialogActionButton:setWidth(promotion and 88 or 36)
+  npcDialogActionButton:setText(promotion and 'Promotion' or '')
+  npcDialogActionButton:setTooltip(promotion and 'promotion' or 'trade')
+  if icon and not icon:isDestroyed() then icon:setVisible(not promotion) end
+  npcDialogActionButton.onClick = function()
+    sendNpcDialogText(promotion and 'promotion' or 'trade')
+  end
+end
 
 local function isWidgetAlive(widget)
   return widget and not widget:isDestroyed()
@@ -300,13 +314,9 @@ local function updateNpcDialogChatMode()
     return
   end
 
-  local chatEnabled = modules.game_console and modules.game_console.isChatEnabled and
-      modules.game_console.isChatEnabled()
-  local button = npcDialogWindow:recursiveGetChildById('npcDialogChatMode')
-  if isWidgetAlive(button) then
-    button:setText(chatEnabled and tr('Chat On') or tr('Chat Off'))
-  end
-  npcDialogInput:setEnabled(chatEnabled)
+  -- A conversa com NPC possui seu proprio campo. Ela nao deve depender do
+  -- modo global de chat, pois o jogador precisa conseguir responder sempre.
+  npcDialogInput:setEnabled(true)
 end
 
 local function focusNpcDialogInputLater(delay)
@@ -490,6 +500,7 @@ function initNpcDialog()
     button.onClick = function()
       sendNpcDialogText(buttonText)
     end
+    if data.text == 'trade' then npcDialogActionButton = button end
   end
 
   npcDialogWindow.onFocus = function()
@@ -534,6 +545,7 @@ function terminateNpcDialog()
     npcDialogWindow:destroy()
   end
   npcDialogWindow = nil
+  npcDialogActionButton = nil
   npcDialogBuffer = nil
   npcDialogInput = nil
   npcDialogName = nil
@@ -581,6 +593,7 @@ function showNpcDialog(name)
   end
   npcDialogName = name
   nameLabel:setText(name)
+  updateNpcDialogAction(name)
   setNpcDialogCreature(name)
 
   if isNewConversation then
@@ -760,17 +773,19 @@ end
 
 function sendNpcDialogText(text)
   if not text or text == '' then
-    return
+    return false
   end
 
   local console = modules.game_console
   if not console or not console.sendNpcMessage then
-    return
+    return false
   end
 
   if not console.sendNpcMessage(text) then
-    return
+    return false
   end
+
+  return true
 end
 
 function sendNpcDialogInput()
@@ -780,8 +795,9 @@ function sendNpcDialogInput()
 
   local text = npcDialogInput:getText()
   if text and text ~= '' then
-    npcDialogInput:clearText()
-    sendNpcDialogText(text)
+    if sendNpcDialogText(text) then
+      npcDialogInput:clearText()
+    end
   end
 end
 
