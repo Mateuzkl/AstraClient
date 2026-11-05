@@ -694,6 +694,7 @@
     <ClInclude Include="..\src\framework\core\declarations.h" />
     <ClInclude Include="..\src\framework\core\event.h" />
     <ClInclude Include="..\src\framework\core\eventdispatcher.h" />
+    <ClInclude Include="..\src\framework\core\scheduledeventqueue.h" />
     <ClInclude Include="..\src\framework\core\filestream.h" />
     <ClInclude Include="..\src\framework\core\graphicalapplication.h" />
     <ClInclude Include="..\src\framework\core\inputevent.h" />

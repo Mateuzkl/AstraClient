@@ -641,6 +641,9 @@
     <ClInclude Include="..\src\framework\core\eventdispatcher.h">
       <Filter>Header Files\framework\core</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\framework\core\scheduledeventqueue.h">
+      <Filter>Header Files\framework\core</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\framework\core\filestream.h">
       <Filter>Header Files\framework\core</Filter>
     </ClInclude>

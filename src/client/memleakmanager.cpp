@@ -232,7 +232,7 @@ void MemLeakManager::updateMemoryBreakdown()
         << g_sprites.getCachedDataCount() << " entries)\n"
         << "Named texture-cache entries: " << g_textures.getTextureCount() << '\n'
         << "Dispatcher immediate queue entries: " << g_dispatcher.getPendingEventCount() << '\n'
-        << "Scheduled queue entries (includes canceled, awaiting removal): " << g_dispatcher.getScheduledEventCount()
+        << g_dispatcher.getScheduledEventDiagnostics()
         << '\n'
         << "Counts/payload sizes are not total RAM. GPU memory is separate.\n"
         << "Full heap, file, minimap and sound allocation breakdown is not instrumented in Astra.";

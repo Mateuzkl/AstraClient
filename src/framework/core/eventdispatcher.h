@@ -25,6 +25,7 @@
 
 #include "clock.h"
 #include "scheduledevent.h"
+#include "scheduledeventqueue.h"
 
 #include <queue>
 
@@ -49,6 +50,7 @@ public:
         // Queue entries, not active callbacks: cancellation is removed by poll().
         return m_scheduledEventList.size();
     }
+    std::string getScheduledEventDiagnostics(size_t limit = 5);
 
 private:
     std::list<EventPtr> m_eventList;
@@ -56,7 +58,7 @@ private:
     bool m_disabled = false;
     bool m_botSafe = false;
     std::recursive_mutex m_mutex;
-    std::priority_queue<ScheduledEventPtr, std::vector<ScheduledEventPtr>, lessScheduledEvent> m_scheduledEventList;
+    ScheduledEventQueue<ScheduledEventPtr, lessScheduledEvent> m_scheduledEventList;
 };
 
 extern EventDispatcher g_dispatcher;

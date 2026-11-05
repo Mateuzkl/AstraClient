@@ -30,6 +30,10 @@ end
 
 function UICreatureButton:setCreature(creature)
     self.creature = creature
+    if not creature and self.creatureWidget then
+      -- The portrait owns a native shared_ptr too, not just this Lua field.
+      self.creatureWidget:setCreature(nil)
+    end
 end
 
 function UICreatureButton:getCreature()
@@ -55,7 +59,7 @@ function UICreatureButton:setup(id)
   self.creatureIcons = {}
 end
 
-function UICreatureButton:update()
+function UICreatureButton:update(targetState)
   if not self.creature then
     return
   end
@@ -65,10 +69,11 @@ function UICreatureButton:update()
   local labelColor = echoColor or (self.isHovered and CreatureButtonColors.onIdle.hovered or CreatureButtonColors.onIdle.notHovered)
   local borderColor = echoColor
 
-  if self.creature == g_game.getAttackingCreature() then
+  targetState = targetState or {attacking = g_game.getAttackingCreature(), following = g_game.getFollowingCreature()}
+  if self.creature == targetState.attacking then
     borderColor = self.isHovered and CreatureButtonColors.onTargeted.hovered or CreatureButtonColors.onTargeted.notHovered
     labelColor = echoColor or borderColor
-  elseif self.creature == g_game.getFollowingCreature() then
+  elseif self.creature == targetState.following then
     borderColor = self.isHovered and CreatureButtonColors.onFollowed.hovered or CreatureButtonColors.onFollowed.notHovered
     labelColor = echoColor or borderColor
   elseif self.isHovered then
@@ -90,9 +95,12 @@ function UICreatureButton:update()
   self.labelWidget:setColor(labelColor)
 end
 
-function UICreatureButton:creatureSetup(creature)
+function UICreatureButton:creatureSetup(creature, targetState)
   if self.creature ~= creature then
     self.creature = creature
+    self.healthPercent = nil
+    self.manaPercent = nil
+    self.creatureIcons = nil
     self.creatureWidget:setCreature(creature)
 
     local name = creature:getName()
@@ -111,7 +119,7 @@ function UICreatureButton:creatureSetup(creature)
   self:updateEmblem()
   self:updateIcons()
 
-  self:update()
+  self:update(targetState)
 end
 
 function UICreatureButton:updateSkull()
@@ -158,7 +166,8 @@ function UICreatureButton:updateLifeBarPercent()
     return
   end
   local percent = self.creature:getHealthPercent()
-  self.percent = percent
+  if self.healthPercent == percent then return end
+  self.healthPercent = percent
   self.lifeBarWidget:setPercent(percent)
 
   local color
@@ -183,17 +192,10 @@ function UICreatureButton:updateManaBarPercent()
     percent = self.creature:getManaPercent()
   end
 
-  if percent < 0 then
-    self.manaBarWidget:setVisible(false)
-    return
-  end
-
-  self.manaBarWidget:setVisible(true)
-  if self.percent == percent then
-    return
-  end
-
-  self.percent = percent
+  if self.manaPercent == percent then return end
+  self.manaPercent = percent
+  self.manaBarWidget:setVisible(percent >= 0)
+  if percent < 0 then return end
   self.manaBarWidget:setPercent(percent)
 end
 
@@ -201,6 +203,11 @@ function UICreatureButton:updateIcons()
   if not self.creature then
     return
   end
+
+  local icons = self.creature.getIcons and self.creature:getIcons() or {}
+  if not self.creature:isMonster() then icons = {} end
+  if self.creatureIcons and table.compare(icons, self.creatureIcons) then return end
+  self.creatureIcons = icons
 
   if self.monster1Widget:getWidth() ~= 0 then
     self.monster1Widget:setWidth(0)
@@ -222,22 +229,7 @@ function UICreatureButton:updateIcons()
     self.monster4Widget:setMarginLeft(0)
   end
 
-  if not self.creature.getIcons then
-    self.creatureIcons = {}
-    return
-  end
-
-  local icons = self.creature:getIcons() or {}
-  if table.compare(icons, self.creatureIcons) then
-    return
-  end
-
-  self.creatureIcons = icons
   if #icons == 0 then
-    return
-  end
-
-  if not self.creature:isMonster() then
     return
   end
 

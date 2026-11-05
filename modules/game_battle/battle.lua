@@ -324,92 +324,93 @@ local function isSummon(creature)
   return creatureType == CreatureTypeSummonOwn or creatureType == CreatureTypeSummonOther
 end
 
-local function doCreatureFitFilters(battle, creature, player)
-  if not creature or creature:isLocalPlayer() or creature:getHealthPercent() <= 0 then
+local function doCreatureFitFilters(filters, creature, playerPos)
+  if not creature or creature:isLocalPlayer() then
     return false
   end
+  local health = creature:getHealthPercent()
+  if health <= 0 then return false end
 
   local pos = creature:getPosition()
-  local playerPos = player:getPosition()
   if not pos or not playerPos or pos.z ~= playerPos.z or not creature:canBeSeen() then
     return false
   end
 
   if creature:isPlayer() then
-    if not isFilterChecked(battle, 'showPlayers') then
+    if not filters.showPlayers then
       return false
     end
-    if not isFilterChecked(battle, 'showNonSkulled') and creature:getSkull() == SkullNone then
+    if not filters.showNonSkulled and creature:getSkull() == SkullNone then
       return false
     end
-    if not isFilterChecked(battle, 'showParty') and creature:getShield() > ShieldWhiteBlue then
+    if not filters.showParty and creature:getShield() > ShieldWhiteBlue then
       return false
     end
     if creature.getVocation then
-      if not isFilterChecked(battle, 'showKnights') and creature:isKnight() then
+      if not filters.showKnights and creature:isKnight() then
         return false
       end
-      if not isFilterChecked(battle, 'showPaladins') and creature:isPaladin() then
+      if not filters.showPaladins and creature:isPaladin() then
         return false
       end
-      if not isFilterChecked(battle, 'showDruids') and creature:isDruid() then
+      if not filters.showDruids and creature:isDruid() then
         return false
       end
-      if not isFilterChecked(battle, 'showSorcerers') and creature:isSorcerer() then
+      if not filters.showSorcerers and creature:isSorcerer() then
         return false
       end
-      if not isFilterChecked(battle, 'showMonks') and creature:isMonk() then
+      if not filters.showMonks and creature:isMonk() then
         return false
       end
     end
   elseif creature:isNpc() then
-    if not isFilterChecked(battle, 'showNPCs') then
+    if not filters.showNPCs then
       return false
     end
   elseif creature:isMonster() then
-    if isSummon(creature) and not isFilterChecked(battle, 'showSummons') then
+    if isSummon(creature) and not filters.showSummons then
       return false
     end
-    if not isFilterChecked(battle, 'showMonsters') then
+    if not filters.showMonsters then
       return false
     end
   end
 
-  return true
+  return pos, health
 end
 
-local function sortCreaturesForBattle(battle, creatures, player)
-  local sortType = (battle.sortType and battle.sortType[1]) or (battle.panel and battle.panel.sortType) or 'byAgeAscending'
-  local descending = sortType:find('Descending') ~= nil
-
-  local function compareValue(a, b)
-    if sortType:find('Distance') then
-      local playerPos = player:getPosition()
-      return getDistanceBetween(playerPos, a:getPosition()), getDistanceBetween(playerPos, b:getPosition())
-    elseif sortType:find('Hitpoints') then
-      return a:getHealthPercent(), b:getHealthPercent()
-    elseif sortType:find('Name') then
-      return a:getName():lower(), b:getName():lower()
+-- Retain only K ranked candidates in a worst-first heap. Later spectators can
+-- replace the worst row without sorting or retaining the entire crowded map.
+local function offerBattleCandidate(heap, capacity, creature, value, age, better, betterValue)
+  if #heap < capacity then
+    local index = #heap + 1
+    heap[index] = {creature = creature, value = value, age = age}
+    while index > 1 do
+      local parent = math.floor(index / 2)
+      if not better(heap[parent], heap[index]) then break end
+      heap[parent], heap[index] = heap[index], heap[parent]
+      index = parent
     end
-
-    return battleAges[a:getId()] or 0, battleAges[b:getId()] or 0
+    return
   end
-
-  table.sort(creatures, function(a, b)
-    local valueA, valueB = compareValue(a, b)
-    if valueA == valueB then
-      valueA = battleAges[a:getId()] or 0
-      valueB = battleAges[b:getId()] or 0
-    end
-
-    if descending then
-      return valueA > valueB
-    end
-    return valueA < valueB
-  end)
+  if not betterValue(value, age, heap[1]) then return end
+  -- Reuse the evicted entry: crowded scans allocate at most K rank records.
+  local entry = heap[1]
+  entry.creature, entry.value, entry.age = creature, value, age
+  local index = 1
+  while index * 2 <= #heap do
+    local child = index * 2
+    if child < #heap and better(heap[child], heap[child + 1]) then child = child + 1 end
+    if not better(heap[index], heap[child]) then break end
+    heap[index], heap[child] = heap[child], heap[index]
+    index = child
+  end
 end
 
-local function updateBattleCreatures(battle, spectators, player)
+local filterNames = {'showPlayers', 'showNonSkulled', 'showParty', 'showKnights', 'showPaladins',
+  'showDruids', 'showSorcerers', 'showMonks', 'showNPCs', 'showSummons', 'showMonsters'}
+
+local function updateBattleCreatures(battle, spectators, playerPos, targetState, seenIds)
   if not battle or not battle.panel then
     return
   end
@@ -424,46 +425,62 @@ local function updateBattleCreatures(battle, spectators, player)
     maxCreatures = #buttons
   end
 
-  local creatures = {}
+  if maxCreatures == 0 then return end
+  local ranked = {}
+  local sortType = (battle.sortType and battle.sortType[1]) or battle.panel.sortType or 'byAgeAscending'
+  local descending = sortType:find('Descending') ~= nil
+  local byDistance, byHitpoints, byName = sortType:find('Distance'), sortType:find('Hitpoints'), sortType:find('Name')
+  local function betterValue(valueA, age, b)
+    local valueB = b.value
+    if valueA == valueB then valueA, valueB = age, b.age end
+    if descending then return valueA > valueB end
+    return valueA < valueB
+  end
+  local function better(a, b) return betterValue(a.value, a.age, b) end
+  -- Filters and the player's position are invariant during this update. Avoid
+  -- repeated Lua/native widget lookups and allocating a position for each row.
+  local filters = {}
+  for _, name in ipairs(filterNames) do filters[name] = isFilterChecked(battle, name) end
   local now = g_clock.millis()
   local resetAgePoint = now - 250
   for _, creature in ipairs(spectators) do
-    if doCreatureFitFilters(battle, creature, player) and #creatures < maxCreatures then
-      if not creature.lastSeen or creature.lastSeen < resetAgePoint then
-        creature.screenAge = now
-      end
-      creature.lastSeen = now
-
-      if not battleAges[creature:getId()] then
-        if battleAgeNumber > 1000 then
-          battleAgeNumber = 1
-          battleAges = {}
-        end
-        battleAges[creature:getId()] = battleAgeNumber
+    local id = creature:getId()
+    seenIds[id] = true
+    local pos, health = doCreatureFitFilters(filters, creature, playerPos)
+    if pos then
+      if not battleAges[id] then
+        battleAges[id] = battleAgeNumber
         battleAgeNumber = battleAgeNumber + 1
       end
-
-      table.insert(creatures, creature)
+      local age = battleAges[id]
+      local value = age
+      if byDistance then value = getDistanceBetween(playerPos, pos)
+      elseif byHitpoints then value = health
+      elseif byName then value = creature:getName():lower() end
+      offerBattleCandidate(ranked, maxCreatures, creature, value, age, better, betterValue)
     end
   end
 
-  sortCreaturesForBattle(battle, creatures, player)
+  table.sort(ranked, better)
 
   local layout = battle.panel:getLayout()
   if layout and layout.disableUpdates then
     layout:disableUpdates()
   end
 
-  for i = 1, #creatures do
+  for i = 1, #ranked do
     local button = buttons[i]
     if button then
-      button:creatureSetup(creatures[i])
+      local creature = ranked[i].creature
+      if not creature.lastSeen or creature.lastSeen < resetAgePoint then creature.screenAge = now end
+      creature.lastSeen = now
+      button:creatureSetup(creature, targetState)
       button:show()
       button:setOn(true)
     end
   end
 
-  for i = #creatures + 1, maxCreatures do
+  for i = #ranked + 1, maxCreatures do
     local button = buttons[i]
     if button then
       button:setCreature(nil)
@@ -495,14 +512,21 @@ function checkCreatures()
     return
   end
   local spectators = g_map.getSpectatorsInRangeEx(playerPos, false, math.floor(dimension.width / 2), math.floor(dimension.width / 2), math.floor(dimension.height / 2), math.floor(dimension.height / 2))
+  local targetState = {attacking = g_game.getAttackingCreature(), following = g_game.getFollowingCreature()}
+  local seenIds = {}
 
   for _, battle in pairs(battleClasses) do
     if battle.window and (not battle.secondary or battle.window:isVisible()) then
-      updateBattleCreatures(battle, spectators, player)
+      updateBattleCreatures(battle, spectators, playerPos, targetState, seenIds)
     end
   end
+  -- Keep numeric age bookkeeping bounded to currently observed spectators;
+  -- do not reset ages in the middle of a crowded selection after 1000 entries.
+  for id in pairs(battleAges) do if not seenIds[id] then battleAges[id] = nil end end
 
-  updateBattleButtons()
+  -- creatureSetup already refreshed each populated row. Do not repeat the full
+  -- native target/style pass; attack/follow/hover events still update immediately.
+  updateSquare(targetState)
 end
 
 function clearBattlePanels()
@@ -530,15 +554,16 @@ function clearBattlePanels()
 end
 
 function updateBattleButtons()
+  local targetState = {attacking = g_game.getAttackingCreature(), following = g_game.getFollowingCreature()}
   for _, battle in pairs(battleClasses) do
     for _, button in ipairs(battle.buttons or {}) do
       if not button:isHidden() and button.update then
-        button:update()
+        button:update(targetState)
       end
     end
   end
 
-  updateSquare()
+  updateSquare(targetState)
 end
 
 function onTargetStateChange()
@@ -562,9 +587,10 @@ function onBattleButtonHoverChange(battleButton, hovered)
   updateSquare()
 end
 
-function updateSquare()
-  local following = g_game.getFollowingCreature()
-  local attacking = g_game.getAttackingCreature()
+function updateSquare(targetState)
+  targetState = targetState or {attacking = g_game.getAttackingCreature(), following = g_game.getFollowingCreature()}
+  local following = targetState.following
+  local attacking = targetState.attacking
 
   if not newHoveredCreature then
     if hoveredCreature then
