@@ -725,9 +725,7 @@ function addBattleWindow()
       if m_interface.addToPanels(data.window) then
         data:showBattle()
         local parent = data.window:getParent()
-        if parent:getLastChild() ~= data.window then
-          parent:moveChildToIndex(data.window, parent:getChildCount())
-        end
+        parent:moveChildToIndex(data.window, parent:getChildCount())
       end
       return
     end
