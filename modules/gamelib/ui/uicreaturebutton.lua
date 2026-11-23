@@ -23,13 +23,16 @@ local EchoRaidColors = {
 function UICreatureButton.create()
   local button = UICreatureButton.internalCreate()
   button:setFocusable(false)
-  button.creature = nil
-  button.isHovered = false
   return button
 end
 
 function UICreatureButton:setCreature(creature)
+  if self.creature ~= creature then
     self.creature = creature
+    if self.creatureWidget then
+      self.creatureWidget:setCreature(creature)
+    end
+  end
 end
 
 function UICreatureButton:getCreature()
@@ -44,6 +47,10 @@ function UICreatureButton:setup(id)
   self.lifeBarWidget = self:getChildById('lifeBar')
   self.manaBarWidget = self:getChildById('manaBar')
   self.creatureWidget = self:getChildById('creature')
+  -- OTUI also exposes this child as self.creature when it builds the row.
+  if self.creature == self.creatureWidget then
+    self.creature = nil
+  end
   self.labelWidget = self:getChildById('label')
   self.skullWidget = self:getChildById('skull')
   self.emblemWidget = self:getChildById('emblem')
@@ -62,16 +69,17 @@ function UICreatureButton:update()
 
   local echoState = self.creature:getEchoRaidVisualState()
   local echoColor = EchoRaidColors[echoState]
-  local labelColor = echoColor or (self.isHovered and CreatureButtonColors.onIdle.hovered or CreatureButtonColors.onIdle.notHovered)
+  local hovered = self:isHovered()
+  local labelColor = echoColor or (hovered and CreatureButtonColors.onIdle.hovered or CreatureButtonColors.onIdle.notHovered)
   local borderColor = echoColor
 
   if self.creature == g_game.getAttackingCreature() then
-    borderColor = self.isHovered and CreatureButtonColors.onTargeted.hovered or CreatureButtonColors.onTargeted.notHovered
+    borderColor = hovered and CreatureButtonColors.onTargeted.hovered or CreatureButtonColors.onTargeted.notHovered
     labelColor = echoColor or borderColor
   elseif self.creature == g_game.getFollowingCreature() then
-    borderColor = self.isHovered and CreatureButtonColors.onFollowed.hovered or CreatureButtonColors.onFollowed.notHovered
+    borderColor = hovered and CreatureButtonColors.onFollowed.hovered or CreatureButtonColors.onFollowed.notHovered
     labelColor = echoColor or borderColor
-  elseif self.isHovered then
+  elseif hovered then
     borderColor = CreatureButtonColors.onIdle.hovered
   end
 
@@ -92,8 +100,7 @@ end
 
 function UICreatureButton:creatureSetup(creature)
   if self.creature ~= creature then
-    self.creature = creature
-    self.creatureWidget:setCreature(creature)
+    self:setCreature(creature)
 
     local name = creature:getName()
     if #name > 14 then
