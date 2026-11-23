@@ -2008,7 +2008,7 @@ local SHAPE_NOT_ENOUGH_ORBS_TOOLTIP = "Action not possible:\n\x95 Not enough Lun
 local SHAPE_RESHAPE_DUST_COST = 250
 
 local function getShapeRefineDustCost(refineLevel)
-	return 125 + (refineLevel or 0) * 75
+	return math.min(325, 125 + (refineLevel or 0) * 75)
 end
 
 local function getShapeRankEffectText(modifierEntry, targetRank)
@@ -2638,7 +2638,7 @@ function WeaponProficiency:updateModifyCost()
 	local itemId = currentItem and currentItem:getId()
 	local cacheEntry = itemId and self.cacheList[itemId]
 	local modifiers = cacheEntry and cacheEntry.modifiers or {}
-	local cost = #modifiers >= 1 and 1000 or 250
+	local cost = #modifiers >= 1 and 325 or 250
 
 	modifyCostText:setText(tostring(cost))
 
@@ -2766,7 +2766,7 @@ function WeaponProficiency:updateModifyButtonState()
 
 	local player = g_game.getLocalPlayer()
 	local currentDust = player and player:getResourceBalance(ResourceTypes.FORGE_DUST) or 0
-	local cost = totalModified >= 1 and 1000 or 250
+	local cost = totalModified >= 1 and 325 or 250
 	local hasEnoughDust = cost <= currentDust
 
 	if level3Unlocked and selectedUnlocked and hasEnoughDust then
