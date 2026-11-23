@@ -1482,6 +1482,28 @@ void ProtocolGame::sendCharacterBazaarRequest()
     g_game.disableBotCall();
 }
 
+void ProtocolGame::sendCharacterInfoRequest(uint8_t type, uint16_t entriesPerPage, uint16_t page)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(0xE5);
+    msg->addU32(0);
+    msg->addU8(type);
+    if (type == 3 || type == 4) {
+        msg->addU16(entriesPerPage);
+        msg->addU16(page);
+    }
+    send(msg);
+}
+
+void ProtocolGame::sendCharacterTitleSelection(uint8_t titleId)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(0x81);
+    msg->addU8(0x0E);
+    msg->addU8(titleId);
+    send(msg);
+}
+
 void ProtocolGame::sendCharacterBazaarCreate(uint32_t startPrice, uint32_t durationSeconds, const std::string& description)
 {
     if (description.size() > 512) {

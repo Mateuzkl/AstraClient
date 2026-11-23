@@ -83,6 +83,58 @@ local function getTimeDisplayClip(hour)
   return x .. " 0 31 31"
 end
 
+local function onAstraRecentDeaths(page, totalPages, timestamps, descriptions)
+  local deaths = {}
+  for i, timestamp in ipairs(timestamps) do
+    deaths[i] = {timestamp, descriptions[i]}
+  end
+  Character.showRecentDeaths(page, totalPages, deaths)
+end
+
+local function onAstraRecentPvPKills(page, totalPages, timestamps, descriptions, statuses)
+  local kills = {}
+  for i, timestamp in ipairs(timestamps) do
+    kills[i] = {timestamp, descriptions[i], statuses[i]}
+  end
+  Character.showPvPDeaths(page, totalPages, kills)
+end
+
+local function onAstraAchievements(points, secretsUnlocked, ids, timestamps, secrets, names, descriptions, grades)
+  local achievements = {}
+  for i, id in ipairs(ids) do
+    achievements[id] = {
+      id = id, timestamp = timestamps[i], secret = secrets[i] ~= 0,
+      name = names[i], description = descriptions[i], grade = grades[i]
+    }
+  end
+  Character.onCyclopediaAchievements(points, secretsUnlocked, achievements)
+end
+
+local function onAstraAppearances(outfits, outfitNames, outfitColors, mounts, mountNames, mountColors, familiars, familiarNames)
+  local outfitList, mountList, familiarList = {}, {}, {}
+  for i, data in ipairs(outfits) do
+    outfitList[i] = {data[1], outfitNames[i], data[2], data[3], data[4]}
+  end
+  for i, data in ipairs(mounts) do
+    mountList[i] = {data[1], mountNames[i], data[2], data[3]}
+  end
+  for i, data in ipairs(familiars) do
+    familiarList[i] = {data[1], familiarNames[i], data[2], data[3]}
+  end
+  Character.onCyclopediaAppearances(outfitList, {outfitColors}, mountList, {mountColors}, familiarList)
+end
+
+local function onAstraTitles(current, ids, names, descriptions, permanents, unlockeds)
+  local titles = {}
+  for i, id in ipairs(ids) do
+    titles[i] = {
+      id = id, name = names[i], description = descriptions[i],
+      permanent = permanents[i] ~= 0, unlocked = unlockeds[i] ~= 0
+    }
+  end
+  Titles.parseData(current, titles)
+end
+
 function init()
   cyclopediaWindow = g_ui.displayUI('cyclopedia.otui')
 
@@ -137,6 +189,14 @@ function init()
     onCyclopediaMisc = Character.onCyclopediaMisc,
     onCyclopediaAchievements = Character.onCyclopediaAchievements,
     onCyclopediaTitles = Titles.parseData,
+    onAstraRecentDeaths = onAstraRecentDeaths,
+    onAstraRecentPvPKills = onAstraRecentPvPKills,
+    onAstraAchievements = onAstraAchievements,
+    onAstraAppearances = onAstraAppearances,
+    onAstraTitles = onAstraTitles,
+    onAstraOffenceStats = Character.onAstraOffenceStats,
+    onAstraDefenceStats = Character.onAstraDefenceStats,
+    onAstraMiscStats = Character.onAstraMiscStats,
     onServerTime = Cyclopedia.onServerTime,
 
     onGameStart = Cyclopedia.startGame,
@@ -254,6 +314,14 @@ function terminate()
     onCyclopediaMisc = Character.onCyclopediaMisc,
     onCyclopediaAchievements = Character.onCyclopediaAchievements,
     onCyclopediaTitles = Titles.parseData,
+    onAstraRecentDeaths = onAstraRecentDeaths,
+    onAstraRecentPvPKills = onAstraRecentPvPKills,
+    onAstraAchievements = onAstraAchievements,
+    onAstraAppearances = onAstraAppearances,
+    onAstraTitles = onAstraTitles,
+    onAstraOffenceStats = Character.onAstraOffenceStats,
+    onAstraDefenceStats = Character.onAstraDefenceStats,
+    onAstraMiscStats = Character.onAstraMiscStats,
     onServerTime = Cyclopedia.onServerTime,
 
     onGameStart = Cyclopedia.startGame,

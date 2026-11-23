@@ -293,6 +293,8 @@ public:
 
     // questlog related
     void requestQuestLog();
+    void requestCyclopediaData(uint8_t type, uint16_t entriesPerPage = 0, uint16_t page = 0);
+    void updateCharacterTitle(uint8_t titleId);
     void requestQuestLine(int questId);
 
     // 870 only
