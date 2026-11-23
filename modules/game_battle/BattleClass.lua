@@ -80,7 +80,6 @@ function BattleClass:configure(windowId, window)
 		self.window = g_ui.createWidget('BattleWindow', m_interface.getContainerPanel())
 		self.window:setId("BattleWindow_" .. windowId)
     self.window.battle = self
-		self.window:setup()
 		self.window:close()
 	else
 		self.window = window
@@ -146,7 +145,6 @@ function BattleClass:configure(windowId, window)
     end
   end
 
-  -- setup
   self.window:setup()
 end
 

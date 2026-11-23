@@ -4,7 +4,11 @@ local function count(values) local n = 0; for _ in pairs(values) do n = n + 1 en
 local events, windows = {}, {}
 local online = false
 local connections = {}
-local parent = {getChildCount = function() return 1 end, moveChildToIndex = function() end}
+local parent = {
+  getChildCount = function() return 1 end,
+  getLastChild = function(self) return self.last end,
+  moveChildToIndex = function(self, child) self.last = child end,
+}
 local function widget()
   return {
     setId = function() end, setVisible = function() end, setFocusable = function() end,
@@ -18,6 +22,7 @@ local function widget()
     isOpened = function(self) return self.visible == true end,
   }
 end
+local canPlace, placementAttempts = false, 0
 local env = setmetatable({
   KeyBind = {getKeyBind = function() return {active = function() end, deactive = function() end} end},
   g_ui = {importStyle = function() end, createWidget = widget},
@@ -26,7 +31,10 @@ local env = setmetatable({
   disconnect = function(_, handlers) for name in pairs(handlers) do connections[name] = nil end end,
   scheduleEvent = function(fn) local event = {}; events[event] = fn; return event end,
   removeEvent = function(event) events[event] = nil end,
-  m_interface = {addToPanels = function() return true end},
+  m_interface = {addToPanels = function()
+    placementAttempts = placementAttempts + 1
+    return canPlace
+  end},
   modules = {game_sidebuttons = {setButtonVisible = function() end}},
   tr = function(text) return text end,
 }, {__index = _G})
@@ -50,7 +58,13 @@ env.init()
 check(count(windows) == 1, 'startup creates only the primary BattleWindow')
 check(count(events) == 0, 'offline startup has no recurring Battle List timer')
 env.addBattleWindow()
-check(count(windows) == 2, 'secondary list is created on demand')
+check(placementAttempts == 1 and count(windows) == 2, 'a full sidebar only tries one secondary window')
+local secondary = env.battleClasses[2].window
+check(not secondary:isVisible(), 'unsuccessful placement leaves the window closed')
+canPlace = true
+env.addBattleWindow()
+check(count(windows) == 2 and env.battleClasses[2].window == secondary, 'retry reuses the unplaced window')
+check(parent.last == secondary, 'opened secondary moves to the end of the sidebar')
 check(env.battleClasses[2].window:isVisible(), 'secondary list opens')
 local config = {name = 'Saved', battleListFilters = {}, battleListSortOrder = {'byAgeAscending'},
   contentMaximized = true, contentHeight = 120, showFilters = true}
