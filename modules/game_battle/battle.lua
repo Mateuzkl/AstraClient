@@ -13,7 +13,7 @@ local battleUpdateInterval = 100
 local battleAgeNumber = 1
 local battleAges = {}
 local hoveredCreature = nil
-local newHoveredCreature = nil
+local hoveredBattleButton = nil
 local prevCreature = nil
 local pendingPanelEvents = {}
 local visibilityEvent = nil
@@ -513,7 +513,7 @@ function clearBattlePanels()
     prevCreature:hideStaticSquare()
   end
   hoveredCreature = nil
-  newHoveredCreature = nil
+  hoveredBattleButton = nil
   prevCreature = nil
 
   for _, battle in pairs(battleClasses) do
@@ -529,12 +529,27 @@ function clearBattlePanels()
   end
 end
 
+local function getVisibleButtonCreature(button)
+  if button and button:isVisible() and not button:isDestroyed() then
+    return button:getCreature()
+  end
+end
+
+local function updateBattleButton(button)
+  if getVisibleButtonCreature(button) then
+    button:update()
+    if button:isHovered() then
+      hoveredBattleButton = button
+    end
+  end
+end
+
 function updateBattleButtons()
+  -- A hide and show can be coalesced before the UI dispatches a hover change.
+  hoveredBattleButton = nil
   for _, battle in pairs(battleClasses) do
     for _, button in ipairs(battle.buttons or {}) do
-      if not button:isHidden() and button.update then
-        button:update()
-      end
+      updateBattleButton(button)
     end
   end
 
@@ -545,38 +560,24 @@ function onTargetStateChange()
   updateBattleButtons()
 end
 
-function onBattleButtonHoverChange(battleButton, hovered)
-  if not hovered then
-    newHoveredCreature = nil
-  else
-    newHoveredCreature = battleButton.getCreature and battleButton:getCreature() or battleButton.creature
+function onBattleButtonHoverChange(battleButton)
+  if hoveredBattleButton == battleButton then
+    hoveredBattleButton = nil
   end
-
-  if battleButton.isHovered ~= hovered then
-    battleButton.isHovered = hovered
-    if battleButton.update then
-      battleButton:update()
-    end
-  end
-
+  updateBattleButton(battleButton)
   updateSquare()
 end
 
 function updateSquare()
+  local currentHover = getVisibleButtonCreature(hoveredBattleButton)
   local following = g_game.getFollowingCreature()
   local attacking = g_game.getAttackingCreature()
 
-  if not newHoveredCreature then
-    if hoveredCreature then
-      hoveredCreature:hideStaticSquare()
-      hoveredCreature = nil
-    end
-  else
+  if hoveredCreature ~= currentHover then
     if hoveredCreature then
       hoveredCreature:hideStaticSquare()
     end
-    hoveredCreature = newHoveredCreature
-    hoveredCreature:showStaticSquare(CreatureButtonColors.onIdle.hovered)
+    hoveredCreature = currentHover
   end
 
   local color = CreatureButtonColors.onIdle
@@ -596,12 +597,13 @@ function updateSquare()
     prevCreature = creature
   end
 
-  if not creature then
-    return
+  if hoveredCreature and hoveredCreature ~= creature then
+    hoveredCreature:showStaticSquare(CreatureButtonColors.onIdle.hovered)
   end
-
-  color = creature == hoveredCreature and color.hovered or color.notHovered
-  creature:showStaticSquare(color)
+  if creature then
+    color = creature == hoveredCreature and color.hovered or color.notHovered
+    creature:showStaticSquare(color)
+  end
 end
 
 -- other functions
@@ -722,9 +724,10 @@ function addBattleWindow()
       data = ensureBattleWindow(i)
       if m_interface.addToPanels(data.window) then
         data:showBattle()
-        data.window:getParent():moveChildToIndex(data.window, data.window:getParent():getChildCount())
-        return
+        local parent = data.window:getParent()
+        parent:moveChildToIndex(data.window, parent:getChildCount())
       end
+      return
     end
   end
 
