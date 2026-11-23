@@ -673,6 +673,11 @@ MagicalArchive < Panel
       layout:
         type: grid
         cell-spacing: 1
+    Panel
+      id: previewProjectiles
+      anchors.fill: previewGrid
+      phantom: true
+      focusable: false
 
 
 AdditionalStats < Panel

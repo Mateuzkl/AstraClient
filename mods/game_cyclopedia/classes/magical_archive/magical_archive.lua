@@ -184,6 +184,10 @@ function MagicalArchive.init()
 end
 
 local function stopPreviewAnimation()
+    if MagicalArchive.previewBuildEvent then
+        removeEvent(MagicalArchive.previewBuildEvent)
+        MagicalArchive.previewBuildEvent = nil
+    end
     if MagicalArchive.previewEvent then
         removeEvent(MagicalArchive.previewEvent)
         MagicalArchive.previewEvent = nil
@@ -454,7 +458,6 @@ function MagicalArchive.onSummaryChange(widget, selected, lastSelected)
         else
             MagicalArchive.runeMenu:setVisible(false)
             MagicalArchive.summaryButtons:selectWidget(MagicalArchive.combatMenu, false, true)
-            MagicalArchive.populateCombatMenu(styleWidget, spellData)
         end
     end
 end
@@ -542,32 +545,20 @@ end
 local effectFrameMs = 75
 local previewPauseMs = 650
 
-local function addPreviewEffect(tile, action, cellSize)
-    local effectId = action.id
-    if not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
-        return
-    end
-
-    local effect = g_things.getThingType(effectId, ThingCategoryEffect)
-    local width, height = effect:getWidth(), effect:getHeight()
-    local frames = effect:getAnimationPhases()
-    if frames < 1 then
-        return
-    end
-
+local function createPreviewSprites(parent, thing, cellSize, patternX, patternY)
+    local width, height = thing:getWidth(), thing:getHeight()
+    local patternsX, patternsY = thing:getNumPatternX(), thing:getNumPatternY()
+    local patternSize = width * height * thing:getLayers()
     local visual = {
         parts = {},
-        sprites = effect:getSprites(),
-        stride = width * height * effect:getLayers()
-            * effect:getNumPatternX() * effect:getNumPatternY() * effect:getNumPatternZ(),
-        frames = frames,
-        startMs = action.timestamp,
-        frameMs = effectId == 33 and effectFrameMs * 4 or effectFrameMs
+        sprites = thing:getSprites(),
+        offset = ((patternY % patternsY) * patternsX + patternX % patternsX) * patternSize,
+        stride = patternSize * patternsX * patternsY * thing:getNumPatternZ()
     }
     local spriteSize = math.max(1, math.floor(cellSize / math.max(width, height)))
     for y = 0, height - 1 do
         for x = 0, width - 1 do
-            local sprite = g_ui.createWidget('SpellArchivePreviewEffect', tile)
+            local sprite = g_ui.createWidget('SpellArchivePreviewEffect', parent)
             sprite:setSize({ width = spriteSize, height = spriteSize })
             sprite:addAnchor(AnchorLeft, 'parent', AnchorLeft)
             sprite:addAnchor(AnchorTop, 'parent', AnchorTop)
@@ -579,15 +570,81 @@ local function addPreviewEffect(tile, action, cellSize)
     return visual
 end
 
-local function playPreviewEffects(panel, effects)
-    if #effects == 0 then
+local function setPreviewFrame(visual, phase)
+    if phase == visual.phase then
         return
     end
 
+    visual.phase = phase
+    for index, sprite in ipairs(visual.parts) do
+        local id = phase >= 0 and visual.sprites[phase * visual.stride + visual.offset + index] or 0
+        if id > 0 and id ~= sprite:getSpriteId() then
+            sprite:setSpriteId(id)
+        end
+        sprite:setVisible(id > 0)
+    end
+end
+
+local function addPreviewEffect(tile, action, cellSize, delay)
+    local effectId = action.id
+    if not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
+        return
+    end
+
+    local effect = g_things.getThingType(effectId, ThingCategoryEffect)
+    local frames = effect:getAnimationPhases()
+    if frames < 1 then
+        return
+    end
+
+    local visual = createPreviewSprites(tile, effect, cellSize, 0, 0)
+    visual.startMs = action.timestamp + delay
+    visual.frameMs = effectId == 33 and effectFrameMs * 4 or effectFrameMs
+    visual.endMs = visual.startMs + frames * visual.frameMs
+    return visual
+end
+
+local function directionPattern(delta)
+    if delta < 0 then
+        return 0
+    end
+    return delta == 0 and 1 or 2
+end
+
+local function addPreviewMissile(layer, action, cellSize, origin, x, y)
+    if not g_sprites.isLoaded() or not g_things.isValidDatId(action.id, ThingCategoryMissile) then
+        return
+    end
+
+    local missile = g_things.getThingType(action.id, ThingCategoryMissile)
+    local widget = g_ui.createWidget('UIWidget', layer)
+    widget:setSize({ width = cellSize, height = cellSize })
+    widget:setPhantom(true)
+    widget:setFocusable(false)
+
+    local visual = createPreviewSprites(widget, missile, cellSize, directionPattern(x), directionPattern(y))
+    visual.widget = widget
+    visual.origin = origin
+    visual.dx, visual.dy = x * (cellSize + 1), y * (cellSize + 1)
+    visual.startMs = action.timestamp
+    visual.travelMs = math.max(150, math.floor(150 * math.sqrt(math.sqrt(x * x + y * y))))
+    visual.endMs = visual.startMs + visual.travelMs
+    return visual
+end
+
+local function playCastPreview(panel, playback)
+    local effects, missiles = playback.effects, playback.missiles
     local duration = 0
     for _, effect in ipairs(effects) do
-        duration = math.max(duration, effect.startMs + effect.frames * effect.frameMs)
+        duration = math.max(duration, effect.endMs)
     end
+    for _, missile in ipairs(missiles) do
+        duration = math.max(duration, missile.endMs)
+    end
+    if duration == 0 then
+        return
+    end
+
     local startedAt = g_clock.realMillis()
     local function update()
         if panel:isDestroyed() or not panel:isVisible() then
@@ -597,19 +654,21 @@ local function playPreviewEffects(panel, effects)
 
         local elapsed = (g_clock.realMillis() - startedAt) % (duration + previewPauseMs)
         for _, effect in ipairs(effects) do
-            local phase = math.floor((elapsed - effect.startMs) / effect.frameMs)
-            if phase < 0 or phase >= effect.frames then
-                phase = -1
-            end
-            if phase ~= effect.phase then
-                effect.phase = phase
-                for index, sprite in ipairs(effect.parts) do
-                    local id = phase >= 0 and effect.sprites[phase * effect.stride + index] or 0
-                    if id ~= sprite:getSpriteId() then
-                        sprite:setSpriteId(id)
-                    end
-                    sprite:setVisible(id > 0)
-                end
+            local phase = elapsed >= effect.startMs and elapsed < effect.endMs
+                and math.floor((elapsed - effect.startMs) / effect.frameMs) or -1
+            setPreviewFrame(effect, phase)
+        end
+        for _, missile in ipairs(missiles) do
+            if elapsed >= missile.startMs and elapsed < missile.endMs then
+                local fraction = (elapsed - missile.startMs) / missile.travelMs
+                local position = playback.layer:getPosition()
+                missile.widget:setPosition({
+                    x = position.x + missile.origin.x + math.floor(missile.dx * fraction),
+                    y = position.y + missile.origin.y + math.floor(missile.dy * fraction)
+                })
+                setPreviewFrame(missile, 0)
+            else
+                setPreviewFrame(missile, -1)
             end
         end
     end
@@ -619,11 +678,11 @@ local function playPreviewEffects(panel, effects)
 end
 
 local function renderCastArea(panel, spellData)
-    stopPreviewAnimation()
     local preview = panel.animationPanel
-    local grid = preview.previewGrid
+    local grid, layer = preview.previewGrid, preview.previewProjectiles
+    local playback = { effects = {}, missiles = {}, layer = layer }
     local minX, maxX, minY, maxY = 0, 0, 0, 0
-    local tiles, effects = {}, {}
+    local tiles = {}
 
     local function markTile(action, role, timestamp)
         local x, y = action.x, action.y
@@ -637,6 +696,9 @@ local function renderCastArea(panel, spellData)
         if action.action == 'fieldEffect' and action.effectID then
             tile.effects = tile.effects or {}
             tile.effects[#tile.effects + 1] = { id = action.effectID, timestamp = timestamp }
+        elseif action.action == 'missile' and action.missileID then
+            tile.missiles = tile.missiles or {}
+            tile.missiles[#tile.missiles + 1] = { id = action.missileID, timestamp = timestamp }
         end
         minX, maxX = math.min(minX, x), math.max(maxX, x)
         minY, maxY = math.min(minY, y), math.max(maxY, y)
@@ -661,10 +723,12 @@ local function renderCastArea(panel, spellData)
     local layout = grid:getLayout()
     layout:disableUpdates()
     grid:destroyChildren()
+    layer:destroyChildren()
     local hasPreview = next(tiles) ~= nil
     preview.animationLabel:setVisible(not hasPreview)
     preview.previewTitle:setVisible(hasPreview)
     grid:setVisible(hasPreview)
+    layer:setVisible(hasPreview)
     if hasPreview then
         local columns, rows = maxX - minX + 3, maxY - minY + 3
         local cellSize = math.min(38, math.floor((preview:getWidth() - 12) / columns) - 1,
@@ -672,6 +736,7 @@ local function renderCastArea(panel, spellData)
         grid:setSize({ width = columns * (cellSize + 1) - 1, height = rows * (cellSize + 1) - 1 })
         layout:setCellSize({ width = cellSize, height = cellSize })
         layout:setNumColumns(columns)
+        local origin = { x = (1 - minX) * (cellSize + 1), y = (1 - minY) * (cellSize + 1) }
 
         local casterOutfit, targetOutfit
         local player = g_game.getLocalPlayer()
@@ -702,11 +767,19 @@ local function renderCastArea(panel, spellData)
                     end
                     widget:setTooltip(tr('Target'))
                 end
-                if tile and tile.effects then
-                    for _, action in ipairs(tile.effects) do
-                        local effect = addPreviewEffect(widget, action, cellSize)
+                if tile then
+                    local travelTime = {}
+                    for _, action in ipairs(tile.missiles or {}) do
+                        local missile = addPreviewMissile(layer, action, cellSize, origin, x, y)
+                        if missile then
+                            playback.missiles[#playback.missiles + 1] = missile
+                            travelTime[action.timestamp] = math.max(travelTime[action.timestamp] or 0, missile.travelMs)
+                        end
+                    end
+                    for _, action in ipairs(tile.effects or {}) do
+                        local effect = addPreviewEffect(widget, action, cellSize, travelTime[action.timestamp] or 0)
                         if effect then
-                            effects[#effects + 1] = effect
+                            playback.effects[#playback.effects + 1] = effect
                         end
                     end
                 end
@@ -715,43 +788,51 @@ local function renderCastArea(panel, spellData)
     end
     layout:enableUpdates()
     layout:update()
-    playPreviewEffects(panel, effects)
+    preview.spellData = spellData
+    preview.playback = playback
+    playCastPreview(panel, playback)
+end
+
+local function queueCastPreview(panel, spellData)
+    stopPreviewAnimation()
+    local preview = panel.animationPanel
+    if preview.spellData ~= spellData then
+        preview.previewGrid:hide()
+        preview.previewProjectiles:hide()
+        preview.previewTitle:hide()
+        preview.animationLabel:hide()
+    end
+
+    -- Build the preview outside the radio group's input callback.
+    MagicalArchive.previewBuildEvent = addEvent(function()
+        MagicalArchive.previewBuildEvent = nil
+        if panel:isDestroyed() or not panel:isVisible() then
+            return
+        end
+        if preview.spellData == spellData then
+            playCastPreview(panel, preview.playback)
+        else
+            renderCastArea(panel, spellData)
+        end
+    end)
 end
 
 function MagicalArchive.populateCombatMenu(panel, spellData)
-    local runeFields = { "spellGroupInfo", "cdInfo", "groupCdInfo" }
-    local allFields = { "manaInfo", "spellGroupInfo", "basePowerInfo", "scalesWithInfo", "cdInfo", "groupCdInfo", "magicTypeInfo", "rangeInfo" }
-
-    for _, widgetId in ipairs(allFields) do
-        local infoWidget = panel:recursiveGetChildById(widgetId)
+    local runeFields = { spellGroupInfo = true, cdInfo = true, groupCdInfo = true }
+    for _, field in ipairs(CombatMenuFields) do
+        local infoWidget = panel:recursiveGetChildById(field.widget)
         if infoWidget then
-            infoWidget:setText("-")
-        end
-    end
-
-    if spellData.type == "Conjure" then
-        for _, field in ipairs(CombatMenuFields) do
-            if table.contains(runeFields, field.widget) then
-                local infoWidget = panel:recursiveGetChildById(field.widget)
-                if infoWidget and type(field.func) == "function" then
-                    local text = field.func(spellData)
-                    infoWidget:setText(text or "-")
-                end
+            local text = "-"
+            if spellData.type ~= "Conjure" or runeFields[field.widget] then
+                text = field.func(spellData) or "-"
             end
-        end
-    else
-        for _, field in ipairs(CombatMenuFields) do
-            local infoWidget = panel:recursiveGetChildById(field.widget)
-            if infoWidget and type(field.func) == "function" then
-                local text = field.func(spellData)
-                infoWidget:setText(text or "-")
-                if field.widget == "scalesWithInfo" then
-                    infoWidget:setTooltip(text or "-")
-                end
+            infoWidget:setText(text)
+            if field.widget == "scalesWithInfo" then
+                infoWidget:setTooltip(text)
             end
         end
     end
-    renderCastArea(panel, spellData)
+    queueCastPreview(panel, spellData)
 end
 
 function MagicalArchive.populateAdditionalMenu(panel, spellData)
