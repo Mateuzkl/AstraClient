@@ -91,15 +91,51 @@ SpellListWindow < UIMiniWindow
     $on:
       image-clip: 113 29 12 12
 
+  Panel
+    id: headPanel
+    height: 20
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 17
+    margin-left: 3
+    margin-right: 4
+
+    Button
+      id: clearSpellSearch
+      size: 18 18
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      focusable: false
+      image-source: /images/store/button-erase-small-up
+      image-clip: 0 0 18 18
+      !tooltip: tr('Clear search')
+      @onClick: self:getParent().spellSearch:clearText()
+
+      $pressed:
+        image-source: /images/store/button-erase-small-down
+
+    TextEdit
+      id: spellSearch
+      height: 20
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: clearSpellSearch.left
+      margin-right: 2
+      padding: 2
+      font: $var-cip-font
+      !placeholder: tr('Search spells...')
+      placeholder-color: $var-cip-inactive-color
+
   VerticalScrollBar
     id: miniwindowScrollBar
     height: 214
-    anchors.top: parent.top
+    anchors.top: headPanel.bottom
     anchors.bottom: next.top
     anchors.right: parent.right
     step: 32
     margin-right: 4
-    margin-top: 16
+    margin-top: 1
     margin-bottom: 1
     pixels-scroll: true
 
@@ -108,7 +144,7 @@ SpellListWindow < UIMiniWindow
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 157
+    height: 181
     margin-left: 3
     margin-right: 3
     focusable: true
@@ -269,23 +305,38 @@ SpellListWindow < UIMiniWindow
       margin-top: 22
       image-source: /images/ui/labels/spellLabel
 
+    Button
+      id: showMore
+      height: 20
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-bottom: 4
+      margin-left: 8
+      margin-right: 8
+      !text: tr('Show More')
+      !tooltip: tr('View this spell in the Magical Archive')
+      visible: false
+      @onClick: modules.game_spells.onShowMore()
+
   ResizeBorder
     id: bottomResizeBorder
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     height: 3
-    minimum: 205
+    minimum: 251
     margin-left: 3
     margin-right: 3
 
 SpellListContents < ScrollablePanel
   id: contentsPanel
   size: 168 214
-  anchors.fill: parent
+  anchors.top: headPanel.bottom
+  anchors.left: parent.left
   anchors.right: miniwindowScrollBar.left
   anchors.bottom: setupPanel.top
   margin-left: 2
   margin-bottom: 1
-  margin-top: 15
+  margin-top: 1
   vertical-scrollbar: miniwindowScrollBar

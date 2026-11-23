@@ -1,23 +1,20 @@
-DraggableSpellIcon < UIItem
+DraggableSpellIcon < UIWidget
   id: moveableImage
   size: 32 32
   draggable: true
-  virtual: true
-  &selectable: true
-  &editable: false
-  image-source: /images/game/spells/spell-icons-32x32
 
 SpellListData < UIWidget
   size: 155 35
   background-opacity: 0.85
 
-  UIItem
+  UIWidget
     id: fixedImage
     size: 32 32
     anchors.left: parent.left
     anchors.top: parent.top
     margin-top: 2
     margin-left: 2
+    phantom: true
     image-source: /images/game/spells/spell-icons-32x32
 
   DraggableSpellIcon
@@ -26,21 +23,11 @@ SpellListData < UIWidget
     margin-top: 2
     margin-left: 2
 
-  Panel
-    id: gray
-    size: 32 32
-    anchors.left: parent.left
-    anchors.top: parent.top
-    margin-top: 2
-    margin-left: 2
-    image-source: /images/ui/ditherpattern
-    visible: false
-
   UIWidget
     id: name
     font: $var-cip-font
     color: $var-text-cip-color
-    anchors.left: prev.right
+    anchors.left: fixedImage.right
     anchors.top: parent.top
     margin-top: 4
     margin-left: 2
@@ -60,7 +47,7 @@ SpellListWindow
   !text: tr('Spell List')
   font: $var-cip-font
   text-offset: 20 0
-  height: 180
+  height: 251
   icon: /images/icons/icon-spell-list-widget
   focusable: true
 
@@ -70,6 +57,14 @@ SpellListWindow
     padding-left: 2
     padding-bottom: 1
     layout: verticalBox
+
+    Label
+      id: emptySpellList
+      height: 22
+      text-align: center
+      focusable: false
+      color: $var-cip-inactive-color
+      !text: tr('No spells available')
 
   UIWidget
     id: miniborder

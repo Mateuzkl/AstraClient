@@ -1,16 +1,53 @@
 t_spelllist = nil
 
 local spellListData = {}
+local spellRows = {}
+local searchQuery = ''
+local selectedSpellId = nil
 local rootPanel = nil
 local lastHighlightWidget = nil
 local spellListConfig = {}
-local player = nil
+local defaultSpellListConfig = {
+  showAttackSpellGroup = true,
+  showDruidSpells = true,
+  showFreeSpells = true,
+  showHealingSpellGroup = true,
+  showKnightSpells = true,
+  showOnlyCurrentLevel = false,
+  showOnlyCurrentVocation = false,
+  showPaladinSpells = true,
+  showPremiumOnlySpells = true,
+  showSorcererSpells = true,
+  showMonkSpells = true,
+  showSupportSpellGroup = true,
+  showUnkownSpells = true
+}
+local vocationFilters = {
+  showSorcererSpells = 1,
+  showDruidSpells = 2,
+  showPaladinSpells = 3,
+  showKnightSpells = 4,
+  showMonkSpells = 9
+}
+
+local function normalizeSearch(text)
+  return ((text or ''):lower():gsub('%s+', ' ')):trim()
+end
+
+local function setupSpellListSession()
+  rootPanel = m_interface.getRootPanel()
+  spellListConfig = table.copy(defaultSpellListConfig)
+  for option, value in pairs(modules.game_sidebars.getSpellListConfig() or {}) do
+    spellListConfig[option] = value
+  end
+end
 
 function init()
   t_spelllist = g_ui.displayUI('t_spelllist')
   --t_spelllist:setContentMinimumHeight(195)
   t_spelllist:setup()
   t_spelllist:hide()
+  t_spelllist.headPanel.spellSearch.onTextChange = onSearchTextChange
 
   connect(g_game, {
     onGameStart = online,
@@ -19,8 +56,13 @@ function init()
 
   connect(LocalPlayer, {
     onSpellsChange = onSpellsChange,
-    onLevelChange = onLevelChange
+    onLevelChange = onLevelChange,
+    onVocationChange = onConfigureList
   })
+
+  if g_game.isOnline() then
+    online()
+  end
 end
 
 function terminate()
@@ -36,11 +78,15 @@ function terminate()
 
   disconnect(LocalPlayer, {
     onSpellsChange = onSpellsChange,
-    onLevelChange = onLevelChange
+    onLevelChange = onLevelChange,
+    onVocationChange = onConfigureList
   })
 end
 
 function toggle()
+  if g_game.isOnline() then
+    online()
+  end
   if t_spelllist:isVisible() then
     t_spelllist:close()
   else
@@ -58,39 +104,33 @@ function toggle()
 end
 
 function online()
-  local benchmark = g_clock.millis()
-  rootPanel = m_interface.getRootPanel()
-  player = g_game.getLocalPlayer()
-
-  spellListConfig = modules.game_sidebars.getSpellListConfig()
-  if table.empty(spellListConfig) then
-    spellListConfig = {
-      ["showAttackSpellGroup"] = true,
-      ["showDruidSpells"] = true,
-      ["showFreeSpells"] = true,
-      ["showHealingSpellGroup"] = true,
-      ["showKnightSpells"] = true,
-      ["showOnlyCurrentLevel"] = false,
-      ["showOnlyCurrentVocation"] = false,
-      ["showPaladinSpells"] = true,
-      ["showPremiumOnlySpells"] = true,
-      ["showSorcererSpells"] = true,
-      ["showMonkSpells"] = true,
-      ["showSupportSpellGroup"] = true,
-      ["showUnkownSpells"] = true
-    }
+  if rootPanel then
+    return
   end
-
-  onConfigureList()
+  local benchmark = g_clock.millis()
+  setupSpellListSession()
+  local player = g_game.getLocalPlayer()
+  if player then
+    onSpellsChange(player, player.spellListIds or {})
+  end
   consoleln("Spelllist loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
+  local player = g_game.getLocalPlayer()
+  if player then
+    player.spellListIds = nil
+  end
+  if rootPanel then
+    modules.game_sidebars.registerSpellListConfig(spellListConfig)
+    modules.game_sidebars.saveConfigJson(true)
+  end
   spellListData = {}
   rootPanel = nil
   lastHighlightWidget = nil
-  modules.game_sidebars.registerSpellListConfig(spellListConfig)
-  modules.game_sidebars.saveConfigJson(true)
+  searchQuery = ''
+  t_spelllist.headPanel.spellSearch:clearText()
+  rebuildSpellRows()
   spellListConfig = {}
   t_spelllist:close()
 end
@@ -100,15 +140,18 @@ function onMiniWindowClose()
 end
 
 function move(panel, height, minimized)
+  if g_game.isOnline() then
+    online()
+  end
   t_spelllist:setParent(panel)
   t_spelllist:open()
 
   if minimized then
-    t_spelllist:setHeight(height)
+    t_spelllist:setHeight(math.max(height, t_spelllist:getMinimumHeight()))
     t_spelllist:minimize()
   else
     t_spelllist:maximize()
-    t_spelllist:setHeight(height)
+    t_spelllist:setHeight(math.max(height, t_spelllist:getMinimumHeight()))
   end
 
   modules.game_sidebuttons.setButtonVisible("spellListWidget", true)
@@ -121,60 +164,87 @@ function getSpellListData()
 end
 
 function onSpellsChange(player, list)
+  -- Keep the server IDs on this player so a module reload can rebuild the rows.
+  player.spellListIds = list
+  if not rootPanel and g_game.isOnline() then
+    -- The login signal can stop before reaching this module.
+    setupSpellListSession()
+  end
   spellListData = {}
-  for _, spellId in pairs(list) do
-    local spell = Spells.getSpellByClientId(spellId)
+  for _, spellId in ipairs(list) do
+    local spell, _, name = Spells.getSpellByClientId(spellId)
     if spell then
-      spell.name = Spells.getSpellNameByWords(spell.words)
+      spell = table.copy(spell)
+      spell.name = spell.name or name
       spellListData[tostring(spellId)] = spell
     end
   end
 
-  if not table.empty(spellListData) then
-    table.sort(spellListData, function(a, b) return a.name < b.name end)
+  if rootPanel then
+    rebuildSpellRows()
+  end
+end
+
+function onSearchTextChange(widget)
+  local query = normalizeSearch(widget:getText())
+  if searchQuery ~= query then
+    searchQuery = query
     onConfigureList()
   end
 end
 
-function onUpdateSpellListLevel()
-  local player = g_game.getLocalPlayer()
-  local list = t_spelllist:recursiveGetChildById("contentsPanel")
-
-  for _, widget in pairs(list:getChildren()) do
-    local disabled = widget:recursiveGetChildById('gray')
-    disabled:setVisible(player:getLevel() < widget.spellData.level)
+function onShowMore()
+  if selectedSpellId then
+    modules.game_cyclopedia.openSpellDetails(selectedSpellId)
   end
 end
 
-function onConfigureList()
-  local player = g_game.getLocalPlayer()
-  local list = t_spelllist:recursiveGetChildById("contentsPanel")
+local function setupDraggableSpell(icon, row, words)
+  icon.words = words
+  icon.onDragEnter = onUpdateDragSpell
+  icon.onDragMove = onUpdateDragSpell
+  icon.onDragLeave = function(self, _, mousePos)
+    return onLeaveDragSpell(self, mousePos, row)
+  end
+end
+
+function rebuildSpellRows()
+  local list = t_spelllist.contentsPanel
   list.onChildFocusChange = nil
+  local layout = list:getLayout()
+  layout:disableUpdates()
 
-  list:destroyChildren()
+  for _, row in ipairs(spellRows) do
+    row:destroy()
+  end
+  spellRows = {}
+
+  local spells = {}
   for _, spell in pairs(spellListData) do
-    if not matchFilter(spell) then
-      goto continue
+    table.insert(spells, spell)
+  end
+  table.sort(spells, function(a, b)
+    if a.name == b.name then
+      return a.id < b.id
     end
+    return a.name < b.name
+  end)
 
+  for _, spell in ipairs(spells) do
     local widget = g_ui.createWidget("SpellListData", list)
     local image = widget:recursiveGetChildById('fixedImage')
     local dragImage = widget:recursiveGetChildById('moveableImage')
     local name = widget:recursiveGetChildById('name')
     local words = widget:recursiveGetChildById('words')
-    local disabled = widget:recursiveGetChildById('gray')
-
-    dragImage.onDragEnter = function(self, mousePos) onUpdateDragSpell(self, mousePos) end
-    dragImage.onDragLeave = function(self, mousePos) onLeaveDragSpell(self, mousePos, widget) end
 
     widget.spellData = spell
-    dragImage.words = spell.words
+    widget.searchName = normalizeSearch(spell.name)
+    widget.searchWords = normalizeSearch(spell.words)
+    setupDraggableSpell(dragImage, widget, spell.words)
     local spellId = SpellIcons[spell.icon][1]
-    local source = SpelllistSettings['Default'].iconsFolder
     local clip = Spells.getImageClipNormal(spellId, 'Default')
 
     image:setImageClip(clip)
-    dragImage:setImageClip(clip)
 
     name:setText(short_text(spell.name, 15))
     if #spell.name > 15 then
@@ -186,23 +256,71 @@ function onConfigureList()
       words:setTooltip(spell.words)
     end
 
-    disabled:setVisible(player:getLevel() < spell.level)
-    :: continue ::
+    table.insert(spellRows, widget)
   end
 
-  onSelectedSpell(list, list:getFirstChild(), nil)
-  list.onChildFocusChange = onSelectedSpell
+  layout:enableUpdates()
+  onConfigureList()
 end
 
-function onSelectedSpell(list, focused, oldFocus)
-  if not focused then
-    return
+function onConfigureList()
+  local player = rootPanel and g_game.getLocalPlayer()
+  local list = t_spelllist.contentsPanel
+  local oldFocus = list:getFocusedChild()
+  local first, selected
+  local layout = list:getLayout()
+  list.onChildFocusChange = nil
+  layout:disableUpdates()
+  for _, row in ipairs(spellRows) do
+    local spell = row.spellData
+    local matchesQuery = searchQuery == '' or row.searchName:find(searchQuery, 1, true)
+      or row.searchWords:find(searchQuery, 1, true)
+    local matches = player and matchesQuery and matchFilter(spell, player)
+    row:setVisible(matches and true or false)
+    if matches then
+      row.fixedImage:setImageColor(player:getLevel() < spell.level and '#909090' or 'white')
+      first = first or row
+      if spell.id == selectedSpellId then
+        selected = row
+      end
+    end
   end
+  list.emptySpellList:setText(searchQuery == '' and tr('No spells available') or tr('No matching spells'))
+  list.emptySpellList:setVisible(first == nil)
+  layout:enableUpdates()
+  layout:update()
 
-  if oldFocus then
+  selected = selected or first
+  list:focusChild(selected, ActiveFocusReason)
+  onSelectedSpell(list, selected, oldFocus)
+  list.onChildFocusChange = onSelectedSpell
+  if selected and list:isVisible() then
+    list:ensureChildVisible(selected)
+  end
+end
+
+function onSelectedSpell(list, focused, oldFocus, reason)
+  if oldFocus and oldFocus ~= focused and not oldFocus:isDestroyed() then
     oldFocus:setBackgroundColor('alpha')
     oldFocus:recursiveGetChildById('words'):setColor("#c0c0c0")
     oldFocus:recursiveGetChildById('name'):setColor("#c0c0c0")
+  end
+
+  selectedSpellId = focused and focused.spellData.id or nil
+  local details = t_spelllist.setupPanel
+  for _, widget in ipairs(details:getChildren()) do
+    widget:setVisible(focused ~= nil)
+  end
+  if not focused then
+    for _, field in ipairs({ 'spellName', 'formula', 'vocation', 'group', 'type', 'cooldown', 'mana', 'lvlMin', 'premium', 'price' }) do
+      details[field]:setText('')
+      details[field]:removeTooltip()
+    end
+    return
+  end
+
+  if reason then
+    UIScrollArea.onChildFocusChange(list, focused, oldFocus, reason)
   end
 
   focused:setBackgroundColor('#585858')
@@ -218,7 +336,9 @@ function onSelectedSpell(list, focused, oldFocus)
   t_spelllist:recursiveGetChildById('type'):setText(focused.spellData.type)
   t_spelllist:recursiveGetChildById('mana'):setText(tr('%s / %s', focused.spellData.mana, focused.spellData.soul))
   t_spelllist:recursiveGetChildById('lvlMin'):setText(focused.spellData.level)
-  t_spelllist:recursiveGetChildById('price'):setText(focused.spellData.price)
+  details.premium:setText(focused.spellData.premium and tr('Yes') or tr('No'))
+  details.price:setText(focused.spellData.price or '-')
+  details.gold:setVisible(focused.spellData.price ~= nil)
 
   local cooldownTime = focused.spellData.exhaustion / 1000
   local cooldownDesc = (cooldownTime > 60 and cooldownTime / 60 .. "min 0s" or cooldownTime .. "s")
@@ -264,9 +384,17 @@ function onSelectedSpell(list, focused, oldFocus)
 end
 
 function onUpdateDragSpell(self, mousePos)
+  if not rootPanel then
+    return false
+  end
   local rootParent = rootPanel:getParent()
-  self:setPhantom(true)
-  self:setParent(rootParent)
+  if self:getParent() ~= rootParent then
+    local image = self:getParent().fixedImage
+    self:setImageSource(image:getImageSource())
+    self:setImageClip(image:getImageClip())
+    self:setPhantom(true)
+    self:setParent(rootParent)
+  end
 
   self:setX(mousePos.x)
   self:setY(mousePos.y)
@@ -311,26 +439,25 @@ function onUpdateDragSpell(self, mousePos)
   lastHighlightWidget = clickedWidget
   lastHighlightWidget:setBorderWidth(1)
   lastHighlightWidget:setBorderColor('white')
+  return true
 end
 
 function onLeaveDragSpell(self, mousePos, originalParent)
-  local replacement = g_ui.createWidget("DraggableSpellIcon", originalParent)
-  originalParent:moveChildToIndex(replacement, 2)
-  replacement:addAnchor(AnchorTop, 'parent', AnchorTop)
-  replacement:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-  replacement:setImageSource(self:getImageSource())
-  replacement:setImageClip(self:getImageClip())
-  replacement:setMarginTop(2)
-  replacement:setMarginLeft(2)
-  replacement.words = self.words
-
-  replacement.onDragEnter = function(self, mousePos) onUpdateDragSpell(self, mousePos) end
-  replacement.onDragLeave = function(self, mousePos) onLeaveDragSpell(self, mousePos, originalParent) end
+  local words = self.words
+  if not originalParent:isDestroyed() then
+    local replacement = g_ui.createWidget("DraggableSpellIcon", originalParent)
+    originalParent:moveChildToIndex(replacement, 2)
+    replacement:addAnchor(AnchorTop, 'parent', AnchorTop)
+    replacement:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    replacement:setMarginTop(2)
+    replacement:setMarginLeft(2)
+    setupDraggableSpell(replacement, originalParent, words)
+  end
   self:destroy()
 
-  if lastHighlightWidget then
-    modules.game_actionbar.onDragSpellLeave(mousePos, replacement.words, lastHighlightWidget)
-    modules.game_helper.onDropSpell(lastHighlightWidget, replacement.words)
+  if lastHighlightWidget and not lastHighlightWidget:isDestroyed() then
+    modules.game_actionbar.onDragSpellLeave(mousePos, words, lastHighlightWidget)
+    modules.game_helper.onDropSpell(lastHighlightWidget, words)
 
     if lastHighlightWidget:getId() == "item" then
       lastHighlightWidget:setBorderWidth(0)
@@ -342,9 +469,9 @@ function onLeaveDragSpell(self, mousePos, originalParent)
       lastHighlightWidget:setBorderColorBottom("#757575")
       lastHighlightWidget:setBorderWidth(1)
     end
-
-    lastHighlightWidget = nil
   end
+  lastHighlightWidget = nil
+  return true
 end
 
 function onExtraMenu()
@@ -380,8 +507,7 @@ function onExtraMenu()
   return true
 end
 
-function matchFilter(spell)
-  local player = g_game.getLocalPlayer()
+function matchFilter(spell, player)
   if getSpellOption("showOnlyCurrentVocation") then
     if spell.vocations and not table.contains(spell.vocations, translateVocation(player:getVocation())) then
       return false
@@ -394,35 +520,16 @@ function matchFilter(spell)
     end
   end
 
-  if not canCheckAllVocations() then
-    if not getSpellOption("showDruidSpells") then
-      if spell.vocations and table.contains(spell.vocations, translateVocation(14)) then
-        return false
+  if spell.vocations and next(spell.vocations) and not canCheckAllVocations() then
+    local matchesVocation = false
+    for option, vocation in pairs(vocationFilters) do
+      if getSpellOption(option) and table.contains(spell.vocations, translateVocation(vocation)) then
+        matchesVocation = true
+        break
       end
     end
-
-    if not getSpellOption("showKnightSpells") then
-      if spell.vocations and table.contains(spell.vocations, translateVocation(11)) then
-        return false
-      end
-    end
-
-    if not getSpellOption("showSorcererSpells") then
-      if spell.vocations and table.contains(spell.vocations, translateVocation(13)) then
-        return false
-      end
-    end
-
-    if not getSpellOption("showPaladinSpells") then
-      if spell.vocations and table.contains(spell.vocations, translateVocation(12)) then
-        return false
-      end
-    end
-
-    if not getSpellOption("showMonkSpells") then
-      if spell.vocations and table.contains(spell.vocations, translateVocation(15)) then
-        return false
-      end
+    if not matchesVocation then
+      return false
     end
   end
 
@@ -445,10 +552,10 @@ function matchFilter(spell)
     end
   end
 
-  if not getSpellOption("showFreeSpells") then
-    return false
+  if spell.premium then
+    return getSpellOption("showPremiumOnlySpells")
   end
-  return true
+  return getSpellOption("showFreeSpells")
 end
 
 -- Helpers
@@ -493,7 +600,7 @@ function checkAllGroups()
 end
 
 function onLevelChange(localPlayer, level, levelPercent, oldLevel, oldLevelPercent)
-  if level ~= oldLevel then
-    onUpdateSpellListLevel()
+  if rootPanel and level ~= oldLevel then
+    onConfigureList()
   end
 end
