@@ -443,6 +443,25 @@ SpellListPanel < Panel
       image-source: /images/store/button-erase-small-up
       image-clip: 0 0 18 18
 
+SpellArchivePreviewTile < Label
+  text-align: center
+  background-color: #414950
+  border-width: 1
+  border-color: #596268
+  color: #eeeeee
+  focusable: false
+
+SpellArchivePreviewActor < UICreature
+  anchors.fill: parent
+  phantom: true
+  focusable: false
+  old-scaling: true
+  animate: true
+
+SpellArchivePreviewEffect < UISprite
+  phantom: true
+  focusable: false
+
 MagicalArchive < Panel
   anchors.fill: parent
   FlatPanel
@@ -632,18 +651,29 @@ MagicalArchive < Panel
       id: animationLabel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
-      !text: tr('Loading...')
+      !text: tr('No cast preview available')
       font: $var-cip-font
       color: $var-text-cip-color
       text-auto-resize: true
-    UIWidget
-      id: comingSoon
-      size: 10 15
+    Label
+      id: previewTitle
+      !text: tr('Cast area')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 7
+      color: $var-text-cip-color
+      text-auto-resize: true
+      visible: false
+    Panel
+      id: previewGrid
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
-      margin-top: -20
-      margin-left: -5
-      image-source: /images/store/store-flag-expires
+      margin-top: 16
+      focusable: false
+      visible: false
+      layout:
+        type: grid
+        cell-spacing: 1
 
 
 AdditionalStats < Panel
@@ -920,7 +950,7 @@ VocationIcon < UIWidget
   image-clip: 0 0 9 9
   tooltip-delayed: true
 
-InfoPanel < Panel
+SpellArchiveInfoPanel < Panel
   anchors.fill: parent
   Panel
     id: firstInfoPanel
@@ -1132,4 +1162,4 @@ MagicalArchiveDataPanel < Panel
       anchors.fill: parent
       margin: 20 5 5 6
       visible: false
-      InfoPanel
+      SpellArchiveInfoPanel

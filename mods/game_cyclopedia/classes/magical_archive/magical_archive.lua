@@ -221,7 +221,7 @@ function MagicalArchive.spellIsLocked(spell, level)
     return false
 end
 
-function MagicalArchive.showSpellList()
+function MagicalArchive.showSpellList(spellId)
     if VisibleCyclopediaPanel:getId() ~= "MagicalArchiveDataPanel" then
         return true
     end
@@ -230,10 +230,26 @@ function MagicalArchive.showSpellList()
         return
     end
 
-    MagicalArchive.setupSpellList()
+    local searchText
+    if spellId then
+        for _, spell in ipairs(MagicalArchive.spellList) do
+            if spell.id == spellId then
+                searchText = spell.words
+                VisibleCyclopediaPanel:recursiveGetChildById('searchText'):setText(searchText, true)
+                break
+            end
+        end
+    end
+
+    MagicalArchive.setupSpellList(searchText, spellId)
 end
 
-function MagicalArchive.setupSpellList(searchText)
+local function setSpellDetailsVisible(panel, visible)
+    panel.spellRuneDataPanel.dataContent:setVisible(visible)
+    panel.spellRuneDataPanel.emptyList:setVisible(not visible)
+end
+
+function MagicalArchive.setupSpellList(searchText, spellId)
     local player = g_game.getLocalPlayer()
     local panel = VisibleCyclopediaPanel
     if not player or not panel or panel:getId() ~= "MagicalArchiveDataPanel" then
@@ -249,13 +265,17 @@ function MagicalArchive.setupSpellList(searchText)
 
     MagicalArchive.cancelRender()
     local generation = MagicalArchive.renderGeneration
+    list.onChildFocusChange = nil
     list:destroyChildren()
+    setSpellDetailsVisible(panel, false)
     cyclopediaWindow.aimTargetBox:setVisible(false)
-    list.onChildFocusChange = function(_, focused, oldFocused)
+    list.onChildFocusChange = function(widget, focused, oldFocused, reason)
+        UIScrollArea.onChildFocusChange(widget, focused, oldFocused, reason)
         MagicalArchive.onSelectSpell(focused, oldFocused)
     end
 
     local index = 1
+    local selectedWidget
     local function renderBatch()
         MagicalArchive.renderEvent = nil
         if generation ~= MagicalArchive.renderGeneration or panel ~= VisibleCyclopediaPanel or panel:isDestroyed() or list:isDestroyed() then
@@ -265,10 +285,11 @@ function MagicalArchive.setupSpellList(searchText)
         local lastIndex = math.min(index + 23, #MagicalArchive.spellList)
         for i = index, lastIndex do
             local spell = MagicalArchive.spellList[i]
+            local isSelectedSpell = spell.id == spellId
             local matchesSearch = not searchText or #searchText == 0 or
                 matchText(searchText, spell.name) or matchText(searchText, spell.words)
-            if matchesSearch and passesVocationFilter(spell.vocations, playerVocation) and
-                passesLevelFilter(spell.level, playerLevel) and passesSpellGroupFilter(spell.group) then
+            if isSelectedSpell or (matchesSearch and passesVocationFilter(spell.vocations, playerVocation) and
+                passesLevelFilter(spell.level, playerLevel) and passesSpellGroupFilter(spell.group)) then
                 local widget = g_ui.createWidget("SmallSpellList", list)
                 local image = widget:recursiveGetChildById('spellIcon')
                 local name = widget:recursiveGetChildById('name')
@@ -283,6 +304,9 @@ function MagicalArchive.setupSpellList(searchText)
                 end
                 disabled:setVisible(MagicalArchive.spellIsLocked(spell, playerLevel))
                 widget.spellData = spell
+                if isSelectedSpell then
+                    selectedWidget = widget
+                end
             end
         end
 
@@ -292,23 +316,23 @@ function MagicalArchive.setupSpellList(searchText)
             return
         end
 
-        local firstWidget = list:getFirstChild()
-        if not firstWidget then
-            local dataContent = panel:recursiveGetChildById("dataContent")
-            if dataContent then
-                dataContent:setVisible(false)
+        local focusedWidget = selectedWidget or list:getFirstChild()
+        if focusedWidget then
+            if list:getFocusedChild() == focusedWidget then
+                MagicalArchive.onSelectSpell(focusedWidget)
+            else
+                list:focusChild(focusedWidget, KeyboardFocusReason)
             end
-            return
         end
-        list:focusChild(firstWidget, KeyboardFocusReason, true)
     end
 
     MagicalArchive.renderEvent = scheduleEvent(renderBatch, 1)
 end
 
 function MagicalArchive.onSelectSpell(focused, oldFocused)
-    if VisibleCyclopediaPanel:getId() ~= "MagicalArchiveDataPanel" then
-        return true
+    local panel = VisibleCyclopediaPanel
+    if not panel or panel:getId() ~= "MagicalArchiveDataPanel" then
+        return
     end
 
     if oldFocused then
@@ -318,25 +342,18 @@ function MagicalArchive.onSelectSpell(focused, oldFocused)
         end
     end
 
-    if not focused then
-        return true
+    local spellData = focused and focused.spellData
+    setSpellDetailsVisible(panel, spellData ~= nil)
+    if not spellData then
+        cyclopediaWindow.aimTargetBox:setVisible(false)
+        return
     end
 
-    local spellPanel = VisibleCyclopediaPanel:recursiveGetChildById("dataContent")
-    if not spellPanel then
-        return true
-    end
-
-    spellPanel:setVisible(true)
+    local spellPanel = panel.spellRuneDataPanel.dataContent
 
     local nameLabel = focused:recursiveGetChildById("name")
     if nameLabel then
         nameLabel:setColor("#f4f4f4")
-    end
-
-    local spellData = focused.spellData
-    if not spellData then
-        return true
     end
 
     local spellId = spellData.icon and SpellIcons[spellData.icon] and SpellIcons[spellData.icon][1] or 0
@@ -499,6 +516,135 @@ function MagicalArchive.onFilterChange(widget)
     MagicalArchive.setupSpellList()
 end
 
+local function addPreviewActor(tile, outfit, direction)
+    if not outfit then
+        return
+    end
+
+    local actor = g_ui.createWidget('SpellArchivePreviewActor', tile)
+    actor:setOutfit(outfit)
+    actor:setDirection(direction)
+    return actor
+end
+
+local function addPreviewEffect(tile, effectId, cellSize)
+    if not effectId or not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
+        return
+    end
+
+    local effect = g_things.getThingType(effectId, ThingCategoryEffect)
+    local width, height = effect:getWidth(), effect:getHeight()
+    local sprites = effect:getSprites()
+    local phase = math.floor((effect:getAnimationPhases() - 1) / 2)
+    local frameOffset = phase * width * height * effect:getLayers()
+        * effect:getNumPatternX() * effect:getNumPatternY() * effect:getNumPatternZ()
+    local spriteSize = math.floor(cellSize / math.max(width, height))
+    for y = 0, height - 1 do
+        for x = 0, width - 1 do
+            local spriteId = sprites[frameOffset + y * width + x + 1]
+            if spriteId and spriteId > 0 then
+                local sprite = g_ui.createWidget('SpellArchivePreviewEffect', tile)
+                sprite:setSize({ width = spriteSize, height = spriteSize })
+                sprite:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+                sprite:addAnchor(AnchorTop, 'parent', AnchorTop)
+                sprite:setMarginLeft(math.floor((cellSize - spriteSize * width) / 2) + (width - x - 1) * spriteSize)
+                sprite:setMarginTop(math.floor((cellSize - spriteSize * height) / 2) + (height - y - 1) * spriteSize)
+                sprite:setSpriteId(spriteId)
+            end
+        end
+    end
+end
+
+local function renderCastArea(panel, spellData)
+    local preview = panel.animationPanel
+    local grid = preview.previewGrid
+    local minX, maxX, minY, maxY = 0, 0, 0, 0
+    local tiles = {}
+
+    local function markTile(action, role)
+        local x, y = action.x, action.y
+        if type(x) ~= 'number' or type(y) ~= 'number' then
+            return
+        end
+        tiles[y] = tiles[y] or {}
+        local tile = tiles[y][x] or {}
+        tiles[y][x] = tile
+        tile[role] = true
+        tile.effectId = tile.effectId or action.effectID
+        minX, maxX = math.min(minX, x), math.max(maxX, x)
+        minY, maxY = math.min(minY, y), math.max(maxY, y)
+    end
+
+    for _, action in ipairs(spellData.initActions) do
+        if action.action == 'target' then
+            markTile(action, 'target')
+        elseif action.action == 'objecttype' then
+            markTile(action, 'affected')
+        end
+    end
+    for _, step in ipairs(spellData.timestamps) do
+        for _, action in ipairs(step.actions or {}) do
+            if action.action == 'fieldEffect' or action.action == 'missile'
+                or action.action == 'objecttype' or action.action == 'clearField' then
+                markTile(action, 'affected')
+            end
+        end
+    end
+
+    local layout = grid:getLayout()
+    layout:disableUpdates()
+    grid:destroyChildren()
+    local hasPreview = next(tiles) ~= nil
+    preview.animationLabel:setVisible(not hasPreview)
+    preview.previewTitle:setVisible(hasPreview)
+    grid:setVisible(hasPreview)
+    if hasPreview then
+        local columns, rows = maxX - minX + 3, maxY - minY + 3
+        local cellSize = math.min(38, math.floor((preview:getWidth() - 12) / columns) - 1,
+            math.floor((preview:getHeight() - 36) / rows) - 1)
+        grid:setSize({ width = columns * (cellSize + 1) - 1, height = rows * (cellSize + 1) - 1 })
+        layout:setCellSize({ width = cellSize, height = cellSize })
+        layout:setNumColumns(columns)
+
+        local casterOutfit, targetOutfit
+        local player = g_game.getLocalPlayer()
+        local outfit = player and player:getOutfit()
+        if outfit and outfit.type > 0 and g_things.isValidDatId(outfit.type, ThingCategoryCreature) then
+            casterOutfit = { type = outfit.type, head = outfit.head, body = outfit.body,
+                legs = outfit.legs, feet = outfit.feet, addons = outfit.addons }
+            targetOutfit = { type = outfit.type, head = outfit.head, body = 88,
+                legs = 76, feet = outfit.feet }
+        end
+
+        for y = minY - 1, maxY + 1 do
+            for x = minX - 1, maxX + 1 do
+                local tile = tiles[y] and tiles[y][x]
+                local widget = g_ui.createWidget('SpellArchivePreviewTile', grid)
+                if tile and tile.affected then
+                    widget:setBackgroundColor('#426b75')
+                    widget:setTooltip(tr('Affected tile'))
+                end
+                if x == 0 and y == 0 then
+                    if not addPreviewActor(widget, casterOutfit, East) then
+                        widget:setText(tr('C'))
+                    end
+                    widget:setTooltip(tr('Caster'))
+                elseif tile and tile.target then
+                    if not addPreviewActor(widget, targetOutfit, West) then
+                        widget:setText(tr('T'))
+                    end
+                    widget:setTooltip(tr('Target'))
+                end
+                if tile then
+                    addPreviewEffect(widget, tile.effectId, cellSize)
+                end
+            end
+        end
+    end
+    layout:enableUpdates()
+    layout:update()
+end
+
 function MagicalArchive.populateCombatMenu(panel, spellData)
     local runeFields = { "spellGroupInfo", "cdInfo", "groupCdInfo" }
     local allFields = { "manaInfo", "spellGroupInfo", "basePowerInfo", "scalesWithInfo", "cdInfo", "groupCdInfo", "magicTypeInfo", "rangeInfo" }
@@ -532,6 +678,7 @@ function MagicalArchive.populateCombatMenu(panel, spellData)
             end
         end
     end
+    renderCastArea(panel, spellData)
 end
 
 function MagicalArchive.populateAdditionalMenu(panel, spellData)

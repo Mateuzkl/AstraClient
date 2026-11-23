@@ -286,7 +286,7 @@ function Cyclopedia.onServerTime(hour, minute)
   end
 end
 
-function Cyclopedia:open(action)
+function Cyclopedia:open(action, spellId)
   if cyclopediaWindow:isHidden() then
     cyclopediaWindow:show(true)
     cyclopediaWindow:raise()
@@ -298,7 +298,7 @@ function Cyclopedia:open(action)
 
   for id, child in pairs(cyclopediaOptionsPanel:getChildren()) do
     if child.category:getText() == (action or 'Items') then
-      onOptionChange(child)
+      onOptionChange(child, spellId)
       break
     end
   end
@@ -324,6 +324,12 @@ end
 
 function hide()
   Cyclopedia.endGame()
+end
+
+function openSpellDetails(spellId)
+  if g_game.isOnline() then
+    Cyclopedia:open("Magical Archive", spellId)
+  end
 end
 
 function toggleRedirect(action, raceId)
@@ -378,7 +384,7 @@ function toggleTracker()
   end
 end
 
-function onOptionChange(widget)
+function onOptionChange(widget, spellId)
   if not widget then
     return
   end
@@ -497,7 +503,7 @@ function onOptionChange(widget)
     VisibleCyclopediaPanel = g_ui.createWidget('MagicalArchiveDataPanel', cyclopediaWindow.optionsPanel)
     cyclopediaWindow.bestiarytrackerButton:setVisible(false)
     VisibleCyclopediaPanel:setId('MagicalArchiveDataPanel')
-    MagicalArchive.showSpellList()
+    MagicalArchive.showSpellList(spellId)
     cyclopediaWindow.optionsPanel:focus()
   else
     VisibleCyclopediaPanel = nil
