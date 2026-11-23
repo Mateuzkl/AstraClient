@@ -520,12 +520,16 @@ function matchFilter(spell, player)
     end
   end
 
-  if not canCheckAllVocations() then
+  if spell.vocations and next(spell.vocations) and not canCheckAllVocations() then
+    local matchesVocation = false
     for option, vocation in pairs(vocationFilters) do
-      if not getSpellOption(option) and spell.vocations
-        and table.contains(spell.vocations, translateVocation(vocation)) then
-        return false
+      if getSpellOption(option) and table.contains(spell.vocations, translateVocation(vocation)) then
+        matchesVocation = true
+        break
       end
+    end
+    if not matchesVocation then
+      return false
     end
   end
 
