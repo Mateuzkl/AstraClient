@@ -585,7 +585,7 @@ local function setPreviewFrame(visual, phase)
     end
 end
 
-local function addPreviewEffect(tile, action, cellSize, delay)
+local function addPreviewEffect(tile, action, cellSize)
     local effectId = action.id
     if not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
         return
@@ -598,7 +598,7 @@ local function addPreviewEffect(tile, action, cellSize, delay)
     end
 
     local visual = createPreviewSprites(tile, effect, cellSize, 0, 0)
-    visual.startMs = action.timestamp + delay
+    visual.startMs = action.timestamp
     visual.frameMs = effectId == 33 and effectFrameMs * 4 or effectFrameMs
     visual.endMs = visual.startMs + frames * visual.frameMs
     return visual
@@ -737,6 +737,7 @@ local function renderCastArea(panel, spellData)
         layout:setCellSize({ width = cellSize, height = cellSize })
         layout:setNumColumns(columns)
         local origin = { x = (1 - minX) * (cellSize + 1), y = (1 - minY) * (cellSize + 1) }
+        local travelTime = {}
 
         local casterOutfit, targetOutfit
         local player = g_game.getLocalPlayer()
@@ -768,7 +769,6 @@ local function renderCastArea(panel, spellData)
                     widget:setTooltip(tr('Target'))
                 end
                 if tile then
-                    local travelTime = {}
                     for _, action in ipairs(tile.missiles or {}) do
                         local missile = addPreviewMissile(layer, action, cellSize, origin, x, y)
                         if missile then
@@ -777,13 +777,20 @@ local function renderCastArea(panel, spellData)
                         end
                     end
                     for _, action in ipairs(tile.effects or {}) do
-                        local effect = addPreviewEffect(widget, action, cellSize, travelTime[action.timestamp] or 0)
+                        local effect = addPreviewEffect(widget, action, cellSize)
                         if effect then
                             playback.effects[#playback.effects + 1] = effect
                         end
                     end
                 end
             end
+        end
+
+        -- Apply each cast step's travel time after collecting all its projectiles.
+        for _, effect in ipairs(playback.effects) do
+            local delay = travelTime[effect.startMs] or 0
+            effect.startMs = effect.startMs + delay
+            effect.endMs = effect.endMs + delay
         end
     end
     layout:enableUpdates()
