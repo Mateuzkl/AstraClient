@@ -183,7 +183,15 @@ function MagicalArchive.init()
     return true
 end
 
+local function stopPreviewAnimation()
+    if MagicalArchive.previewEvent then
+        removeEvent(MagicalArchive.previewEvent)
+        MagicalArchive.previewEvent = nil
+    end
+end
+
 function MagicalArchive.cancelRender()
+    stopPreviewAnimation()
     MagicalArchive.renderGeneration = MagicalArchive.renderGeneration + 1
     if MagicalArchive.renderEvent then
         removeEvent(MagicalArchive.renderEvent)
@@ -345,6 +353,7 @@ function MagicalArchive.onSelectSpell(focused, oldFocused)
     local spellData = focused and focused.spellData
     setSpellDetailsVisible(panel, spellData ~= nil)
     if not spellData then
+        stopPreviewAnimation()
         cyclopediaWindow.aimTargetBox:setVisible(false)
         return
     end
@@ -431,6 +440,9 @@ function MagicalArchive.onSummaryChange(widget, selected, lastSelected)
     end
 
     local selectedId = selected:getId()
+    if selectedId ~= "combatMenu" then
+        stopPreviewAnimation()
+    end
     local spellData = spellFocused.spellData
     if selectedId == "combatMenu" then
         MagicalArchive.populateCombatMenu(styleWidget, spellData)
@@ -527,41 +539,93 @@ local function addPreviewActor(tile, outfit, direction)
     return actor
 end
 
-local function addPreviewEffect(tile, effectId, cellSize)
-    if not effectId or not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
+local effectFrameMs = 75
+local previewPauseMs = 650
+
+local function addPreviewEffect(tile, action, cellSize)
+    local effectId = action.id
+    if not g_sprites.isLoaded() or not g_things.isValidDatId(effectId, ThingCategoryEffect) then
         return
     end
 
     local effect = g_things.getThingType(effectId, ThingCategoryEffect)
     local width, height = effect:getWidth(), effect:getHeight()
-    local sprites = effect:getSprites()
-    local phase = math.floor((effect:getAnimationPhases() - 1) / 2)
-    local frameOffset = phase * width * height * effect:getLayers()
-        * effect:getNumPatternX() * effect:getNumPatternY() * effect:getNumPatternZ()
-    local spriteSize = math.floor(cellSize / math.max(width, height))
+    local frames = effect:getAnimationPhases()
+    if frames < 1 then
+        return
+    end
+
+    local visual = {
+        parts = {},
+        sprites = effect:getSprites(),
+        stride = width * height * effect:getLayers()
+            * effect:getNumPatternX() * effect:getNumPatternY() * effect:getNumPatternZ(),
+        frames = frames,
+        startMs = action.timestamp,
+        frameMs = effectId == 33 and effectFrameMs * 4 or effectFrameMs
+    }
+    local spriteSize = math.max(1, math.floor(cellSize / math.max(width, height)))
     for y = 0, height - 1 do
         for x = 0, width - 1 do
-            local spriteId = sprites[frameOffset + y * width + x + 1]
-            if spriteId and spriteId > 0 then
-                local sprite = g_ui.createWidget('SpellArchivePreviewEffect', tile)
-                sprite:setSize({ width = spriteSize, height = spriteSize })
-                sprite:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-                sprite:addAnchor(AnchorTop, 'parent', AnchorTop)
-                sprite:setMarginLeft(math.floor((cellSize - spriteSize * width) / 2) + (width - x - 1) * spriteSize)
-                sprite:setMarginTop(math.floor((cellSize - spriteSize * height) / 2) + (height - y - 1) * spriteSize)
-                sprite:setSpriteId(spriteId)
+            local sprite = g_ui.createWidget('SpellArchivePreviewEffect', tile)
+            sprite:setSize({ width = spriteSize, height = spriteSize })
+            sprite:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+            sprite:addAnchor(AnchorTop, 'parent', AnchorTop)
+            sprite:setMarginLeft(math.floor((cellSize - spriteSize * width) / 2) + (width - x - 1) * spriteSize)
+            sprite:setMarginTop(math.floor((cellSize - spriteSize * height) / 2) + (height - y - 1) * spriteSize)
+            visual.parts[#visual.parts + 1] = sprite
+        end
+    end
+    return visual
+end
+
+local function playPreviewEffects(panel, effects)
+    if #effects == 0 then
+        return
+    end
+
+    local duration = 0
+    for _, effect in ipairs(effects) do
+        duration = math.max(duration, effect.startMs + effect.frames * effect.frameMs)
+    end
+    local startedAt = g_clock.realMillis()
+    local function update()
+        if panel:isDestroyed() or not panel:isVisible() then
+            stopPreviewAnimation()
+            return
+        end
+
+        local elapsed = (g_clock.realMillis() - startedAt) % (duration + previewPauseMs)
+        for _, effect in ipairs(effects) do
+            local phase = math.floor((elapsed - effect.startMs) / effect.frameMs)
+            if phase < 0 or phase >= effect.frames then
+                phase = -1
+            end
+            if phase ~= effect.phase then
+                effect.phase = phase
+                for index, sprite in ipairs(effect.parts) do
+                    local id = phase >= 0 and effect.sprites[phase * effect.stride + index] or 0
+                    if id ~= sprite:getSpriteId() then
+                        sprite:setSpriteId(id)
+                    end
+                    sprite:setVisible(id > 0)
+                end
             end
         end
     end
+
+    update()
+    MagicalArchive.previewEvent = cycleEvent(update, 35)
 end
 
 local function renderCastArea(panel, spellData)
+    stopPreviewAnimation()
     local preview = panel.animationPanel
     local grid = preview.previewGrid
     local minX, maxX, minY, maxY = 0, 0, 0, 0
-    local tiles = {}
+    local tiles, effects = {}, {}
 
-    local function markTile(action, role)
+    local function markTile(action, role, timestamp)
         local x, y = action.x, action.y
         if type(x) ~= 'number' or type(y) ~= 'number' then
             return
@@ -570,7 +634,10 @@ local function renderCastArea(panel, spellData)
         local tile = tiles[y][x] or {}
         tiles[y][x] = tile
         tile[role] = true
-        tile.effectId = tile.effectId or action.effectID
+        if action.action == 'fieldEffect' and action.effectID then
+            tile.effects = tile.effects or {}
+            tile.effects[#tile.effects + 1] = { id = action.effectID, timestamp = timestamp }
+        end
         minX, maxX = math.min(minX, x), math.max(maxX, x)
         minY, maxY = math.min(minY, y), math.max(maxY, y)
     end
@@ -586,7 +653,7 @@ local function renderCastArea(panel, spellData)
         for _, action in ipairs(step.actions or {}) do
             if action.action == 'fieldEffect' or action.action == 'missile'
                 or action.action == 'objecttype' or action.action == 'clearField' then
-                markTile(action, 'affected')
+                markTile(action, 'affected', step.timestamp or 0)
             end
         end
     end
@@ -635,14 +702,20 @@ local function renderCastArea(panel, spellData)
                     end
                     widget:setTooltip(tr('Target'))
                 end
-                if tile then
-                    addPreviewEffect(widget, tile.effectId, cellSize)
+                if tile and tile.effects then
+                    for _, action in ipairs(tile.effects) do
+                        local effect = addPreviewEffect(widget, action, cellSize)
+                        if effect then
+                            effects[#effects + 1] = effect
+                        end
+                    end
                 end
             end
         end
     end
     layout:enableUpdates()
     layout:update()
+    playPreviewEffects(panel, effects)
 end
 
 function MagicalArchive.populateCombatMenu(panel, spellData)

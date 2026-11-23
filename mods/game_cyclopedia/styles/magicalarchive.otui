@@ -456,7 +456,6 @@ SpellArchivePreviewActor < UICreature
   phantom: true
   focusable: false
   old-scaling: true
-  animate: true
 
 SpellArchivePreviewEffect < UISprite
   phantom: true
