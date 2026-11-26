@@ -8,12 +8,18 @@
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/image.h>
+#include <framework/ui/uimanager.h>
+#include <framework/ui/uitextedit.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <emscripten/emscripten.h>
 #include <emscripten/threading.h>
+#include <functional>
 #include <GLES2/gl2.h>
+#include <sstream>
 
 namespace
 {
@@ -118,19 +124,120 @@ void browserShowFatalError(const char *message)
     // clang-format on
 }
 
-void browserShowVirtualKeyboard(const char *text)
+std::string jsonEscape(const std::string &input)
+{
+    std::string out;
+    out.reserve(input.size() + 8);
+    for (const unsigned char ch : input) {
+        switch (ch) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (ch < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned int>(ch));
+                    out += buf;
+                } else {
+                    out.push_back(static_cast<char>(ch));
+                }
+                break;
+        }
+    }
+    return out;
+}
+
+bool isNumericTextEdit(UITextEdit *edit)
+{
+    if (!edit)
+        return false;
+    const std::string &valid = edit->getValidCharacters();
+    if (!valid.empty()) {
+        bool hasDigit = false;
+        for (unsigned char c : valid) {
+            if (std::isdigit(c)) {
+                hasDigit = true;
+            } else if (c != '-' && c != '.' && c != ',') {
+                return false;
+            }
+        }
+        if (hasDigit)
+            return true;
+    }
+    std::string id = edit->getId();
+    std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return id.find("token") != std::string::npos || id.find("number") != std::string::npos;
+}
+
+bool isEmailTextEdit(UITextEdit *edit)
+{
+    if (!edit)
+        return false;
+    std::string id = edit->getId();
+    std::transform(id.begin(), id.end(), id.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return id.find("email") != std::string::npos || id.find("accountname") != std::string::npos;
+}
+
+void browserShowVirtualKeyboard(const char *metaJson)
 {
     // clang-format off
     MAIN_THREAD_EM_ASM({
+    const json = UTF8ToString($0);
+    if (window.AstraBrowser && typeof window.AstraBrowser.showMobileKeyboard === 'function') {
+        window.AstraBrowser.showMobileKeyboard(json);
+        return;
+    }
     const editor = document.getElementById('astra-virtual-keyboard');
     if (!editor)
         return;
-    editor.value = UTF8ToString($0);
+    let text = json;
+    try {
+        const parsed = JSON.parse(json);
+        if (parsed && typeof parsed.text === 'string') text = parsed.text;
+    } catch (_) {}
+    editor.value = text;
     editor.focus({preventScroll: true});
     editor.setSelectionRange(editor.value.length, editor.value.length);
     if (navigator.virtualKeyboard && navigator.virtualKeyboard.show)
         navigator.virtualKeyboard.show();
-    }, text);
+    }, metaJson);
+    // clang-format on
+}
+
+void browserSyncFocusedTextInput(const char *metaJson)
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraBrowser && typeof window.AstraBrowser.syncFocusedTextInput === 'function') {
+        window.AstraBrowser.syncFocusedTextInput(UTF8ToString($0));
+    }
+    }, metaJson);
+    // clang-format on
+}
+
+void browserHideVirtualKeyboard()
+{
+    // clang-format off
+    MAIN_THREAD_ASYNC_EM_ASM({
+    if (window.AstraBrowser && typeof window.AstraBrowser.hideMobileKeyboard === 'function') {
+        window.AstraBrowser.hideMobileKeyboard();
+    }
+    });
+    // clang-format on
+}
+
+void browserUpdateTextInputRects(const char *rectsJson)
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraBrowser && typeof window.AstraBrowser.updateTextInputRects === 'function') {
+        window.AstraBrowser.updateTextInputRects(UTF8ToString($0));
+    }
+    }, rectsJson);
     // clang-format on
 }
 
@@ -167,7 +274,7 @@ void BrowserWindow::init()
         g_logger.fatal("Unable to activate the browser WebGL2 context.");
 
     if (g_app.isMobile() && m_maxPixelRatio <= 0.0f)
-        m_maxPixelRatio = 1.5f;
+        m_maxPixelRatio = 1.75f;
 
     updateCanvasSize();
     installCallbacks();
@@ -408,7 +515,7 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
     g_dispatcher.addEvent([this, eventType, touches = std::move(touches)] {
         if (!m_onInputEvent)
             return;
-        constexpr int DragThresholdPx = 8;
+        constexpr int DragThresholdPx = 16;
         constexpr ticks_t LongPressMs = 450;
 
         auto findSlotById = [this](long id) -> int {
@@ -517,12 +624,16 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
                     m_onInputEvent(m_inputEvent);
 
                     if (slot.dragged) {
+                        if (cancelled) {
+                            // Cancel active drag cleanly without executing onDrop on a target slot.
+                            g_ui.updateDraggingWidget(nullptr, Point());
+                        }
                         m_inputEvent.reset(Fw::MouseReleaseInputEvent);
-                        m_inputEvent.mousePos = pos;
+                        m_inputEvent.mousePos = cancelled ? Point(-1, -1) : pos;
                         m_inputEvent.mouseButton = Fw::MouseLeftButton;
                         m_mouseButtonStates[Fw::MouseLeftButton] = false;
                         m_onInputEvent(m_inputEvent);
-                    } else if (!cancelled) {
+                    } else if (!cancelled && !slot.consumed) {
                         const bool longPress = (stdext::millis() - slot.pressTime) >= LongPressMs;
                         const Fw::MouseButton clickBtn = longPress ? Fw::MouseRightButton : Fw::MouseLeftButton;
                         m_inputEvent.reset(Fw::MousePressInputEvent);
@@ -562,13 +673,14 @@ void BrowserWindow::releaseAllTouches()
             continue;
         if (i == 0) {
             m_inputEvent.reset(Fw::MouseReleaseInputEvent);
-            m_inputEvent.mousePos = slot.lastPos;
+            m_inputEvent.mousePos = Point(-1, -1);
             m_inputEvent.mouseButton = Fw::MouseTouch;
             m_mouseButtonStates[Fw::MouseTouch] = false;
             m_onInputEvent(m_inputEvent);
             if (slot.dragged) {
+                g_ui.updateDraggingWidget(nullptr, Point());
                 m_inputEvent.reset(Fw::MouseReleaseInputEvent);
-                m_inputEvent.mousePos = slot.lastPos;
+                m_inputEvent.mousePos = Point(-1, -1);
                 m_inputEvent.mouseButton = Fw::MouseLeftButton;
                 m_mouseButtonStates[Fw::MouseLeftButton] = false;
                 m_onInputEvent(m_inputEvent);
@@ -654,6 +766,7 @@ void BrowserWindow::handleViewportChanged()
 void BrowserWindow::handleContextLost(bool lost)
 {
     if (lost) {
+        m_contextLostGeneration.fetch_add(1, std::memory_order_acq_rel);
         m_contextLost = true;
         g_dispatcher.addEvent([this] {
             releaseAllKeys();
@@ -661,8 +774,9 @@ void BrowserWindow::handleContextLost(bool lost)
         });
         return;
     }
-    g_graphicsDispatcher.addEvent([this] {
-        if (!m_created)
+    const uint64_t generation = m_contextLostGeneration.load(std::memory_order_acquire);
+    g_graphicsDispatcher.addEvent([this, generation] {
+        if (!m_created || m_contextLostGeneration.load(std::memory_order_acquire) != generation)
             return;
         if (m_context > 0)
             emscripten_webgl_make_context_current(m_context);
@@ -686,6 +800,49 @@ void BrowserWindow::handlePaste(std::string text)
 
 void BrowserWindow::handleVirtualText(std::string text) { handlePaste(std::move(text)); }
 
+void BrowserWindow::handleVirtualTextReplace(std::string text, int selStart, int selEnd)
+{
+    g_dispatcher.addEvent([this, text = std::move(text), selStart, selEnd] {
+        if (!m_created)
+            return;
+        UIWidgetPtr current = g_ui.getKeyboardReceiver();
+        while (current) {
+            UIWidgetPtr focusedChild = current->getFocusedChild();
+            if (!focusedChild)
+                break;
+            current = focusedChild;
+        }
+        auto edit = std::dynamic_pointer_cast<UITextEdit>(current);
+        if (!edit || !edit->isEditable())
+            return;
+
+        m_syncingFromBrowser = true;
+        std::string applied = text;
+        const uint maxLen = edit->getMaxLength();
+        if (maxLen > 0 && applied.size() > maxLen)
+            applied.resize(maxLen);
+        const std::string &validChars = edit->getValidCharacters();
+        if (!validChars.empty()) {
+            std::string filtered;
+            filtered.reserve(applied.size());
+            for (char ch : applied) {
+                if (validChars.find(ch) != std::string::npos)
+                    filtered.push_back(ch);
+            }
+            applied = std::move(filtered);
+        }
+        edit->setText(applied);
+        const int len = static_cast<int>(applied.size());
+        const int start = std::clamp(selStart >= 0 ? selStart : len, 0, len);
+        const int end = std::clamp(selEnd >= 0 ? selEnd : start, 0, len);
+        edit->setCursorPos(end);
+        if (edit->isSelectable())
+            edit->setSelection(start, end);
+        m_syncingFromBrowser = false;
+        g_app.repaint();
+    });
+}
+
 void BrowserWindow::handleVirtualKey(Fw::Key key)
 {
     g_dispatcher.addEvent([this, key] {
@@ -702,12 +859,21 @@ EMSCRIPTEN_KEEPALIVE void astra_browser_text_input(const char *text)
     g_browserWindow.handleVirtualText(text ? text : "");
 }
 
+EMSCRIPTEN_KEEPALIVE void astra_browser_set_text(const char *text, int selStart, int selEnd)
+{
+    g_browserWindow.handleVirtualTextReplace(text ? text : "", selStart, selEnd);
+}
+
 EMSCRIPTEN_KEEPALIVE void astra_browser_virtual_key(int key)
 {
     if (key == 8)
         g_browserWindow.handleVirtualKey(Fw::KeyBackspace);
+    else if (key == 9)
+        g_browserWindow.handleVirtualKey(Fw::KeyTab);
     else if (key == 13)
         g_browserWindow.handleVirtualKey(Fw::KeyEnter);
+    else if (key == 27)
+        g_browserWindow.handleVirtualKey(Fw::KeyEscape);
 }
 
 EMSCRIPTEN_KEEPALIVE void astra_browser_set_visibility(int visible)
@@ -726,7 +892,17 @@ EMSCRIPTEN_KEEPALIVE void astra_browser_context_lost(int lost)
 }
 }
 
-void BrowserWindow::poll() { fireKeysPress(); }
+void BrowserWindow::poll()
+{
+    fireKeysPress();
+    if (m_created && (g_app.isMobile() || m_usingTouch)) {
+        const ticks_t now = stdext::millis();
+        if (now - m_lastTextRectSyncTicks >= 120) {
+            m_lastTextRectSyncTicks = now;
+            syncTextInputRects(false);
+        }
+    }
+}
 
 void BrowserWindow::swapBuffers()
 {
@@ -828,10 +1004,183 @@ std::string BrowserWindow::getClipboardText() { return m_clipboardText; }
 
 std::string BrowserWindow::getPlatformType() { return "BROWSER-WEBGL2"; }
 
-void BrowserWindow::showTextEditor(const std::string &, const std::string &, const std::string &text, int)
+void BrowserWindow::showTextEditor(const std::string &title, const std::string &, const std::string &text, int flags)
 {
-    if (m_usingTouch || g_app.isMobile())
-        browserShowVirtualKeyboard(text.c_str());
+    if (!m_usingTouch && !g_app.isMobile())
+        return;
+    std::ostringstream oss;
+    oss << "{\"text\":\"" << jsonEscape(text) << "\",\"placeholder\":\"" << jsonEscape(title)
+        << "\",\"multiline\":" << ((flags & 1) ? "true" : "false")
+        << ",\"password\":" << ((flags & 2) ? "true" : "false")
+        << ",\"numeric\":" << ((flags & 4) ? "true" : "false")
+        << ",\"email\":false,\"maxLen\":0,\"cursor\":" << text.size()
+        << ",\"selStart\":" << text.size() << ",\"selEnd\":" << text.size() << "}";
+    browserShowVirtualKeyboard(oss.str().c_str());
+}
+
+void BrowserWindow::hideTextEditor()
+{
+    browserHideVirtualKeyboard();
+}
+
+void BrowserWindow::consumeTouchGesture()
+{
+    if (m_touchSlots[0].active)
+        m_touchSlots[0].consumed = true;
+}
+
+void BrowserWindow::openWebProfile(const std::string &profile)
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraLauncher && typeof window.AstraLauncher.switchProfile === 'function')
+        window.AstraLauncher.switchProfile(UTF8ToString($0));
+    }, profile.c_str());
+    // clang-format on
+}
+
+void BrowserWindow::toggleWebDiagnostics()
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraLauncher && typeof window.AstraLauncher.toggleDiagnostics === 'function')
+        window.AstraLauncher.toggleDiagnostics();
+    });
+    // clang-format on
+}
+
+void BrowserWindow::requestWebFullscreen()
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraLauncher && typeof window.AstraLauncher.requestFullscreen === 'function')
+        window.AstraLauncher.requestFullscreen();
+    });
+    // clang-format on
+}
+
+static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, double cssScaleY)
+{
+    const Rect r = edit->getRect();
+    const std::string text = edit->getText();
+    const int selStart = edit->hasSelection() ? edit->getSelectionStart() : edit->getCursorPos();
+    const int selEnd = edit->hasSelection() ? edit->getSelectionEnd() : edit->getCursorPos();
+    std::ostringstream oss;
+    oss << "{\"id\":\"" << jsonEscape(edit->getId())
+        << "\",\"x\":" << static_cast<int>(std::lround(r.left() * cssScaleX))
+        << ",\"y\":" << static_cast<int>(std::lround(r.top() * cssScaleY))
+        << ",\"w\":" << static_cast<int>(std::lround(r.width() * cssScaleX))
+        << ",\"h\":" << static_cast<int>(std::lround(r.height() * cssScaleY))
+        << ",\"text\":\"" << jsonEscape(text)
+        << "\",\"placeholder\":\"" << jsonEscape(edit->getPlaceholder())
+        << "\",\"cursor\":" << edit->getCursorPos()
+        << ",\"selStart\":" << selStart
+        << ",\"selEnd\":" << selEnd
+        << ",\"maxLen\":" << edit->getMaxLength()
+        << ",\"password\":" << (edit->isTextHidden() ? "true" : "false")
+        << ",\"multiline\":" << (edit->isMultiline() ? "true" : "false")
+        << ",\"numeric\":" << (isNumericTextEdit(edit) ? "true" : "false")
+        << ",\"email\":" << (isEmailTextEdit(edit) ? "true" : "false")
+        << ",\"focused\":" << (edit->isFocused() ? "true" : "false") << "}";
+    return oss.str();
+}
+
+void BrowserWindow::onTextEditActivated(UITextEdit *edit)
+{
+    if (!edit || !edit->isEditable() || (!m_usingTouch && !g_app.isMobile()))
+        return;
+    const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+        ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+    const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+        ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+    syncTextInputRects(true);
+    browserShowVirtualKeyboard(serializeTextEditMeta(edit, cssScaleX, cssScaleY).c_str());
+}
+
+void BrowserWindow::onTextEditFocusChanged(UITextEdit *edit, bool focused)
+{
+    if (!edit || (!m_usingTouch && !g_app.isMobile()))
+        return;
+    if (focused && edit->isEditable()) {
+        const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+            ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+            : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+        const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+            ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+            : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+        browserSyncFocusedTextInput(serializeTextEditMeta(edit, cssScaleX, cssScaleY).c_str());
+        syncTextInputRects(true);
+    } else if (!focused) {
+        g_dispatcher.addEvent([this] {
+            UIWidgetPtr current = g_ui.getKeyboardReceiver();
+            while (current) {
+                UIWidgetPtr child = current->getFocusedChild();
+                if (!child)
+                    break;
+                current = child;
+            }
+            auto activeEdit = std::dynamic_pointer_cast<UITextEdit>(current);
+            if (!activeEdit || !activeEdit->isEditable())
+                browserHideVirtualKeyboard();
+        });
+    }
+}
+
+void BrowserWindow::onTextEditChanged(UITextEdit *edit)
+{
+    if (m_syncingFromBrowser || !edit || !edit->isEditable() || !edit->isFocused())
+        return;
+    if (!m_usingTouch && !g_app.isMobile())
+        return;
+    const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+        ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+    const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+        ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+    browserSyncFocusedTextInput(serializeTextEditMeta(edit, cssScaleX, cssScaleY).c_str());
+}
+
+void BrowserWindow::syncTextInputRects(bool force)
+{
+    UIWidgetPtr root = g_ui.getRootWidget();
+    if (!root || m_size.width() <= 0 || m_size.height() <= 0)
+        return;
+    const double cssScaleX = (m_cssWidth > 0.0)
+        ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+    const double cssScaleY = (m_cssHeight > 0.0)
+        ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+        : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+
+    std::vector<UITextEdit *> visibleEdits;
+    std::function<void(const UIWidgetPtr &)> collect = [&](const UIWidgetPtr &widget) {
+        if (!widget || !widget->isVisible() || !widget->isEnabled())
+            return;
+        if (auto edit = std::dynamic_pointer_cast<UITextEdit>(widget)) {
+            if (edit->isEditable() && !edit->getRect().isEmpty())
+                visibleEdits.push_back(edit.get());
+        }
+        for (const auto &child : widget->getChildren())
+            collect(child);
+    };
+    collect(root);
+
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < visibleEdits.size(); ++i) {
+        if (i > 0)
+            oss << ",";
+        oss << serializeTextEditMeta(visibleEdits[i], cssScaleX, cssScaleY);
+    }
+    oss << "]";
+    std::string json = oss.str();
+    if (!force && json == m_lastTextRectsJson)
+        return;
+    m_lastTextRectsJson = std::move(json);
+    browserUpdateTextInputRects(m_lastTextRectsJson.c_str());
 }
 
 #endif

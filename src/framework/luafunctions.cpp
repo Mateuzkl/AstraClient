@@ -413,6 +413,11 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_window", "isMaximized", &PlatformWindow::isMaximized, &g_window);
     g_lua.bindSingletonFunction("g_window", "hasFocus", &PlatformWindow::hasFocus, &g_window);
     g_lua.bindSingletonFunction("g_window", "showTextEditor", &PlatformWindow::showTextEditor, &g_window);
+    g_lua.bindSingletonFunction("g_window", "hideTextEditor", &PlatformWindow::hideTextEditor, &g_window);
+    g_lua.bindSingletonFunction("g_window", "consumeTouchGesture", &PlatformWindow::consumeTouchGesture, &g_window);
+    g_lua.bindSingletonFunction("g_window", "openWebProfile", &PlatformWindow::openWebProfile, &g_window);
+    g_lua.bindSingletonFunction("g_window", "toggleWebDiagnostics", &PlatformWindow::toggleWebDiagnostics, &g_window);
+    g_lua.bindSingletonFunction("g_window", "requestWebFullscreen", &PlatformWindow::requestWebFullscreen, &g_window);
     g_lua.bindSingletonFunction("g_window", "flash", &PlatformWindow::flash, &g_window);
     
     // Input

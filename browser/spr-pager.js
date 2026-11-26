@@ -10,6 +10,7 @@
 
   const DEFAULT_PAGE_SIZE = 256 * 1024;
   const MAX_CONCURRENT = 6;
+  const DEFAULT_TIMEOUT_MS = 15000;
   const DB_NAME = 'ASTRA_SPR_PAGE_CACHE';
   const DB_VERSION = 1;
 
@@ -21,7 +22,7 @@
         typeof m.file !== 'string' || !m.file || /^https?:|^\//i.test(m.file) || m.file.includes('..') ||
         !/^sha256-[a-f0-9]{64}$/.test(m.uuid) ||
         !Number.isSafeInteger(m.size) || m.size <= 0 || m.size > 2147483648 ||
-        !Number.isSafeInteger(m.pageSize) || m.pageSize < 4096 || m.pageSize > 4 * 1024 * 1024 ||
+        m.pageSize !== DEFAULT_PAGE_SIZE ||
         !Number.isSafeInteger(m.spriteCount) || m.spriteCount <= 0 ||
         !Number.isSafeInteger(m.indexBytes) || m.indexBytes < 8 || m.indexBytes > m.size ||
         !Array.isArray(m.hashes)) {
@@ -114,10 +115,17 @@
     });
   }
 
-  function createPager({ manifest, baseUrl, store = null, fetcher = globalThis.fetch, onDeliver = () => {}, maxConcurrent = MAX_CONCURRENT } = {}) {
+  async function clearProfilePages(indexedDB, namespace) {
+    const store = await openPageStore(indexedDB, namespace);
+    if (!store) return;
+    try { await store.clearPages(); } finally { store.close(); }
+  }
+
+  function createPager({ manifest, baseUrl, store = null, fetcher = globalThis.fetch, onDeliver = () => {}, maxConcurrent = MAX_CONCURRENT, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
     const valid = validateSprManifest(manifest);
     const sprUrl = new URL(valid.file, baseUrl || 'http://localhost/').href;
     const inFlight = new Set();
+    const activeControllers = new Set();
     const queue = [];
     let activeFetches = 0;
     let disposed = false;
@@ -161,38 +169,64 @@
         try {
           const cached = await activeStore.getPage(pageIndex);
           if (cached instanceof ArrayBuffer && cached.byteLength === range.size) {
-            stats.idbHits++;
-            return new Uint8Array(cached);
+            const cachedHash = await sha256Hex(cached);
+            if (cachedHash === expectedHash) {
+              stats.idbHits++;
+              return new Uint8Array(cached);
+            }
           }
         } catch (_) {}
       }
 
-      const response = await fetcher(sprUrl, {
-        method: 'GET',
-        headers: { Range: `bytes=${range.start}-${range.end}` },
-        credentials: 'same-origin',
-        cache: 'force-cache'
-      });
-      if (response.status !== 206) {
-        throw new Error(`Expected HTTP 206 for sprite page ${pageIndex}, got ${response.status}`);
-      }
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength !== range.size) {
-        throw new Error(`Sprite page ${pageIndex} length mismatch (${buffer.byteLength} != ${range.size})`);
-      }
-      const actualHash = await sha256Hex(buffer);
-      if (actualHash !== expectedHash) {
-        throw new Error(`Sprite page ${pageIndex} SHA-256 verification failed`);
-      }
+      const controller = typeof AbortController === 'function' ? new AbortController() : null;
+      if (controller) activeControllers.add(controller);
+      let timeoutId = null;
+      const deadlinePromise = timeoutMs > 0
+        ? new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+              if (controller) { try { controller.abort(); } catch (_) {} }
+              reject(new Error(`Sprite page ${pageIndex} download timed out`));
+            }, timeoutMs);
+          })
+        : null;
 
-      stats.networkFetches++;
-      stats.bytesTransferred += buffer.byteLength;
+      try {
+        const doFetch = async () => {
+          const init = {
+            method: 'GET',
+            headers: { Range: `bytes=${range.start}-${range.end}` },
+            credentials: 'same-origin',
+            cache: 'force-cache'
+          };
+          if (controller) init.signal = controller.signal;
+          const response = await fetcher(sprUrl, init);
+          if (response.status !== 206) {
+            throw new Error(`Expected HTTP 206 for sprite page ${pageIndex}, got ${response.status}`);
+          }
+          const buffer = await response.arrayBuffer();
+          if (buffer.byteLength !== range.size) {
+            throw new Error(`Sprite page ${pageIndex} length mismatch (${buffer.byteLength} != ${range.size})`);
+          }
+          const actualHash = await sha256Hex(buffer);
+          if (actualHash !== expectedHash) {
+            throw new Error(`Sprite page ${pageIndex} SHA-256 verification failed`);
+          }
+          return buffer;
+        };
 
-      if (activeStore) {
-        // Persist asynchronously; quota failures never fail gameplay.
-        activeStore.putPage(pageIndex, buffer.slice(0)).catch(() => {});
+        const buffer = deadlinePromise ? await Promise.race([doFetch(), deadlinePromise]) : await doFetch();
+        stats.networkFetches++;
+        stats.bytesTransferred += buffer.byteLength;
+
+        if (activeStore && !disposed) {
+          // Persist asynchronously; quota failures never fail gameplay.
+          activeStore.putPage(pageIndex, buffer.slice(0)).catch(() => {});
+        }
+        return new Uint8Array(buffer);
+      } finally {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        if (controller) activeControllers.delete(controller);
       }
-      return new Uint8Array(buffer);
     }
 
     function pump() {
@@ -234,6 +268,10 @@
         disposed = true;
         queue.length = 0;
         inFlight.clear();
+        for (const controller of activeControllers) {
+          try { controller.abort(); } catch (_) {}
+        }
+        activeControllers.clear();
         if (store && typeof store.close === 'function') store.close();
       }
     };
@@ -242,9 +280,11 @@
   return {
     DEFAULT_PAGE_SIZE,
     MAX_CONCURRENT,
+    DB_NAME,
     validateSprManifest,
     pageByteRange,
     openPageStore,
+    clearProfilePages,
     createPager
   };
 });

@@ -62,6 +62,7 @@ class MinimapBlock
 {
 public:
     void clean();
+    void invalidateBlockTextures();
     void update();
     void updateTile(int x, int y, const MinimapTile& tile);
     MinimapTile& getTile(int x, int y) { return m_tiles[getTileIndex(x,y)]; }
@@ -91,6 +92,7 @@ public:
     void terminate();
 
     void clean();
+    void invalidateBlockTextures();
 
     void draw(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color);
     void drawSprites(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color, bool liveTerrain = true);

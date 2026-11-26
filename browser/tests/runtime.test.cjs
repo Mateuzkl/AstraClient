@@ -234,6 +234,78 @@ test('game focus consumes mapped hotkeys without stealing HTML or clipboard inpu
   assert.equal(document.count() + editor.count(), 0);
 });
 
+test('mobile touch on synced text input rect synchronously focuses native input and syncs text', () => {
+  const document = eventTarget();
+  const canvas = Object.assign(eventTarget(), {
+    getBoundingClientRect: () => ({ left: 10, top: 20, width: 800, height: 390 }),
+    focusCount: 0,
+    focus() { this.focusCount++; }
+  });
+  const editor = eventTarget();
+  const bar = { hidden: true, style: {} };
+  const mobileInput = Object.assign(eventTarget(), {
+    type: 'text', inputMode: 'text', placeholder: '', value: '', maxLength: 0,
+    selectionStart: 0, selectionEnd: 0, focusCount: 0, blurCount: 0,
+    focus() { this.focusCount++; document.activeElement = this; },
+    blur() { this.blurCount++; if (document.activeElement === this) document.activeElement = null; },
+    setSelectionRange(s, e) { this.selectionStart = s; this.selectionEnd = e; },
+    removeAttribute() {}
+  });
+  const nextBtn = eventTarget();
+  const doneBtn = eventTarget();
+  document.body = { getAttribute: (k) => k === 'data-profile' ? 'mobile' : null };
+  document.getElementById = id => ({
+    canvas, 'astra-virtual-keyboard': editor,
+    'astra-mobile-keyboard-bar': bar, 'astra-mobile-input': mobileInput,
+    'astra-mobile-input-next': nextBtn, 'astra-mobile-input-done': doneBtn
+  }[id] || null);
+  const calls = [];
+  const api = runtime({}, undefined, { document, innerHeight: 390, visualViewport: Object.assign(eventTarget(), { height: 190, offsetTop: 0 }) });
+  const stop = api.installTextBridge({ ccall(name, _, _t, values) { calls.push([name, ...values]); } });
+
+  api.updateTextInputRects(JSON.stringify([
+    { id: 'accountNameTextEdit', x: 200, y: 100, w: 180, h: 28, text: '', email: true, password: false, numeric: false, maxLen: 49 }
+  ]));
+
+  // Tap directly on Email field -> bar opens, touchend prevents canvas focus steal, and mobileInput.focus() runs SYNCHRONOUSLY!
+  let touchEndPrevented = 0;
+  canvas.dispatch('touchstart', { changedTouches: [{ identifier: 1, clientX: 250, clientY: 134 }] });
+  canvas.dispatch('touchend', { changedTouches: [{ identifier: 1, clientX: 252, clientY: 135 }], preventDefault() { touchEndPrevented++; } });
+  assert.equal(touchEndPrevented, 1);
+  assert.equal(bar.hidden, false);
+  assert.equal(mobileInput.focusCount, 1);
+  assert.equal(mobileInput.type, 'text');
+  assert.equal(mobileInput.inputMode, 'email');
+  assert.equal(bar.style.bottom, '200px');
+
+  // Typing via Gboard/iOS IME calls astra_browser_set_text with exact value + selection.
+  mobileInput.value = 'player@astra.gg';
+  mobileInput.selectionStart = 15;
+  mobileInput.selectionEnd = 15;
+  mobileInput.dispatch('input', {});
+  assert.deepEqual(calls[0], ['astra_browser_set_text', 'player@astra.gg', 15, 15]);
+
+  // Delayed C++ showMobileKeyboard echo for the same focused widget preserves already-typed text.
+  api.showMobileKeyboard(JSON.stringify({ id: 'accountNameTextEdit', text: '', email: true }));
+  assert.equal(mobileInput.value, 'player@astra.gg');
+
+  // Tapping Next via touch (touchend) sends Tab (key 9) without dismissing the keyboard or double-firing on click.
+  let nextTouchPrevented = 0;
+  nextBtn.dispatch('touchend', { preventDefault() { nextTouchPrevented++; } });
+  nextBtn.dispatch('click', {});
+  assert.equal(nextTouchPrevented, 1);
+  assert.equal(calls.filter(c => c[0] === 'astra_browser_virtual_key' && c[1] === 9).length, 1);
+
+  // Tapping outside text rects hides the bar and blurs mobileInput.
+  canvas.dispatch('touchstart', { changedTouches: [{ identifier: 2, clientX: 30, clientY: 40 }] });
+  canvas.dispatch('touchend', { changedTouches: [{ identifier: 2, clientX: 30, clientY: 40 }] });
+  assert.equal(bar.hidden, true);
+  assert.equal(mobileInput.blurCount, 1);
+
+  stop();
+  assert.equal(document.count() + canvas.count() + editor.count() + mobileInput.count() + nextBtn.count() + doneBtn.count(), 0);
+});
+
 test('persistence hooks release timers and listeners and ignore late ticks', () => {
   const host = eventTarget();
   const document = eventTarget();

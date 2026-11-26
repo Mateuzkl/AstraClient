@@ -199,6 +199,12 @@ if(WASM)
 
     # Lista revisavel: um arquivo novo nunca entra automaticamente no pacote.
     find_program(ASTRA_NODE_EXECUTABLE NAMES node nodejs REQUIRED)
+    if(DEFINED _ASTRA_WASM_CACHED_PROFILE AND NOT _ASTRA_WASM_CACHED_PROFILE STREQUAL ASTRA_WASM_PROFILE)
+        message(FATAL_ERROR
+            "Cannot switch ASTRA_WASM_PROFILE from '${_ASTRA_WASM_CACHED_PROFILE}' to '${ASTRA_WASM_PROFILE}' "
+            "in an existing build directory. Use a separate build directory or reconfigure with --fresh.")
+    endif()
+    set(_ASTRA_WASM_CACHED_PROFILE "${ASTRA_WASM_PROFILE}" CACHE INTERNAL "Configured Astra WASM profile")
     if(ASTRA_WASM_PROFILE STREQUAL "mobile")
         set(ASTRA_WEB_POLICY_DEFAULT "${CMAKE_SOURCE_DIR}/browser/mobile-assets.json")
         set(ASTRA_WASM_DEFAULT_PTHREAD_POOL_SIZE "2")
@@ -276,7 +282,7 @@ if(WASM)
         -sEXIT_RUNTIME=1
         -sENVIRONMENT=web,worker
         -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,wasmMemory
-        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_astra_spr_page_loaded','_astra_browser_set_visibility','_astra_browser_viewport_changed','_astra_browser_context_lost']"
+        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_astra_spr_page_loaded','_astra_browser_set_visibility','_astra_browser_viewport_changed','_astra_browser_context_lost','_astra_browser_set_text']"
         -sDYNAMIC_EXECUTION=0
         -lidbfs.js
         -lwebsocket.js
@@ -324,6 +330,17 @@ if(WASM)
                 --profile "${ASTRA_WASM_PROFILE}"
                 --root-dist "${ASTRA_WASM_DIST_DIR}"
                 --subdir "${ASTRA_WASM_OUTPUT_SUBDIR}"
+            COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
+                "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WASM_PROFILE_DIST}" "${ASTRA_WASM_THINGS_DIR}"
+            VERBATIM
+        )
+    elseif(ASTRA_WASM_PROFILE STREQUAL "mobile")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py"
+                "${ASTRA_WASM_PROFILE_DIST}"
+                --profile "mobile"
+                --root-dist "${ASTRA_WASM_PROFILE_DIST}"
+                --subdir ""
             COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
                 "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WASM_PROFILE_DIST}" "${ASTRA_WASM_THINGS_DIR}"
             VERBATIM

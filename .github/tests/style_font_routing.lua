@@ -1,16 +1,20 @@
 -- Exercise the production startup loader with bitmap and RmlUi font assets.
+local currentLayout = ''
 local files = {
     ['/fonts/'] = {'/fonts/default.otfont', '/fonts/rml'},
     ['/fonts/rml'] = {'/fonts/rml/Barlow-Regular.ttf', '/fonts/rml/fallback.otf',
         '/fonts/rml/OFL.txt', '/fonts/rml/nested.otfont'},
     ['/styles/'] = {'/styles/default.otui'},
     ['/particles/'] = {'/particles/default.otps'},
+    ['/layouts/mobile/styles'] = {'/layouts/mobile/styles/50-mobile-controls.otui'},
 }
 local fonts, styles, particles, cursors
 g_resources = {
     directoryExists = function(path) return files[path] ~= nil end,
+    fileExists = function() return false end,
     listDirectoryFiles = function(path) return assert(files[path]) end,
     isFileType = function(path, extension) return path:sub(-#extension - 1) == '.' .. extension end,
+    getLayout = function() return currentLayout end,
 }
 g_fonts = {importFont = function(path)
     assert(path:sub(-7) == '.otfont', 'outline font sent to the OTUI bitmap loader: ' .. path)
@@ -34,4 +38,10 @@ for _, nativeRmlUi in ipairs({false, true}) do
     assert(#fonts == 2, 'unsupported font import reached the bitmap loader')
     terminate()
 end
-print('Style font routing: PASS (with and without RmlUi)')
+currentLayout = 'mobile'
+fonts, styles, particles, cursors = {}, {}, {}, 0
+init()
+assert(#styles == 2 and styles[1] == '/styles/default.otui' and styles[2] == '/layouts/mobile/styles/50-mobile-controls.otui',
+    'layout style overrides must load after base styles')
+terminate()
+print('Style font routing: PASS (with and without RmlUi + mobile layout)')

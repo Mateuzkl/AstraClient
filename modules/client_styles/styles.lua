@@ -24,8 +24,8 @@ function init()
     end)
     safeCall("load cursors", function()
         g_mouse.loadCursors('/data/cursors/cursors')
-        local layout = g_resources.getLayout()
-        if layout and layout:len() > 0 and g_resources.fileExists('/layouts/' .. layout .. '/cursors/cursors.otml') then
+        local layout = (g_resources.getLayout and g_resources.getLayout()) or ""
+        if layout:len() > 0 and g_resources.fileExists and g_resources.fileExists('/layouts/' .. layout .. '/cursors/cursors.otml') then
             g_mouse.loadCursors('/layouts/' .. layout .. '/cursors/cursors')
         end
     end)
@@ -40,48 +40,43 @@ function importResources(dir, type)
         return
     end
 
-    local dataByRel = {}
-    local layoutByRel = {}
-    local seenRel = {}
-    local orderedRel = {}
-
-    local function collectFrom(baseRoot, currentDir, targetMap)
-        if not g_resources.directoryExists(currentDir) then
-            return
-        end
-        local files = g_resources.listDirectoryFiles(currentDir, true, true)
-        for _, file in pairs(files) do
-            if g_resources.isFileType(file, type) then
-                local rel = file:sub(#baseRoot + 1)
-                if not seenRel[rel] then
-                    seenRel[rel] = true
-                    table.insert(orderedRel, rel)
+    local function collectSorted(baseRoot)
+        local collected = {}
+        local function visit(currentDir)
+            if not g_resources.directoryExists(currentDir) then
+                return
+            end
+            local files = g_resources.listDirectoryFiles(currentDir, true, true)
+            for _, file in pairs(files) do
+                if g_resources.isFileType(file, type) then
+                    table.insert(collected, file)
+                elseif g_resources.directoryExists(file) then
+                    visit(file)
                 end
-                targetMap[rel] = file
-            elseif g_resources.directoryExists(file) then
-                collectFrom(baseRoot, file, targetMap)
             end
         end
+        visit(baseRoot)
+        table.sort(collected)
+        return collected
     end
 
-    -- Load base /data/<dir> first, then apply /layouts/<layout>/<dir> overrides on top
-    -- so styles added to /data/styles remain available while layout overrides still win.
+    -- Prefer explicit /data/<dir>, falling back to /<dir>/ for mocked test environments.
     local dataRoot = '/data/' .. dir
-    collectFrom(dataRoot, dataRoot, dataByRel)
-
-    local layout = g_resources.getLayout()
-    if layout and layout:len() > 0 then
-        local layoutRoot = '/layouts/' .. layout .. '/' .. dir
-        collectFrom(layoutRoot, layoutRoot, layoutByRel)
+    if not g_resources.directoryExists(dataRoot) then
+        dataRoot = '/' .. dir .. '/'
     end
 
-    table.sort(orderedRel)
-    for _, rel in ipairs(orderedRel) do
-        if dataByRel[rel] then
-            loader(dataByRel[rel])
-        end
-        if layoutByRel[rel] then
-            loader(layoutByRel[rel])
+    -- Load all base /data/<dir> files first, then apply all /layouts/<layout>/<dir>
+    -- overrides afterwards so layout definitions always take precedence regardless of filename.
+    for _, file in ipairs(collectSorted(dataRoot)) do
+        loader(file)
+    end
+
+    local layout = (g_resources.getLayout and g_resources.getLayout()) or ""
+    if layout:len() > 0 then
+        local layoutRoot = '/layouts/' .. layout .. '/' .. dir
+        for _, file in ipairs(collectSorted(layoutRoot)) do
+            loader(file)
         end
     end
 end

@@ -30,6 +30,7 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/apngloader.h>
 #include <framework/util/stats.h>
+#include <unordered_set>
 
 TextureManager g_textures;
 
@@ -107,9 +108,35 @@ bool TextureManager::unload(const std::string& fileName)
 
 void TextureManager::reload()
 {
+    std::unordered_set<const Texture*> reloaded;
     for(auto& it : m_textures) {
-        const std::string& path = g_resources.guessFilePath(it.first, "png");
         const TexturePtr& tex = it.second;
+        if(!tex || !reloaded.insert(tex.get()).second)
+            continue;
+
+        const std::string& path = g_resources.guessFilePath(g_resources.resolvePath(it.first), "png");
+        if (tex->isAnimatedTexture()) {
+            try {
+                std::stringstream fin;
+                g_resources.readFileStream(path, fin);
+                apng_data apng;
+                if (load_apng(fin, &apng) == 0) {
+                    Size imageSize(apng.width, apng.height);
+                    if (apng.num_frames > 1) {
+                        std::vector<ImagePtr> frames;
+                        frames.reserve(apng.num_frames);
+                        for (uint i = 0; i < apng.num_frames; ++i) {
+                            uchar* frameData = apng.pdata + (i * apng.height * apng.width * apng.bpp);
+                            frames.push_back(std::make_shared<Image>(imageSize, apng.bpp, frameData));
+                        }
+                        static_cast<AnimatedTexture*>(tex.get())->replaceFrames(frames);
+                        tex->setTime(stdext::time());
+                    }
+                    free_apng(&apng);
+                }
+            } catch(...) {}
+            continue;
+        }
 
         ImagePtr image = Image::load(path);
         if(!image)
@@ -123,6 +150,8 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
 {
     auto it = m_textures.find(fileName);
     if (it != m_textures.end()) {
+        if (it->second)
+            it->second->setTime(stdext::time());
         return it->second;
     }
 
@@ -135,6 +164,8 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
     it = m_textures.find(filePath);
     if(it != m_textures.end()) {
         texture = it->second;
+        if (texture)
+            texture->setTime(stdext::time());
     }
 
     // texture not found, load it

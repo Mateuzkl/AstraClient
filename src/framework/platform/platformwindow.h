@@ -105,6 +105,11 @@ public:
     void setOnInputEvent(const OnInputEventCallback& onInputEvent) { m_onInputEvent = onInputEvent; }
 
     virtual void showTextEditor(const std::string& title, const std::string& description, const std::string& text, int flags) {}
+    virtual void hideTextEditor() {}
+    virtual void consumeTouchGesture() {}
+    virtual void openWebProfile(const std::string&) {}
+    virtual void toggleWebDiagnostics() {}
+    virtual void requestWebFullscreen() {}
     virtual void handleTextInput(std::string text) {} // for android
 
     void setScaling(float scaling) { m_scaling = scaling; }

@@ -63,17 +63,24 @@
     assertSecurePage,
     ownsKeyboardFocus() {
       const focused = document.activeElement;
-      return !!focused && (focused === document.getElementById('canvas') ||
-        focused === document.getElementById('astra-virtual-keyboard'));
+      const canvas = document.getElementById('canvas');
+      const vkb = document.getElementById('astra-virtual-keyboard');
+      const mobileInput = document.getElementById('astra-mobile-input');
+      return !!focused && (focused === canvas || focused === vkb || focused === mobileInput);
     },
 
     keyboardPolicy(event, mapped) {
       if (!this.ownsKeyboardFocus()) return 0; // HTML controls keep their keys.
+      const vkb = document.getElementById('astra-virtual-keyboard');
+      const canvas = document.getElementById('canvas');
+      const mobileInput = document.getElementById('astra-mobile-input');
+      if (mobileInput && mobileInput !== vkb && mobileInput !== canvas && document.activeElement === mobileInput)
+        return 0; // Native mobile input handles all keys/IME/paste.
       const printable = [...(event.key || '')].length === 1;
       if (!mapped && !printable) return 0;
       const clipboard = (event.ctrlKey || event.metaKey) && !event.altKey;
       if (clipboard && event.code === 'KeyV') return 0; // The paste bridge owns it.
-      if (document.activeElement === document.getElementById('astra-virtual-keyboard') &&
+      if (document.activeElement === vkb &&
           !event.ctrlKey && !event.altKey && !event.metaKey &&
           (printable || event.code === 'Backspace' || event.code === 'Enter' || event.code === 'NumpadEnter'))
         return 0; // Native editing/IME produces input/beforeinput, not duplicate text.
@@ -170,20 +177,284 @@
 
     installTextBridge(module) {
       let active = true;
+      let textInputRects = [];
+      let currentMeta = null;
+      let composing = false;
+      let touchTapStart = null;
+      let lastUserInputAt = 0;
       const listeners = [];
-      const listen = (target, type, callback) => {
-        target.addEventListener(type, callback);
-        listeners.push([target, type, callback]);
+      const listen = (target, type, callback, options) => {
+        if (!target || typeof target.addEventListener !== 'function') return;
+        target.addEventListener(type, callback, options);
+        listeners.push([target, type, callback, options]);
       };
+      const isMobileContext = () => {
+        const bodyProfile = document.body && document.body.getAttribute && document.body.getAttribute('data-profile');
+        if (bodyProfile === 'mobile') return true;
+        return !!(window.navigator && Number(window.navigator.maxTouchPoints || 0) > 0 &&
+          window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+      };
+      const editor = document.getElementById('astra-virtual-keyboard');
+      const rawCanvas = document.getElementById('canvas');
+      const canvas = rawCanvas && rawCanvas !== editor ? rawCanvas : null;
+      const rawBar = document.getElementById('astra-mobile-keyboard-bar');
+      const bar = rawBar && rawBar !== editor && rawBar !== canvas ? rawBar : null;
+      const rawMobileInput = document.getElementById('astra-mobile-input');
+      const mobileInput = rawMobileInput && rawMobileInput !== editor && rawMobileInput !== canvas ? rawMobileInput : null;
+      const rawNextBtn = document.getElementById('astra-mobile-input-next');
+      const nextBtn = rawNextBtn && rawNextBtn !== editor && rawNextBtn !== canvas ? rawNextBtn : null;
+      const rawDoneBtn = document.getElementById('astra-mobile-input-done');
+      const doneBtn = rawDoneBtn && rawDoneBtn !== editor && rawDoneBtn !== canvas ? rawDoneBtn : null;
+
+      const positionBar = () => {
+        if (!bar || bar.hidden) return;
+        const vv = window.visualViewport;
+        if (vv && typeof vv.height === 'number' && vv.height > 0) {
+          const bottomOffset = Math.max(0, Math.round(window.innerHeight - (vv.height + (vv.offsetTop || 0))));
+          bar.style.bottom = `${bottomOffset}px`;
+        } else {
+          bar.style.bottom = '0px';
+        }
+      };
+
+      const configureMobileInput = (meta, preserveIfFocused) => {
+        if (!mobileInput || !meta) return;
+        const prevId = currentMeta && currentMeta.id ? currentMeta.id : '';
+        const nextId = meta.id || '';
+        const sameWidget = !!(prevId && nextId && prevId === nextId);
+        currentMeta = meta;
+        const desiredType = meta.password ? 'password' : 'text';
+        if (mobileInput.type !== desiredType) {
+          try { mobileInput.type = desiredType; } catch (_) {}
+        }
+        mobileInput.inputMode = meta.numeric ? 'numeric' : (meta.email ? 'email' : 'text');
+        mobileInput.placeholder = meta.placeholder || (meta.password ? 'Password' : (meta.email ? 'Email' : (meta.numeric ? 'Token' : 'Type here…')));
+        if (meta.maxLen && meta.maxLen > 0) mobileInput.maxLength = meta.maxLen;
+        else mobileInput.removeAttribute('maxlength');
+        const nextVal = typeof meta.text === 'string' ? meta.text : '';
+        const skipValueOverwrite = composing || (preserveIfFocused && sameWidget && document.activeElement === mobileInput);
+        if (!skipValueOverwrite && mobileInput.value !== nextVal) {
+          mobileInput.value = nextVal;
+          try {
+            const s = typeof meta.selStart === 'number' ? meta.selStart : nextVal.length;
+            const e = typeof meta.selEnd === 'number' ? meta.selEnd : s;
+            mobileInput.setSelectionRange(s, e);
+          } catch (_) {}
+        }
+      };
+
+      const pushMobileTextToEngine = () => {
+        if (!active || !mobileInput) return;
+        const value = mobileInput.value;
+        const selStart = typeof mobileInput.selectionStart === 'number' ? mobileInput.selectionStart : value.length;
+        const selEnd = typeof mobileInput.selectionEnd === 'number' ? mobileInput.selectionEnd : selStart;
+        if (typeof module.ccall === 'function') {
+          try {
+            module.ccall('astra_browser_set_text', null, ['string', 'number', 'number'], [value, selStart, selEnd]);
+            return;
+          } catch (_) {}
+        }
+        if (value) module.ccall('astra_browser_text_input', null, ['string'], [value]);
+      };
+
+      const openMobileBar = (meta, syncFocus) => {
+        if (!bar || !mobileInput) {
+          const fallback = document.getElementById('astra-virtual-keyboard');
+          if (fallback) {
+            if (meta && typeof meta.text === 'string') fallback.value = meta.text;
+            fallback.focus({ preventScroll: true });
+          }
+          return;
+        }
+        const sameFocusedWidget = !bar.hidden && currentMeta && meta &&
+          currentMeta.id && meta.id && currentMeta.id === meta.id &&
+          document.activeElement === mobileInput;
+        configureMobileInput(meta || currentMeta || { text: '' }, sameFocusedWidget);
+        bar.hidden = false;
+        positionBar();
+        if (syncFocus) {
+          try { mobileInput.focus({ preventScroll: true }); } catch (_) { mobileInput.focus(); }
+          if (!sameFocusedWidget) {
+            try {
+              const len = mobileInput.value.length;
+              mobileInput.setSelectionRange(len, len);
+            } catch (_) {}
+          }
+          if (typeof navigator !== 'undefined' && navigator.virtualKeyboard && typeof navigator.virtualKeyboard.show === 'function') {
+            try { navigator.virtualKeyboard.show(); } catch (_) {}
+          }
+        }
+      };
+
+      const closeMobileBar = (refocusCanvas) => {
+        if (!bar || bar.hidden) return;
+        bar.hidden = true;
+        if (mobileInput && document.activeElement === mobileInput) {
+          try { mobileInput.blur(); } catch (_) {}
+        }
+        if (refocusCanvas && canvas && typeof canvas.focus === 'function') {
+          try { canvas.focus({ preventScroll: true }); } catch (_) {}
+        }
+      };
+
+      const findHitTextRect = (cssX, cssY) => {
+        const pad = 12;
+        for (let i = textInputRects.length - 1; i >= 0; --i) {
+          const r = textInputRects[i];
+          if (cssX >= r.x - pad && cssX <= r.x + r.w + pad && cssY >= r.y - pad && cssY <= r.y + r.h + pad) {
+            return r;
+          }
+        }
+        return null;
+      };
+
+      window.AstraBrowser.updateTextInputRects = (json) => {
+        if (!active) return;
+        try {
+          const parsed = typeof json === 'string' ? JSON.parse(json) : json;
+          if (Array.isArray(parsed)) textInputRects = parsed;
+        } catch (_) {}
+      };
+      window.AstraBrowser.getTextInputRects = () => textInputRects.slice();
+      window.AstraBrowser.showMobileKeyboard = (json) => {
+        if (!active) return;
+        let meta = null;
+        try { meta = typeof json === 'string' ? JSON.parse(json) : json; } catch (_) { meta = { text: String(json || '') }; }
+        openMobileBar(meta, true);
+      };
+      window.AstraBrowser.syncFocusedTextInput = (json) => {
+        if (!active) return;
+        let meta = null;
+        try { meta = typeof json === 'string' ? JSON.parse(json) : json; } catch (_) { return; }
+        const recentlyTyped = (Date.now() - lastUserInputAt) < 250;
+        configureMobileInput(meta, recentlyTyped);
+        if (bar && !bar.hidden) positionBar();
+      };
+      window.AstraBrowser.hideMobileKeyboard = () => {
+        if (!active) return;
+        closeMobileBar(false);
+      };
+
       listen(document, 'paste', event => {
         if (!active || !this.ownsKeyboardFocus()) return;
+        if (mobileInput && document.activeElement === mobileInput) return; // Native paste fires input on mobileInput.
         const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
         if (text) {
           module.ccall('astra_browser_paste', null, ['string'], [text]);
           event.preventDefault();
         }
       });
-      const editor = document.getElementById('astra-virtual-keyboard');
+
+      if (canvas) {
+        // Capture-phase touch tracking so focusing the native mobile input runs
+        // synchronously inside the trusted touchend user gesture (required by iOS Safari & Android Chrome).
+        listen(canvas, 'touchstart', event => {
+          if (!active || !isMobileContext()) return;
+          const t = event.changedTouches && event.changedTouches[0];
+          if (!t) return;
+          const rect = typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+          touchTapStart = { id: t.identifier, x: t.clientX - rect.left, y: t.clientY - rect.top };
+        }, { capture: true, passive: true });
+
+        listen(canvas, 'mousedown', event => {
+          if (active && isMobileContext() && bar && !bar.hidden && document.activeElement === mobileInput) {
+            event.preventDefault();
+          }
+        }, { capture: true });
+
+        listen(canvas, 'touchend', event => {
+          if (!active || !isMobileContext() || !touchTapStart) return;
+          let matched = null;
+          if (event.changedTouches) {
+            for (let i = 0; i < event.changedTouches.length; ++i) {
+              if (event.changedTouches[i].identifier === touchTapStart.id) {
+                matched = event.changedTouches[i];
+                break;
+              }
+            }
+          }
+          const start = touchTapStart;
+          touchTapStart = null;
+          if (!matched) return;
+          const rect = typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+          const cssX = matched.clientX - rect.left;
+          const cssY = matched.clientY - rect.top;
+          if (Math.max(Math.abs(cssX - start.x), Math.abs(cssY - start.y)) > 20) return;
+          const hit = findHitTextRect(cssX, cssY);
+          if (hit) {
+            // Prevent the browser from synthesizing compatibility mousedown on <canvas tabindex="0">,
+            // which would otherwise steal DOM focus back from mobileInput and dismiss the native keyboard.
+            if (typeof event.preventDefault === 'function') event.preventDefault();
+            openMobileBar(hit, true);
+          } else if (bar && !bar.hidden) {
+            closeMobileBar(false);
+          }
+        }, { capture: true, passive: false });
+      }
+
+      if (mobileInput) {
+        listen(mobileInput, 'compositionstart', () => { composing = true; });
+        listen(mobileInput, 'compositionend', () => {
+          composing = false;
+          lastUserInputAt = Date.now();
+          pushMobileTextToEngine();
+        });
+        listen(mobileInput, 'input', () => {
+          if (!active || composing) return;
+          lastUserInputAt = Date.now();
+          pushMobileTextToEngine();
+        });
+        listen(mobileInput, 'keydown', event => {
+          if (!active) return;
+          if (event.key === 'Enter') {
+            pushMobileTextToEngine();
+            module.ccall('astra_browser_virtual_key', null, ['number'], [13]);
+            event.preventDefault();
+            if (!currentMeta || !currentMeta.multiline) closeMobileBar(true);
+          } else if (event.key === 'Tab') {
+            pushMobileTextToEngine();
+            module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
+            event.preventDefault();
+          } else if (event.key === 'Escape') {
+            module.ccall('astra_browser_virtual_key', null, ['number'], [27]);
+            event.preventDefault();
+            closeMobileBar(true);
+          }
+        });
+      }
+      if (nextBtn) {
+        let lastTouchNextMs = 0;
+        const triggerNext = () => {
+          if (!active) return;
+          pushMobileTextToEngine();
+          module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
+          if (mobileInput) {
+            try { mobileInput.focus({ preventScroll: true }); } catch (_) {}
+          }
+        };
+        listen(nextBtn, 'mousedown', event => event.preventDefault());
+        listen(nextBtn, 'touchend', event => {
+          event.preventDefault();
+          lastTouchNextMs = Date.now();
+          triggerNext();
+        }, { passive: false });
+        listen(nextBtn, 'click', () => {
+          if (Date.now() - lastTouchNextMs < 400) return;
+          triggerNext();
+        });
+      }
+      if (doneBtn) {
+        listen(doneBtn, 'click', () => {
+          if (!active) return;
+          pushMobileTextToEngine();
+          closeMobileBar(true);
+        });
+      }
+      if (window.visualViewport) {
+        listen(window.visualViewport, 'resize', positionBar);
+        listen(window.visualViewport, 'scroll', positionBar);
+      }
+
       if (editor) {
         listen(editor, 'beforeinput', event => {
           if (active && event.inputType === 'deleteContentBackward') {
@@ -205,7 +476,8 @@
       }
       return () => {
         active = false;
-        for (const [target, type, callback] of listeners) target.removeEventListener(type, callback);
+        closeMobileBar(false);
+        for (const [target, type, callback, options] of listeners) target.removeEventListener(type, callback, options);
         listeners.length = 0;
       };
     },

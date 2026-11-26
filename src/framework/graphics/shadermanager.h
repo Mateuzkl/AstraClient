@@ -40,9 +40,18 @@ public:
     }
     void addTexture(const std::string& name, const std::string& file);
     PainterShaderProgramPtr getShader(const std::string& name);
+    void reload();
 
 private:
+    struct ShaderSpec {
+        std::string vertex;
+        std::string fragment;
+        bool colorMatrix = false;
+        std::vector<std::string> textures;
+    };
+
     std::unordered_map<std::string, PainterShaderProgramPtr> m_shaders;
+    std::unordered_map<std::string, ShaderSpec> m_shaderSpecs;
 };
 
 

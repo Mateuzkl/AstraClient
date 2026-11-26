@@ -54,7 +54,10 @@ void Client::init(std::vector<std::string>& args)
     g_things.init();
     g_healthBars.init();
 #ifdef __EMSCRIPTEN__
-    g_app.setOnContextRestored([] { g_things.unloadTextures(); });
+    g_app.setOnContextRestored([] {
+        g_things.unloadTextures();
+        g_minimap.invalidateBlockTextures();
+    });
 #endif
 #ifdef FW_RMLUI
     registerRmlImageProvider();

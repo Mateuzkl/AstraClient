@@ -3,6 +3,7 @@ local overlay
 local keypad
 local rightControls
 local mobileHudBar
+local mobileLoginSettingsBtn
 local settingsDrawer
 local touchStart = 0
 local touchOrigin = { x = 0, y = 0 }
@@ -13,6 +14,7 @@ local zoomOutButton
 local keypadButton
 local keypadEvent
 local keypadActive = false
+local keypadTouchButton = nil
 local keypadMousePos = { x = 0.5, y = 0.5 }
 local keypadTicks = 0
 local controlsVisible = true
@@ -37,13 +39,12 @@ local function computeAutoScale()
   if not size or size.width <= 0 or size.height <= 0 then
     return 1.0
   end
-  -- Target comfortable touch ergonomics in landscape (~760x380 logical UI units)
-  -- instead of the legacy hardcoded 5.0 scale that broke mobile viewports.
-  local ratioW = size.width / 780.0
-  local ratioH = size.height / 400.0
+  -- Target crisp readability and generous touch targets in landscape (~700x360 logical UI units).
+  local ratioW = size.width / 700.0
+  local ratioH = size.height / 360.0
   local autoScale = math.min(ratioW, ratioH)
-  -- Snap to 0.25 increments in [1.0, 2.25] for crisp bitmap font rendering.
-  autoScale = clamp(math.floor(autoScale * 4 + 0.5) / 4, 1.0, 2.25)
+  -- Snap to 0.25 increments in [1.0, 2.5] for crisp bitmap font rendering.
+  autoScale = clamp(math.floor(autoScale * 4 + 0.5) / 4, 1.0, 2.5)
   return autoScale
 end
 
@@ -152,10 +153,11 @@ local function syncSettingsHighlights()
   setChecked('cfgFps45', fps > 30 and fps <= 45)
   setChecked('cfgFps60', fps > 45)
 
-  local dpr = g_window.getMaxPixelRatio and g_window.getMaxPixelRatio() or 1.5
-  setChecked('cfgDpr10', dpr > 0 and dpr <= 1.05)
-  setChecked('cfgDpr125', dpr > 1.05 and dpr <= 1.3)
-  setChecked('cfgDpr15', dpr > 1.3 or dpr == 0)
+  local dpr = g_window.getMaxPixelRatio and g_window.getMaxPixelRatio() or 1.75
+  setChecked('cfgDpr10', dpr > 0 and dpr <= 1.1)
+  setChecked('cfgDpr15', dpr > 1.1 and dpr <= 1.6)
+  setChecked('cfgDpr175', dpr > 1.6 and dpr <= 1.85)
+  setChecked('cfgDpr20', dpr > 1.85 or dpr == 0)
 
   local lightsBtn = settingsDrawer:recursiveGetChildById('cfgLights')
   if lightsBtn then
@@ -191,10 +193,10 @@ end
 local function updateOnlineVisibility()
   if not overlay then return end
   local isOnline = g_game.isOnline()
+  if mobileLoginSettingsBtn then mobileLoginSettingsBtn:setVisible(not isOnline) end
   if mobileHudBar then mobileHudBar:setVisible(isOnline) end
   if keypad then keypad:setVisible(isOnline and controlsVisible) end
   if rightControls then rightControls:setVisible(isOnline and controlsVisible) end
-  if settingsDrawer and not isOnline then settingsDrawer:setVisible(false) end
   if mobileHudBar then
     local padBtn = mobileHudBar:getChildById('hudTogglePad')
     if padBtn then padBtn:setChecked(controlsVisible) end
@@ -266,10 +268,33 @@ local function triggerTouchActionOnTile(pos)
 end
 
 local function focusMobileChat()
-  if modules.game_console and modules.game_console.getConsoleTextEdit then
-    local edit = modules.game_console.getConsoleTextEdit()
+  local consoleMod = modules.game_console
+  if consoleMod then
+    if consoleMod.isChatEnabled and not consoleMod.isChatEnabled() and consoleMod.enableChat then
+      consoleMod.enableChat(true)
+    end
+    local edit = nil
+    if consoleMod.getConsole then
+      local consoleObj = consoleMod.getConsole()
+      if consoleObj then
+        if consoleObj.consoleTextEdit then
+          edit = consoleObj.consoleTextEdit
+        elseif consoleObj.panel and consoleObj.panel.recursiveGetChildById then
+          edit = consoleObj.panel:recursiveGetChildById('consoleTextEdit')
+        elseif consoleObj.recursiveGetChildById then
+          edit = consoleObj:recursiveGetChildById('consoleTextEdit')
+        end
+      end
+    end
+    if not edit and consoleMod.getConsoleTextEdit then
+      edit = consoleMod.getConsoleTextEdit()
+    end
+    if not edit then
+      local root = g_ui.getRootWidget()
+      if root then edit = root:recursiveGetChildById('consoleTextEdit') end
+    end
     if edit then
-      edit:focus()
+      edit:recursiveFocus(MouseFocusReason)
       if g_window.showTextEditor then
         g_window.showTextEditor('Chat', '', edit:getText() or '', 0)
       end
@@ -278,6 +303,16 @@ local function focusMobileChat()
   end
   if g_window.showTextEditor then
     g_window.showTextEditor('Chat', '', '', 0)
+  end
+end
+
+local function toggleSettingsDrawer()
+  if not settingsDrawer then return end
+  local show = not settingsDrawer:isVisible()
+  settingsDrawer:setVisible(show)
+  if show then
+    settingsDrawer:raise()
+    syncSettingsHighlights()
   end
 end
 
@@ -312,15 +347,10 @@ local function wireOverlayButtons()
       if keypadButton then keypadButton:setChecked(controlsVisible) end
       updateOnlineVisibility()
     end)
-    bindHud('hudSettings', function()
-      if not settingsDrawer then return end
-      local show = not settingsDrawer:isVisible()
-      settingsDrawer:setVisible(show)
-      if show then
-        settingsDrawer:raise()
-        syncSettingsHighlights()
-      end
-    end)
+    bindHud('hudSettings', toggleSettingsDrawer)
+  end
+  if mobileLoginSettingsBtn then
+    mobileLoginSettingsBtn.onClick = toggleSettingsDrawer
   end
 
   if rightControls then
@@ -331,7 +361,11 @@ local function wireOverlayButtons()
     bindAction('btnAttack', attackNearestOrCycle)
     bindAction('btnFollow', toggleFollowOrChase)
     bindAction('btnUse', function()
-      actionMode = (actionMode == 'use') and nil or 'use'
+      if actionMode == 'use' then
+        actionMode = nil
+      else
+        actionMode = 'use'
+      end
       updateActionButtons()
     end)
     bindAction('btnLook', function()
@@ -340,7 +374,11 @@ local function wireOverlayButtons()
         g_game.look(target)
         return
       end
-      actionMode = (actionMode == 'look') and nil or 'look'
+      if actionMode == 'look' then
+        actionMode = nil
+      else
+        actionMode = 'look'
+      end
       updateActionButtons()
     end)
     bindAction('btnStop', function()
@@ -407,8 +445,9 @@ local function wireOverlayButtons()
       syncSettingsHighlights()
     end
     bindCfg('cfgDpr10', function() setDpr(1.0) end)
-    bindCfg('cfgDpr125', function() setDpr(1.25) end)
     bindCfg('cfgDpr15', function() setDpr(1.5) end)
+    bindCfg('cfgDpr175', function() setDpr(1.75) end)
+    bindCfg('cfgDpr20', function() setDpr(2.0) end)
 
     bindCfg('cfgLights', function()
       drawLightsEnabled = not drawLightsEnabled
@@ -421,6 +460,15 @@ local function wireOverlayButtons()
       g_settings.set('mobileFloorFading', floorFadingEnabled)
       applyMobileGraphicsOptions()
       syncSettingsHighlights()
+    end)
+    bindCfg('cfgWebFull', function()
+      if g_window.requestWebFullscreen then g_window.requestWebFullscreen() end
+    end)
+    bindCfg('cfgWebDiag', function()
+      if g_window.toggleWebDiagnostics then g_window.toggleWebDiagnostics() end
+    end)
+    bindCfg('cfgWebDesktop', function()
+      if g_window.openWebProfile then g_window.openWebProfile('desktop') end
     end)
     bindCfg('cfgTrimCache', function()
       if g_textures and g_textures.trimCache then
@@ -450,7 +498,7 @@ function init()
 
   local savedFps = tonumber(g_settings.getNumber('mobileMaxFps', 45)) or 45
   if g_app.setMaxFps then g_app.setMaxFps(clamp(savedFps, 20, 60)) end
-  local savedDpr = tonumber(g_settings.getNumber('mobileMaxDpr', 1.5)) or 1.5
+  local savedDpr = tonumber(g_settings.getNumber('mobileMaxDpr', 1.75)) or 1.75
   if g_window.setMaxPixelRatio then g_window.setMaxPixelRatio(clamp(savedDpr, 1.0, 2.0)) end
 
   overlay = g_ui.displayUI('mobile')
@@ -458,6 +506,7 @@ function init()
   keypad = overlay:getChildById('keypad')
   rightControls = overlay:getChildById('rightControls')
   mobileHudBar = overlay:getChildById('mobileHudBar')
+  mobileLoginSettingsBtn = overlay:getChildById('mobileLoginSettingsBtn')
   settingsDrawer = overlay:getChildById('mobileSettingsDrawer')
   overlay:raise()
 
@@ -496,6 +545,8 @@ function init()
   })
   if keypad then
     connect(keypad, {
+      onTouchPress = onKeypadTouchPress,
+      onTouchRelease = onKeypadTouchRelease,
       onMousePress = onKeypadTouchPress,
       onMouseRelease = onKeypadTouchRelease,
       onMouseMove = onKeypadTouchMove
@@ -533,6 +584,8 @@ function terminate()
   })
   if keypad then
     disconnect(keypad, {
+      onTouchPress = onKeypadTouchPress,
+      onTouchRelease = onKeypadTouchRelease,
       onMousePress = onKeypadTouchPress,
       onMouseRelease = onKeypadTouchRelease,
       onMouseMove = onKeypadTouchMove
@@ -556,6 +609,7 @@ function terminate()
   keypad = nil
   rightControls = nil
   mobileHudBar = nil
+  mobileLoginSettingsBtn = nil
   settingsDrawer = nil
 end
 
@@ -594,7 +648,9 @@ function onGlobalMousePress(pos, button)
     if actionMode and not (keypad and keypad:isVisible() and keypad:containsPoint(pos))
        and not (rightControls and rightControls:isVisible() and rightControls:containsPoint(pos))
        and not (mobileHudBar and mobileHudBar:isVisible() and mobileHudBar:containsPoint(pos)) then
-      triggerTouchActionOnTile(pos)
+      if triggerTouchActionOnTile(pos) and g_window.consumeTouchGesture then
+        g_window.consumeTouchGesture()
+      end
       return
     end
     if keypad and keypad:isVisible() and keypad:containsPoint(pos) then
@@ -634,10 +690,10 @@ end
 
 function onGlobalMouseRelease(pos, button)
   if not overlay then return end
-  if button == MouseTouch or button == MouseLeftButton then
+  if button == MouseTouch or button == MouseLeftButton or button == keypadTouchButton then
     if overlay.cursor then overlay.cursor:hide() end
     removeEvent(updateCursorEvent)
-    if keypadActive and (button == MouseTouch or not g_mouse.isPressed(MouseTouch)) then
+    if keypadActive and (button == keypadTouchButton or (not keypadTouchButton and not g_mouse.isPressed(MouseTouch))) then
       stopKeypadWalk()
     end
   end
@@ -667,6 +723,7 @@ end
 
 function stopKeypadWalk()
   keypadActive = false
+  keypadTouchButton = nil
   removeEvent(keypadEvent)
   keypadEvent = nil
   if keypad and keypad.pointer then
@@ -682,16 +739,30 @@ function onKeypadTouchMove(widget, pos, offset)
 end
 
 function onKeypadTouchPress(widget, pos, button)
-  if button ~= MouseTouch and button ~= MouseLeftButton then return false end
+  if button ~= MouseTouch and button ~= MouseTouch2 and button ~= MouseTouch3 and button ~= MouseLeftButton then
+    return false
+  end
+  if keypadActive and keypadTouchButton and keypadTouchButton ~= button then
+    return false
+  end
   keypadActive = true
+  keypadTouchButton = button
   keypadTicks = 0
   updateKeypadMousePos(widget, pos)
+  if button == MouseTouch and g_window.consumeTouchGesture then
+    g_window.consumeTouchGesture()
+  end
   executeWalk()
   return true
 end
 
 function onKeypadTouchRelease(widget, pos, button)
-  if button ~= MouseTouch and button ~= MouseLeftButton then return false end
+  if keypadTouchButton and button ~= keypadTouchButton then
+    return false
+  end
+  if button ~= MouseTouch and button ~= MouseTouch2 and button ~= MouseTouch3 and button ~= MouseLeftButton then
+    return false
+  end
   stopKeypadWalk()
   return true
 end
@@ -726,7 +797,12 @@ function executeWalk()
   if not keypad or not keypad.pointer then return end
   removeEvent(keypadEvent)
   keypadEvent = nil
-  if not keypadActive or not modules.game_walking or (not g_mouse.isPressed(MouseTouch) and not g_mouse.isPressed(MouseLeftButton)) then
+  if not keypadActive or not modules.game_walking then
+    stopKeypadWalk()
+    return
+  end
+  local activeBtn = keypadTouchButton or MouseTouch
+  if not g_mouse.isPressed(activeBtn) and not g_mouse.isPressed(MouseLeftButton) then
     stopKeypadWalk()
     return
   end

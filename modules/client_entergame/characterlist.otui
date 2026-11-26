@@ -585,6 +585,8 @@ StaticMainWindow
     id: buttonCancel
     !text: tr('Cancel')
     size: 43 20
+    $mobile:
+      size: 72 28
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 6
@@ -660,6 +662,8 @@ StaticMainWindow
     anchors.verticalCenter: buttonHidden.verticalCenter
     margin-left: 10
     size: 127 22
+    $mobile:
+      visible: false
     CheckBox
       id: recordSession
       anchors.left: parent.left

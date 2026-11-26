@@ -623,6 +623,9 @@ void GraphicalApplication::onBrowserContextRestored()
 
     g_textures.reload();
     g_fonts.reload();
+    g_text.terminate();
+    g_text.init();
+    g_shaders.reload();
 
     if (m_onContextRestored)
         m_onContextRestored();

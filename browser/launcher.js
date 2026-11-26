@@ -64,6 +64,8 @@
     const overlay = el('astra-launcher');
     if (overlay && typeof overlay.setAttribute === 'function') overlay.setAttribute('data-profile', profile);
     if (document.body && typeof document.body.setAttribute === 'function') document.body.setAttribute('data-profile', profile);
+    const webOptions = el('astra-web-options');
+    if (webOptions) webOptions.hidden = profile === 'mobile';
     const label = el('launcher-profile-label');
     if (label) {
       const detectedNote = profileResolution && profileResolution.source === 'manual' ? ' (manual)' : '';
@@ -245,12 +247,19 @@
   }
   async function prepareSprPager() {
     disposeSprPager();
-    if (!manifest || !manifest.sprManifest || !sprPagerApi) return;
+    if (!manifest || manifest.sprMode !== 'paged') return;
+    if (!manifest.sprManifest || !sprPagerApi) {
+      throw new Error('On-demand sprite pager is unavailable for paged mobile bundle.');
+    }
     const sprManifestUrl = resolveProfileAsset(manifest.sprManifest);
     const response = await fetch(sprManifestUrl, { cache: 'no-store', credentials: 'same-origin' });
     if (!response.ok) throw new Error('On-demand sprite manifest is missing.');
     const sprManifest = sprPagerApi.validateSprManifest(await response.json());
-    const pageStore = await sprPagerApi.openPageStore(window.indexedDB, `${location.pathname}:${activeProfile}`);
+    const sprNamespace = `${location.pathname}:${activeProfile}`;
+    if (fullVerify && typeof sprPagerApi.clearProfilePages === 'function') {
+      await sprPagerApi.clearProfilePages(window.indexedDB, sprNamespace).catch(() => {});
+    }
+    const pageStore = await sprPagerApi.openPageStore(window.indexedDB, sprNamespace);
     sprPager = sprPagerApi.createPager({
       manifest: sprManifest,
       baseUrl: profileBaseUrl().href,
@@ -312,6 +321,7 @@
       if (releasePreload) releasePreload();
       disposeSprPager();
       if (engineStarted) { window.AstraLauncher.failed(error.message || String(error)); return; }
+      if (viewportController) viewportController.deactivate();
       current = 'error'; message(error.message || String(error), true);
       mode('error'); el('launcher-reload').hidden = false;
     }
@@ -331,7 +341,11 @@
   });
   el('launcher-cancel-remove').addEventListener('click', () => { el('launcher-confirm').hidden = true; });
   el('launcher-confirm-remove').addEventListener('click', () => task(async () => {
-    await store.remove(); current = 'missing'; message('Game data removed. Your saved settings were kept.');
+    await store.remove();
+    if (sprPagerApi && typeof sprPagerApi.clearProfilePages === 'function') {
+      await sprPagerApi.clearProfilePages(window.indexedDB, `${location.pathname}:${activeProfile}`).catch(() => {});
+    }
+    current = 'missing'; message('Game data removed. Your saved settings were kept.');
   }));
   el('launcher-play').addEventListener('click', () => {
     if (running || engineStarted) return;
@@ -466,7 +480,22 @@
     },
     frameStats(stats) { telemetry.render = stats; report(); },
     getProfile() { return activeProfile; },
-    getTelemetry() { return telemetry; }
+    getTelemetry() { return telemetry; },
+    switchProfile(choice) {
+      if (!platformApi) return;
+      const target = choice === 'desktop' || choice === 'mobile' || choice === 'auto' ? choice : 'auto';
+      platformApi.writeSavedPreference(safeLocalStorage(), location.pathname, target);
+      window.location.reload();
+    },
+    toggleDiagnostics() {
+      const toggle = el('launcher-performance-toggle');
+      if (!toggle) return;
+      toggle.checked = !toggle.checked;
+      toggle.dispatchEvent(new Event('change'));
+    },
+    requestFullscreen() {
+      if (viewportController) viewportController.requestFullscreenAndLandscape();
+    }
   };
   el('launcher-reload').addEventListener('click', () => {
     try { sessionStorage.setItem(repairKey, 'on'); } catch (_) {}

@@ -93,6 +93,8 @@ public:
     bool isEditable() { return m_editable; }
     bool isSelectable() { return m_selectable; }
     bool isAutoScrolling() { return m_autoScroll; }
+    const std::string& getValidCharacters() const { return m_validCharacters; }
+    const std::string& getPlaceholder() const { return m_placeholder; }
 
 protected:
     void updateText();

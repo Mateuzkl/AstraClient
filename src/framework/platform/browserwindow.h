@@ -9,6 +9,8 @@
 #include <emscripten/html5.h>
 #include <vector>
 
+class UITextEdit;
+
 class BrowserWindow final : public PlatformWindow
 {
   public:
@@ -45,8 +47,20 @@ class BrowserWindow final : public PlatformWindow
 
     void showTextEditor(const std::string &title, const std::string &description, const std::string &text,
                         int flags) override;
+    void hideTextEditor() override;
+    void consumeTouchGesture() override;
+    void openWebProfile(const std::string &profile) override;
+    void toggleWebDiagnostics() override;
+    void requestWebFullscreen() override;
+
+    void onTextEditActivated(UITextEdit *edit);
+    void onTextEditFocusChanged(UITextEdit *edit, bool focused);
+    void onTextEditChanged(UITextEdit *edit);
+    void syncTextInputRects(bool force = false);
+
     void handlePaste(std::string text);
     void handleVirtualText(std::string text);
+    void handleVirtualTextReplace(std::string text, int selStart, int selEnd);
     void handleVirtualKey(Fw::Key key);
     void handleVisibilityChange(bool visible);
     void handleViewportChanged();
@@ -67,6 +81,7 @@ class BrowserWindow final : public PlatformWindow
         Point startPos;
         Point lastPos;
         bool dragged = false;
+        bool consumed = false;
         ticks_t pressTime = 0;
     };
 
@@ -94,6 +109,10 @@ class BrowserWindow final : public PlatformWindow
     double m_cssWidth = 0.0;
     double m_cssHeight = 0.0;
     std::atomic_bool m_contextLost = false;
+    std::atomic<uint64_t> m_contextLostGeneration = 0;
+    bool m_syncingFromBrowser = false;
+    ticks_t m_lastTextRectSyncTicks = 0;
+    std::string m_lastTextRectsJson;
     std::array<TouchSlot, 3> m_touchSlots;
 };
 

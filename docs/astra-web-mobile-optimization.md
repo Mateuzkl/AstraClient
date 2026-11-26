@@ -35,7 +35,7 @@ astraclient.html + launcher.js + platform.js + profiles.json
            |-- mobile/asset-manifest.json
            |-- mobile/spr-manifest.json   (122 KiB; hashes SHA-256 de 1.728 páginas de 256 KiB)
            |-- mobile/Tibia.spr           (431,78 MiB servidos sob demanda via HTTP Range 206)
-           +-- Flag -mobile-lite (53 módulos essenciais, Atlas 2048x2048, DPR<=1.5x, multitouch)
+           +-- Flag -mobile-lite (53 módulos essenciais, Atlas 2048x2048, DPR<=1.75x, multitouch + teclado nativo síncrono)
 ```
 
 ### Compatibilidade retroativa (modo flat)
@@ -56,18 +56,23 @@ A detecção combina múltiplos sinais em vez de depender apenas de `User-Agent`
 - Classificação correta de **dispositivos híbridos** (notebooks Windows/Linux com tela sensível ao toque + mouse/trackpad permanecem em **Desktop**).
 - Redimensionar uma janela desktop estreita **nunca** ativa Mobile Lite sem sinais touch/mobile.
 - **Imutabilidade na sessão ativa:** o perfil escolhido antes do boot nunca muda durante uma sessão em execução apenas por rotação ou redimensionamento de janela.
-- **Override manual:** seletor `Auto / Desktop Full / Mobile Lite` disponível tanto no card do launcher quanto em *Web Options*, persistido por `location.pathname` em `localStorage` com fallback seguro caso o bundle alvo não esteja publicado.
+- **Override manual:** seletor `Auto / Desktop Full / Mobile Lite` disponível no card do launcher, no painel *Web Options* (Desktop) e no drawer *Settings -> Web* (Mobile Lite — o botão flutuante `Web options` fica completamente oculto no Mobile para não obstruir a interface), persistido por `location.pathname` em `localStorage` com fallback seguro caso o bundle alvo não esteja publicado.
 
-### 3.2 Fullscreen, Landscape e Teclado Virtual
+### 3.2 Fullscreen, Landscape e Teclado Virtual Nativo (Android & iOS)
 
-No perfil Mobile Lite (`createMobileViewportController` em `browser/platform.js` + `browser/launcher.css`):
+No perfil Mobile Lite (`createMobileViewportController` em `browser/platform.js`, `installTextBridge` em `browser/runtime.js`, `BrowserWindow` + `UITextEdit` e `browser/launcher.css`):
 
 - Ao clicar em **Play** (gesto explícito do usuário), tenta `requestFullscreen()` e `screen.orientation.lock('landscape')`.
 - Suporta `landscape-primary` (`landscape-left`) e `landscape-secondary` (`landscape-right`), recalculando viewport e enviando `_astra_browser_viewport_changed()` para o WASM.
 - Quando o navegador bloqueia `screen.orientation.lock()` (caso comum no Safari iOS/iPadOS) e o aparelho está em **portrait**, exibe o overlay `#astra-rotate-overlay` orientando o usuário a girar o aparelho, com botão de tentativa de tela cheia + opção *Continue anyway* (e oculta automaticamente o overlay enquanto o teclado virtual está aberto).
-- Respeita `env(safe-area-inset-*)` para notch/ilha dinâmica/barras gestuais (`viewport-fit=cover` em `browser/shell.html`).
+- Respeita `env(safe-area-inset-*)` (via variáveis CSS `--astra-safe-top/right/bottom/left` em `:root`) para notch/ilha dinâmica/barras gestuais (`viewport-fit=cover` em `browser/shell.html`).
 - Bloqueia scroll/pinch-zoom acidental sobre o canvas (`touch-action: none`, `overscroll-behavior: none`, `user-select: none`).
-- Pausa a renderização quando a aba entra em segundo plano (`visibilitychange` -> `_astra_browser_set_visibility`) e trata perda/restauração de contexto WebGL2 (`webglcontextlost` / `webglcontextrestored` -> `_astra_browser_context_lost` + reconstrução completa de Painter, FBOs, Atlas, Texturas, Fontes e ThingTypes).
+- **Teclado virtual síncrono global para todos os `UITextEdit`:**
+  - Sob `-sPROXY_TO_PTHREAD=1`, chamadas assíncronas do pthread C++ chegam à main thread depois que o evento `touchend` expira, fazendo Android Chrome e iOS Safari rejeitarem `.focus()` silenciosamente. Além disso, `UITextEdit::getTextPos()` retornava `-1` em campos vazios e impedia a abertura do editor.
+  - Solução implementada globalmente: `BrowserWindow::syncTextInputRects()` sincroniza periodicamente (e a cada mudança de foco) os retângulos CSS e metadados (`id`, `text`, `email`, `password`, `numeric`, `multiline`, `maxLen`, cursor/seleção) de **todos** os `UITextEdit` visíveis e editáveis para a main thread.
+  - Um listener em fase de captura (`touchend`) no `#canvas` faz hit-test síncrono (+12px de tolerância tátil) e foca imediatamente o `<input id="astra-mobile-input">` (`font-size: 16px`, evitando auto-zoom no iOS Safari) dentro do gesto confiável do usuário, exibindo a barra `#astra-mobile-keyboard-bar` (com botões **Next** / `Tab` e **OK**) ancorada dinamicamente sobre `window.visualViewport`.
+  - A sincronização bidirecional usa `astra_browser_set_text(text, selStart, selEnd)`, preservando composição IME (Gboard/iOS), autocorreção, swipe, seleção, copiar/colar e `Backspace` contínuo em **login, chat, busca, trade e modais**.
+- Pausa a renderização quando a aba entra em segundo plano (`visibilitychange` -> `_astra_browser_set_visibility`) e trata perda/restauração de contexto WebGL2 (`webglcontextlost` / `webglcontextrestored` -> `_astra_browser_context_lost` + reconstrução completa de Painter, FBOs, Atlas, Texturas, TextRender, Shaders, Minimap, Fontes e ThingTypes com guarda de geração atômica).
 
 ---
 
@@ -130,16 +135,18 @@ Analisamos a viabilidade arquitetural de um build single-thread para navegadores
 
 ## 7. Controles Touch, Interface Mobile e Otimizações Gráficas
 
-- **Multitouch real (`src/framework/platform/browserwindow.cpp`):** suporte simultâneo a até 3 toques independentes (`MouseTouch` + tap/drag/long-press 450ms -> clique esquerdo/direito, `MouseTouch2`, `MouseTouch3`), tratamento de `touchcancel`, debounce de mouse sintético (600ms) e conversão exata CSS -> backing buffer (`cssToWindowPos`).
-- **UI Clean-Room (`modules/client_mobile/{mobile.otui,mobile.lua}` + `layouts/mobile/styles/50-mobile-controls.otui`):**
-  - Escala automática responsiva (substituindo `g_app.scale(5.0)` antigo que quebrava layouts em telas menores).
-  - Joystick analógico de 8 direções com deadzone configurável e opção de lado esquerdo/direito.
+- **Multitouch real (`src/framework/platform/browserwindow.cpp`):** suporte simultâneo a até 3 toques independentes (`MouseTouch` + tap/drag com tolerância de `16px` lógicos + long-press 450ms -> clique esquerdo/direito, `MouseTouch2`, `MouseTouch3`), consumo de gesto (`g_window.consumeTouchGesture()`) para evitar walk indesejado após *Look/Use*/joystick, cancelamento seguro de drag em `touchcancel`, debounce de mouse sintético (600ms) e conversão exata CSS -> backing buffer (`cssToWindowPos`).
+- **UI Clean-Room & Login Mobile (`modules/client_mobile/{mobile.otui,mobile.lua}`, `modules/client_entergame/{entergame,characterlist}.otui`, `layouts/mobile/styles/50-mobile-controls.otui`):**
+  - Tela de login adaptada para mobile landscape (`$mobile:`): card compacto `400×258`, campos táteis de `28px` com fonte legível (`verdana-11px-antialised`), botões `Log in` e seletor de servidor ampliados (`132×30`) e remoção de elementos desktop redundantes (`cam`, `Auto Login`, `Login with Google`, links sublinhados cortados), preservando 100% dos IDs para `entergame.lua`.
+  - Botão flutuante `Web options` removido no perfil Mobile Lite; funções web essenciais (`Fullscr`, `Diag`, `Desktop`) integradas ao drawer de configurações mobile (acessível também na tela de login pelo botão `Settings` no canto superior direito).
+  - Escala automática responsiva (`~700×360` alvo em landscape, substituindo `g_app.scale(5.0)` antigo).
+  - Joystick analógico de 8 direções com eventos `onTouchPress`/`onTouchRelease` nativos, deadzone configurável e opção de lado esquerdo/direito.
   - Botões de ação simultâneos ao joystick: **Attack, Follow, Use, Look, Stop**, além de barra rápida **F1–F6**.
   - Barra HUD superior compacta para alternar **Inventory, Battle, VIP, Skills, Minimap, Chat, Hotkeys, Pad** e **Mobile Settings**.
-  - Painel de configurações mobile: escala de controles, escala de UI, lado do joystick, limite de FPS, teto de DPR, luzes ambiente, floor-fade e botão manual *Trim Texture Cache*.
+  - Painel de configurações mobile: escala de controles, escala de UI, lado do joystick, limite de FPS, teto de DPR (`1.0x / 1.5x / 1.75x / 2.0x`), luzes ambiente, floor-fade, opções Web (`Fullscr / Diag / Desktop`) e botão manual *Trim Texture Cache*.
 - **Otimizações de GPU e Memória Gráfica:**
   - **Atlas de Sprites:** `2048×2048` (**16 MiB VRAM**) no Mobile Lite vs `4096×4096` (**64 MiB VRAM**) no Desktop (**-75% VRAM**).
-  - **DPR Cap:** teto padrão de `1.5×` no mobile (`g_window.setMaxPixelRatio(1.5)`), renderizando um celular DPR 3 (`844×390` CSS) em `1266×585` em vez de `2532×1170` (**4× menos pixels**).
+  - **DPR Cap (Nitidez vs Performance):** teto padrão ajustado para **`1.75×`** no mobile (`g_window.setMaxPixelRatio(1.75)`), renderizando um celular DPR 3 (`844×390` CSS) em `1477×683` em vez de `2532×1170` (**~2,9× menos pixels** que DPR nativo, com fontes bitmap significativamente mais nítidas que `1.5×`, ainda configurável entre `1.0×` e `2.0×`).
   - **FPS Cap & Idle:** teto padrão de 45 FPS configurável no mobile; pausa automática em aba oculta; skip do `cycleEvent` de hover do mouse no `uigamemap.lua`; skip de shaders pesados de arena em `game_shaders/shaders.lua`.
   - **Cache LRU e Eviction:** `ImageCache` limitado a `512` itens / `8 MiB` no mobile (vs `2000` / `32 MiB`); eviction de `ThingType` acelerada para `25s` @ `200/s` (vs `60s` @ `100/s`) + `TextureManager::trimCache(30)` seguro a cada 15s (verificando `tex.use_count() <= mapRefs`).
 
@@ -193,14 +200,14 @@ Medições reais coletadas em builds **Release** (Emscripten 6.0.8, C++23, `wasm
 
 | Cenário / Plataforma | Status | Ambiente / Observação |
 | --- | --- | --- |
-| Testes unitários JS/Node (`browser/tests/*.test.cjs`) | **Validado (83/83 PASS)** | Node 24 (inclui `platform`, `spr-pager`, `serve-range`, `dual-profile`, `security`, `asset-cache`, `launcher`) |
-| Testes Python & integridade de assets | **Validado (6/6 + 948 text assets PASS)** | `check_browser_assets.py`, `text_assets.py`, `manifest.py`, `browser_bundle.cjs scan` (0 findings) |
+| Testes unitários JS/Node (`browser/tests/*.test.cjs`) | **Validado (86/86 PASS)** | Node 24 (inclui `platform`, `spr-pager`, `serve-range`, `dual-profile`, `runtime` touch/keyboard sync, `security`, `asset-cache`, `launcher`) |
+| Testes Python & integridade de assets | **Validado (6/6 + 948 text assets PASS)** | `check_browser_assets.py`, `text_assets.py`, `manifest.py`, `style_font_routing.lua`, `browser_bundle.cjs scan` (0 findings) |
 | Testes C++ nativos + ASan/UBSan | **Validado (100% PASS)** | Suites C++23, UTF-8, WebSocket, RSA, UUID, Fetch, Keyboard, Cursor, ASan+UBSan Queue & Lua |
 | Nginx TLS + COOP/COEP/CORP + WSS binário | **Validado (1/1 PASS)** | `nginx.test.cjs` com Nginx real em Ubuntu 24.04 (WSL2) |
-| Web Desktop Full (Cold & Warm, WebGL2) | **Validado ao vivo (0 erros)** | Chrome Headless CDP (Windows, 1280×720, SwiftShader WebGL2) |
-| Web Mobile Lite (Android Pixel 8 emulado, DPR 3, Touch) | **Validado em emulação (0 erros)** | Chrome Headless CDP (844×390 landscape, rotação portrait, `HTTP 206` SPR + IDB hit) |
-| Android físico (Chrome / Samsung Internet) | **Pendente de teste em hardware físico** | Requer validação tátil real (multitouch 3 dedos, `screen.orientation.lock`, teclado IME, GPU móvel) |
-| iOS / iPadOS físico (Safari 16+/17+/18+) | **Pendente de teste em hardware físico** | Requer validação real de jetsam de memória, safe-area notch/ilha dinâmica, fallback portrait e `WebAssembly.Memory` no WebKit |
+| Web Desktop Full (Cold & Warm, WebGL2) | **Validado ao vivo (0 erros)** | Chrome Headless CDP (Windows, 1280×720, SwiftShader WebGL2, `Web options` visível) |
+| Web Mobile Lite (Android Pixel 8 emulado, DPR 3, Touch) | **Validado em emulação (0 erros)** | Chrome Headless CDP (844×390 landscape, `1477×683` @ DPR `1.75x`, toque real nos campos de login abrindo `#astra-mobile-keyboard-bar` + `Next`/`OK`, `Web options` oculto, `HTTP 206` SPR + IDB hit) |
+| **Checklist físico Android (Chrome / Samsung Internet)** | **Requer validação em aparelho real** | 1) Tocar em Email/Senha/Token abre Gboard imediatamente; 2) Digitação, autocorreção, Backspace, copiar/colar e botão `Next` funcionam sem fechar o teclado; 3) Barra acessória acompanha `visualViewport` acima do teclado em landscape; 4) Fullscreen + `orientation.lock('landscape')` e safe-area; 5) Botão `Settings` no login abre drawer com `Fullscr/Diag/Desktop` e sem `Web options` flutuante; 6) Multitouch joystick + ações em jogo |
+| **Checklist físico iOS / iPadOS (Safari 16+/17+/18+)** | **Requer validação em aparelho real** | 1) Toque síncrono em `touchend` abre teclado iOS sem auto-zoom (`font-size: 16px`); 2) Botão `Next` navega entre campos sem perder foco; 3) Overlay portrait + safe-area de notch/ilha dinâmica; 4) Estabilidade de `WebAssembly.Memory` (256 MiB) sob WebKit jetsam |
 
 ---
 
@@ -229,7 +236,7 @@ Medições reais coletadas em builds **Release** (Emscripten 6.0.8, C++23, `wasm
 ### Servidor Local de Desenvolvimento (com suporte a HTTP `Range 206`)
 
 ```bash
-python3 browser/serve.py --bind 127.0.0.1 --port 8088 build-wasm/dist
+python3 browser/serve.py --bind 127.0.0.1 --port 8088 build-wasm-all-release/dist
 ```
 
 ### Requisitos de Produção (Nginx)

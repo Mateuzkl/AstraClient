@@ -31,6 +31,9 @@
 #include <framework/otml/otmlnode.h>
 #include <framework/core/application.h>
 #include <framework/graphics/fontmanager.h>
+#ifdef __EMSCRIPTEN__
+#include <framework/platform/browserwindow.h>
+#endif
 
 UITextEdit::UITextEdit()
 {
@@ -555,6 +558,10 @@ void UITextEdit::moveCursorHorizontally(bool right)
 
     blinkCursor();
     update(true);
+#ifdef __EMSCRIPTEN__
+    if (m_editable && isFocused())
+        g_browserWindow.onTextEditChanged(this);
+#endif
 }
 
 void UITextEdit::moveCursorVertically(bool up)
@@ -608,6 +615,10 @@ void UITextEdit::moveCursorVertically(bool up)
     }
     blinkCursor();
     update(true);
+#ifdef __EMSCRIPTEN__
+    if (m_editable && isFocused())
+        g_browserWindow.onTextEditChanged(this);
+#endif
 }
 
 int UITextEdit::getTextPos(Point pos)
@@ -687,6 +698,10 @@ void UITextEdit::updateText()
 
     blinkCursor();
     update(true);
+#ifdef __EMSCRIPTEN__
+    if (m_editable && isFocused())
+        g_browserWindow.onTextEditChanged(this);
+#endif
 }
 
 void UITextEdit::onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode)
@@ -751,6 +766,10 @@ void UITextEdit::onFocusChange(bool focused, Fw::FocusReason reason)
     } else if(m_selectable)
         clearSelection();
     UIWidget::onFocusChange(focused, reason);
+#ifdef __EMSCRIPTEN__
+    if (m_editable)
+        g_browserWindow.onTextEditFocusChanged(this, focused);
+#endif
 }
 
 bool UITextEdit::onKeyPress(uchar keyCode, int keyboardModifiers, int autoRepeatTicks)
@@ -914,11 +933,18 @@ bool UITextEdit::onMousePress(const Point& mousePos, Fw::MouseButton button)
                 m_selectionReference = pos;
                 setSelection(pos, pos);
             }
-#ifdef __EMSCRIPTEN__
-            if (m_editable)
-                g_window.showTextEditor("Edit text", "", m_text, m_multiline ? 1 : 0);
-#endif
+        } else if (m_editable) {
+            setCursorPos(static_cast<int>(m_text.length()));
+            if (m_selectable) {
+                m_selectionReference = m_cursorPos;
+                setSelection(m_cursorPos, m_cursorPos);
+            }
         }
+#ifdef __EMSCRIPTEN__
+        if (m_editable) {
+            g_browserWindow.onTextEditActivated(this);
+        }
+#endif
 #endif
         return true;
     }

@@ -18,6 +18,8 @@ const initialAstraProfile = (() => {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
 })();
 
+let runtimeReady = false;
+
 var Module = {
   canvas: document.getElementById('canvas'),
   arguments: initialAstraProfile === 'mobile' ? ['-mobile-lite'] : [],
@@ -64,6 +66,7 @@ var Module = {
   }],
 
   onRuntimeInitialized: () => {
+    runtimeReady = true;
     AstraLauncher.runtimeInitialized();
     setAstraStatus('');
     Module.canvas.focus();
@@ -83,6 +86,7 @@ var Module = {
 
 if (typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
+    if (!runtimeReady) return;
     if (typeof Module._astra_browser_set_visibility === 'function') {
       Module._astra_browser_set_visibility(document.hidden ? 0 : 1);
     }
@@ -91,13 +95,13 @@ if (typeof document.addEventListener === 'function') {
 
 Module.canvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
-  if (typeof Module._astra_browser_context_lost === 'function') {
+  if (runtimeReady && typeof Module._astra_browser_context_lost === 'function') {
     Module._astra_browser_context_lost(1);
   }
   setAstraStatus('WebGL context lost — waiting to restore…');
 });
 Module.canvas.addEventListener('webglcontextrestored', () => {
-  if (typeof Module._astra_browser_context_lost === 'function') {
+  if (runtimeReady && typeof Module._astra_browser_context_lost === 'function') {
     Module._astra_browser_context_lost(0);
   }
   setAstraStatus('');

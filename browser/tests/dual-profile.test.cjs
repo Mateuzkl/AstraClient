@@ -55,7 +55,7 @@ function runDualProfileLauncher({ userAgent, maxTouchPoints = 0, coarse = false,
   const sprBuf = createFakeSpr(2, 32);
   const sprHash = crypto.createHash('sha256').update(sprBuf).digest('hex');
   const sprManifest = {
-    schema: 1, version: '8.60', file: 'Tibia.spr', size: sprBuf.length, pageSize: 4096,
+    schema: 1, version: '8.60', file: 'Tibia.spr', size: sprBuf.length, pageSize: 262144,
     spriteCount: 2, indexBytes: 16, uuid: 'sha256-' + sprHash, hashes: [sprHash]
   };
 
@@ -219,7 +219,10 @@ test('Mobile device selects Mobile Lite before downloading assets, never fetches
   // Verify on-demand SPR page request fetches 206 Partial Content and delivers into WASM memory!
   assert.equal(typeof run.context.Module.astraRequestSprPage, 'function');
   run.context.Module.astraRequestSprPage(0);
-  await new Promise(r => setTimeout(r, 30));
+  const deadline = Date.now() + 2000;
+  while (run.deliveredPages.length === 0 && Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 15));
+  }
   assert.equal(run.deliveredPages.length, 1);
   assert.equal(run.deliveredPages[0].ok, 1);
   assert.equal(run.deliveredPages[0].firstByte, 0x78);

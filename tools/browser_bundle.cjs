@@ -23,9 +23,10 @@ function stagingDirectory(root, binary) {
 function copyAsset(original, destination) {
   const source = fs.statSync(original);
   const old = fs.existsSync(destination) ? fs.statSync(destination) : null;
-  if (old && old.size === source.size && Math.abs(old.mtimeMs - source.mtimeMs) < 1) return;
+  if (old && old.size === source.size && Math.abs(old.mtimeMs - source.mtimeMs) < 1) return false;
   fs.copyFileSync(original, destination);
   fs.utimesSync(destination, source.atime, source.mtime);
+  return true;
 }
 function validName(name) {
   if (typeof name !== 'string' || /[\\:\x00-\x1f]/.test(name) ||
@@ -169,14 +170,15 @@ function preparePagedSpr(thingsRoot, profileDist) {
   if (!fs.existsSync(srcSpr)) throw new Error('Asset obrigatorio ausente: Tibia.spr');
   fs.mkdirSync(profileDist, { recursive: true });
   const dstSpr = path.join(profileDist, 'Tibia.spr');
-  copyAsset(srcSpr, dstSpr);
+  const sprReplaced = copyAsset(srcSpr, dstSpr);
   const manifestPath = path.join(profileDist, 'spr-manifest.json');
   const sprStat = fs.statSync(srcSpr);
-  if (fs.existsSync(manifestPath)) {
+  if (!sprReplaced && fs.existsSync(manifestPath)) {
     try {
       const existing = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       const mStat = fs.statSync(manifestPath);
-      if (existing && existing.schema === 1 && existing.size === sprStat.size && mStat.mtimeMs >= sprStat.mtimeMs) {
+      if (existing && existing.schema === 1 && existing.size === sprStat.size &&
+          existing.pageSize === SPR_PAGE_SIZE && mStat.mtimeMs >= sprStat.mtimeMs) {
         return existing;
       }
     } catch (_) {}

@@ -49,6 +49,10 @@ function init()
 
   topMenu = g_ui.createWidget('TopMenu', g_ui.getRootWidget())
 
+  if g_app.isMobile() then
+    topMenu:hide()
+  end
+
   if g_game.isOnline() then
     scheduleEvent(online, 10)
   end
@@ -97,8 +101,10 @@ function online()
 end
 
 function offline()
-  if topMenu.hideIngame then
+  if topMenu.hideIngame and not g_app.isMobile() then
     show()
+  elseif g_app.isMobile() then
+    topMenu:hide()
   end
   if topMenu.onlineLabel then
     topMenu.onlineLabel:show()
@@ -257,8 +263,8 @@ end
 
 function updateStatus()
   removeEvent(statusUpdateEvent)
+  if not topMenu or not topMenu.onlineLabel then return end
   if not Services or not Services.status or #Services.status < 1 then return end
-  if not topMenu.onlineLabel then return end
   if g_game.isOnline() then return end
   local playersOnline = 0
   local onlineLabel = ''
@@ -268,6 +274,7 @@ function updateStatus()
   for index = 1, #Services.status do
     local url = Services.status[index]
     HTTP.postJSON(url, {type="cacheinfo"}, function(data, err)
+      if not topMenu then return end
       if err then
         g_logger.warning("HTTP error for " .. url .. ": " .. err)
         statusUpdateEvent = scheduleEvent(updateStatus, 60000)

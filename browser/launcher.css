@@ -1,4 +1,4 @@
-:root { color-scheme: dark; font-family: "Segoe UI", system-ui, sans-serif; color: #edf0ff; background: #0c0b1b; }
+:root { color-scheme: dark; font-family: "Segoe UI", system-ui, sans-serif; color: #edf0ff; background: #0c0b1b; --astra-safe-top: env(safe-area-inset-top, 0px); --astra-safe-right: env(safe-area-inset-right, 0px); --astra-safe-bottom: env(safe-area-inset-bottom, 0px); --astra-safe-left: env(safe-area-inset-left, 0px); }
 * { box-sizing: border-box; }
 html, body, #astra-root { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
 body[data-profile="mobile"] #astra-root { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); background: #050910; }
@@ -98,5 +98,11 @@ h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
 .rotate-card p { margin: 0 0 18px; font-size: 13px; line-height: 1.5; color: #c2bad6; }
 .rotate-actions { display: grid; gap: 10px; }
 .rotate-actions .play-button { margin-top: 0; padding: 13px; font-size: 14px; }
-body[data-profile="mobile"] #astra-web-options { bottom: max(10px, env(safe-area-inset-bottom, 0px)); right: max(10px, env(safe-area-inset-right, 0px)); }
+body[data-profile="mobile"] #astra-web-options { display: none !important; }
 body[data-profile="mobile"] .splash-emblem { width: min(260px, 52vw, 40vh); margin: 0 auto 6px; }
+
+#astra-mobile-keyboard-bar { position: fixed; z-index: 12; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 8px; padding: 8px max(12px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); background: #0d1222f5; border-top: 1px solid #7d96d688; box-shadow: 0 -6px 24px #000a; }
+#astra-mobile-input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; font-size: 16px; line-height: 1.3; color: #f4f7ff; background: #161d34; border: 1px solid #8ea6e2aa; border-radius: 8px; outline: none; }
+#astra-mobile-input:focus { border-color: #c2d6ff; box-shadow: 0 0 0 2px #7ea6ff44; }
+.mobile-kb-btn { flex: none; height: 40px; min-width: 56px; padding: 0 12px; font-size: 14px; font-weight: 600; color: #e8efff; background: #1f2b4b; border: 1px solid #7690cf88; border-radius: 8px; }
+.mobile-kb-done { background: linear-gradient(135deg, #4b6fe0, #6f55db); border-color: #b7c8ffaa; color: #fff; }

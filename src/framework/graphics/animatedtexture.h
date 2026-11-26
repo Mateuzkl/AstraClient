@@ -33,6 +33,7 @@ public:
     virtual ~AnimatedTexture();
 
     void replace(const ImagePtr& image) { }
+    void replaceFrames(const std::vector<ImagePtr>& frames);
     void update();
 
     virtual bool isAnimatedTexture() { return true; }

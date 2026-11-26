@@ -36,6 +36,7 @@ void ShaderManager::init()
 void ShaderManager::terminate()
 {
     m_shaders.clear();
+    m_shaderSpecs.clear();
 }
 
 void ShaderManager::createShader(const std::string& name, std::string vertex, std::string fragment, bool colorMatrix)
@@ -50,6 +51,11 @@ void ShaderManager::createShader(const std::string& name, std::string vertex, st
     }
 
     g_graphicsDispatcher.addEventEx("createShader", [&, name, vertex, fragment, colorMatrix] {
+        ShaderSpec spec;
+        spec.vertex = vertex;
+        spec.fragment = fragment;
+        spec.colorMatrix = colorMatrix;
+        m_shaderSpecs[name] = std::move(spec);
         auto program = PainterShaderProgram::create(name, vertex, fragment, colorMatrix);
         if (program)
             m_shaders[name] = program;
@@ -59,10 +65,29 @@ void ShaderManager::createShader(const std::string& name, std::string vertex, st
 void ShaderManager::addTexture(const std::string& name, const std::string& file)
 {
     g_graphicsDispatcher.addEventEx("addTexture", [&, name, file] {
+        auto specIt = m_shaderSpecs.find(name);
+        if (specIt != m_shaderSpecs.end())
+            specIt->second.textures.push_back(file);
         auto program = getShader(name);
         if (program)
             program->addMultiTexture(file);
     });
+}
+
+void ShaderManager::reload()
+{
+    VALIDATE_GRAPHICS_THREAD();
+    m_shaders.clear();
+    for (const auto& entry : m_shaderSpecs) {
+        const std::string& name = entry.first;
+        const ShaderSpec& spec = entry.second;
+        auto program = PainterShaderProgram::create(name, spec.vertex, spec.fragment, spec.colorMatrix);
+        if (!program)
+            continue;
+        for (const auto& texFile : spec.textures)
+            program->addMultiTexture(texFile);
+        m_shaders[name] = program;
+    }
 }
 
 PainterShaderProgramPtr ShaderManager::getShader(const std::string& name)

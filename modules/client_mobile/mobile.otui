@@ -14,6 +14,16 @@ UIWidget
     focusable: false
     phantom: true
 
+  MobileHudPill
+    id: mobileLoginSettingsBtn
+    size: 72 30
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 8
+    margin-right: 10
+    text: Settings
+    visible: true
+
   UIWidget
     id: mobileHudBar
     height: 36
@@ -201,10 +211,10 @@ UIWidget
 
   MobileDrawerPanel
     id: mobileSettingsDrawer
-    size: 300 290
-    anchors.top: mobileHudBar.bottom
+    size: 316 326
+    anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 8
+    margin-top: 46
     visible: false
     layout:
       type: verticalBox
@@ -317,16 +327,20 @@ UIWidget
         text-align: left
       MobileHudPill
         id: cfgDpr10
-        size: 60 28
+        size: 46 28
         text: 1.0x
       MobileHudPill
-        id: cfgDpr125
-        size: 60 28
-        text: 1.25x
-      MobileHudPill
         id: cfgDpr15
-        size: 60 28
+        size: 46 28
         text: 1.5x
+      MobileHudPill
+        id: cfgDpr175
+        size: 50 28
+        text: 1.75x
+      MobileHudPill
+        id: cfgDpr20
+        size: 46 28
+        text: 2.0x
 
     MobileDrawerRow
       layout:
@@ -339,12 +353,34 @@ UIWidget
         text-align: left
       MobileHudPill
         id: cfgLights
-        size: 94 28
+        size: 98 28
         text: Lights: On
       MobileHudPill
         id: cfgFloorFade
-        size: 94 28
+        size: 98 28
         text: Fade: On
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: Web
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgWebFull
+        size: 66 28
+        text: Fullscr
+      MobileHudPill
+        id: cfgWebDiag
+        size: 58 28
+        text: Diag
+      MobileHudPill
+        id: cfgWebDesktop
+        size: 72 28
+        text: Desktop
 
     MobileDrawerRow
       layout:
@@ -352,9 +388,9 @@ UIWidget
         spacing: 4
       MobileHudPill
         id: cfgTrimCache
-        size: 136 28
+        size: 144 28
         text: Free Texture Cache
       MobileHudPill
         id: cfgCloseDrawer
-        size: 136 28
+        size: 144 28
         text: Close
