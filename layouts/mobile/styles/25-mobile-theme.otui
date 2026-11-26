@@ -1,77 +1,79 @@
-// Clean-room Mobile Obsidian + Smoked Glass + Brushed Gold Global Theme.
+// Clean-room Classic Dark-Charcoal / Translucent Slate Global Mobile Theme.
 // Loaded ONLY when layout == 'mobile' (zero impact on Desktop Full).
 
 MainWindow < UIWindow
   font: mobile-title-18
-  color: #f6d475
+  color: #edf0f5
   size: 320 240
   opacity: 1
-  padding-top: 38
-  padding-left: 16
-  padding-right: 16
-  padding-bottom: 14
-  image-source: /images/mobile_ui/panel_gold
-  image-border: 12
-  text-offset: 0 9
+  padding-top: 32
+  padding-left: 14
+  padding-right: 14
+  padding-bottom: 12
+  image-source: /images/mobile_ui/panel_window
+  image-border: 8
+  image-border-top: 26
+  image-border-bottom: 8
+  text-offset: 0 5
   text-align: top
   draggable: true
   anchors.centerIn: parent
 
   $disabled:
-    color: #8f96a6
+    color: #8c929c
 
 StaticMainWindow < MainWindow
   draggable: false
 
 Button < UIButton
   font: mobile-btn-15
-  color: #f3eedc
+  color: #edf0f5
   size: 112 36
   text-offset: 0 0
   text-align: center
   image-source: /images/mobile_ui/btn_dark
   image-color: #ffffffff
   image-clip: 0 0 128 48
-  image-border: 10
-  padding: 4 12 4 12
+  image-border: 6
+  padding: 4 10 4 10
   opacity: 1.0
   change-cursor-image: false
 
   $hover !disabled:
     image-clip: 0 48 128 48
-    color: #ffd96a
+    color: #ffffff
 
   $pressed:
     image-clip: 0 96 128 48
     text-offset: 0 1
-    color: #ffd96a
+    color: #e4dcb8
 
   $on:
     image-clip: 0 48 128 48
-    color: #ffd96a
+    color: #f0e6bc
 
   $disabled:
-    color: #9ba3b488
+    color: #8c929c88
     opacity: 0.6
 
 TextEdit < UITextEdit
   font: mobile-input-14
-  color: #f4f0e4
+  color: #f0f2f5
   size: 160 36
   text-offset: 0 0
   opacity: 1
-  padding: 8 10 6 10
+  padding: 7 10 5 10
   image-source: /images/mobile_ui/input_idle
-  image-border: 10
+  image-border: 6
   selection-color: #ffffff
-  selection-background-color: #2478d4cc
+  selection-background-color: #3a6ea5cc
   change-cursor-image: false
 
   $focus:
     image-source: /images/mobile_ui/input_focus
 
   $disabled:
-    color: #8f96a688
+    color: #8c929c88
     opacity: 0.6
 
 CheckBox < UICheckBox
@@ -79,7 +81,7 @@ CheckBox < UICheckBox
   size: 22 22
   text-align: left
   text-offset: 28 1
-  color: #e9e2ce
+  color: #e2e6ec
   image-color: #ffffffff
   image-rect: 0 0 22 22
   image-source: /images/mobile_ui/checkbox
@@ -88,65 +90,65 @@ CheckBox < UICheckBox
 
   $checked !disabled:
     image-clip: 0 24 24 24
-    color: #fff6dc
+    color: #ffffff
 
   $disabled:
     image-clip: 0 48 24 24
-    color: #9ba3b488
+    color: #8c929c88
 
 ComboBox < UIComboBox
   font: mobile-input-14
-  color: #f3eedc
+  color: #edf0f5
   size: 140 36
   text-offset: 10 0
   text-align: left
   image-source: /images/mobile_ui/btn_dark
   image-clip: 0 0 128 48
-  image-border: 10
+  image-border: 6
   padding-right: 26
 
   $hover !disabled:
     image-clip: 0 48 128 48
-    color: #ffd96a
+    color: #ffffff
 
   $on:
     image-clip: 0 48 128 48
-    color: #ffd96a
+    color: #f0e6bc
 
   $disabled:
-    color: #9ba3b488
+    color: #8c929c88
     opacity: 0.6
 
 ComboBoxPopupMenu < UIPopupMenu
-  background-color: #090e19f5
+  background-color: #14171cf4
   border-width: 1
-  border-color: #e8b83ebb
+  border-color: #626976
   padding: 4
 
 ComboBoxPopupMenuButton < UIButton
   height: 36
   font: mobile-input-14
-  color: #f3eedc
+  color: #edf0f5
   text-align: left
   text-offset: 10 0
   background-color: alpha
 
   $hover:
-    background-color: #e8b83e38
-    color: #ffd96a
+    background-color: #3a404c99
+    color: #ffffff
 
   $pressed:
-    background-color: #e8b83e55
+    background-color: #4d5564bb
     color: #ffffff
 
 HorizontalSeparator < UIWidget
   height: 1
-  background-color: #e8b83e44
+  background-color: #5a606c88
   phantom: true
   focusable: false
 
 VerticalSeparator < UIWidget
   width: 1
-  background-color: #ffffff28
+  background-color: #5a606c88
   phantom: true
   focusable: false

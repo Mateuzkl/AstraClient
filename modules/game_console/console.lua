@@ -132,6 +132,30 @@ function getConsole()
   return consolePanel:recursiveGetChildById('consoleTextEdit')
 end
 
+function isMobileChatOpen()
+  local bottom = m_interface and m_interface.getBottomPanel and m_interface.getBottomPanel() or nil
+  return bottom and bottom:isVisible() or false
+end
+
+function setMobileChatVisible(visible)
+  local bottom = m_interface and m_interface.getBottomPanel and m_interface.getBottomPanel() or nil
+  if not bottom then return end
+  bottom:setVisible(visible == true)
+  if visible then
+    bottom:raise()
+    local edit = getConsole()
+    if edit then
+      edit:enable()
+      edit:focus()
+      edit:setCursorPos(-1)
+    end
+  end
+end
+
+function toggleMobileChat()
+  setMobileChatVisible(not isMobileChatOpen())
+end
+
 function sendCurrentMessage(defaultKeybind)
   local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
   local message = consoleTextEdit:getText()
@@ -607,7 +631,9 @@ function onPlayerUnload()
 
   end
 
-  modules.game_sidebars.setChannelOptions(option)
+  if modules.game_sidebars and modules.game_sidebars.setChannelOptions then
+    modules.game_sidebars.setChannelOptions(option)
+  end
 end
 
 function onPlayerLoad(channelsOpen)

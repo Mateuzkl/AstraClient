@@ -1,31 +1,30 @@
-// Clean-room Dark-Glass Mobile Console overrides preserving all AstraClient Chat child IDs.
+// Clean-room Translucent Dark-Charcoal On-Demand Mobile Console (zero reserved space when closed).
 ConsoleTabBar < MoveableTabBar
-  height: 28
-  padding: 0 4
+  height: 24
+  padding: 0 3
   border-width-top: 0
-  margin-top: 2
+  margin-top: 1
   margin-right: 0
 
 ConsoleTabBarButton < UIButton
-  size: 28 26
+  size: 26 22
   font: mobile-hud-12
-  background-color: #0e1424cc
+  background-color: #1c2026d8
   border-width: 1
-  border-color: #ffffff24
+  border-color: #525864aa
   anchors.top: parent.top
   anchors.left: parent.left
   anchors.bottom: parent.bottom
-  color: #9aa5ba
+  color: #b0b6c2
   text-offset: 0 0
-  margin-bottom: 0
-  padding-left: 12
-  padding-right: 12
-  &tabWidth: 96
+  padding-left: 10
+  padding-right: 10
+  &tabWidth: 88
 
   $checked:
-    color: #ffd96a
-    background-color: #202a42ee
-    border-color: #e8b83ecc
+    color: #ffffff
+    background-color: #343a46ee
+    border-color: #c8bfa0cc
 
   $on !checked:
     color: #ff7b72
@@ -33,48 +32,45 @@ ConsoleTabBarButton < UIButton
 ConsolePanel < Panel
   id: consolePanel
   anchors.fill: parent
-  margin-top: 2
-  image-source: /images/mobile_ui/panel_glass
-  image-border: 10
-  padding: 4
+  image-source: /images/mobile_ui/panel_dark
+  image-border: 6
+  padding: 3
 
   Panel
     id: parentPanel
-    background-color: #050912b0
+    background-color: #0c0e12cc
     border-width: 1
-    border-color: #ffffff1a
+    border-color: #464c56aa
     anchors.top: next.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-top: 2
-    padding: 4
+    padding: 3
 
     Button
       id: toggleChat
-      !tooltip: tr('Enable/disable chat')
-      !text: tr('Chat On')
-      size: 74 30
+      !text: tr('Hide')
+      size: 56 28
       font: mobile-hud-12
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      margin-bottom: 1
-      @onClick: toggleChat()
+      @onClick: if modules.game_console and modules.game_console.setMobileChatVisible then modules.game_console.setMobileChatVisible(false) else toggleChat() end
 
     TextEditCipsoft
       id: consoleTextEdit
       font: mobile-input-14
-      color: #f4f0e4
+      color: #f0f2f5
       image-source: /images/mobile_ui/input_idle
-      image-border: 8
-      padding: 5 8 4 8
+      image-border: 6
+      padding: 4 8 4 8
       anchors.top: sayModeButton.top
       anchors.left: sayModeButton.right
       anchors.right: prev.left
       anchors.bottom: parent.bottom
-      height: 30
-      margin-left: 4
-      margin-right: 4
+      height: 28
+      margin-left: 3
+      margin-right: 3
       shift-navigation: true
       max-length: 255
       text-auto-submit: true
@@ -84,24 +80,19 @@ ConsolePanel < Panel
     ConsoleIconButton
       id: sayModeButton
       icon: /images/game/console/say
-      !tooltip: tr('Adjust volume')
       &sayMode: 2
-      size: 30 30
+      size: 28 28
       anchors.left: parent.left
       anchors.bottom: parent.bottom
-      margin-left: 2
-      margin-bottom: 1
       @onClick: sayModeChange()
 
     Panel
       id: consoleContentPanel
-      background-color: #04070ec0
+      background-color: #0a0c10b0
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.bottom: consoleTextEdit.top
-      margin-bottom: 4
-      margin-left: 1
-      margin-top: 1
+      margin-bottom: 3
       focusable: false
       $on:
         anchors.right: parent.horizontalCenter
@@ -117,29 +108,25 @@ ConsolePanel < Panel
           type: verticalBox
           align-bottom: true
         inverted-scroll: true
-        padding: 4
+        padding: 3
 
       VerticalScrollBar
         id: consoleScrollBar
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: parent.right
-        margin-top: 2
-        margin-right: 2
-        margin-bottom: 2
-        step: 24
+        step: 20
         pixels-scroll: true
 
     Panel
       id: consoleReadyOnlyPanel
-      background-color: #04070ec0
+      background-color: #0a0c10b0
       anchors.top: parent.top
       anchors.left: prev.right
       anchors.right: parent.right
       anchors.bottom: consoleTextEdit.top
-      margin-bottom: 4
-      margin-left: 3
-      margin-top: 1
+      margin-bottom: 3
+      margin-left: 2
       focusable: false
       visible: false
 
@@ -152,17 +139,14 @@ ConsolePanel < Panel
           type: verticalBox
           align-bottom: true
         inverted-scroll: true
-        padding: 4
+        padding: 3
 
       VerticalScrollBar
         id: consoleReadyOnlyScrollBar
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: parent.right
-        margin-top: 2
-        margin-right: 2
-        margin-bottom: 2
-        step: 24
+        step: 20
         pixels-scroll: true
 
   ConsoleTabBar
@@ -170,25 +154,18 @@ ConsolePanel < Panel
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
-    height: 28
-    margin-top: 1
-    margin-left: 24
-    movable: true
+    height: 24
+    margin-left: 22
+    movable: false
     phantom: true
-    tab-draggable: true
-    tab-todrag: readOnly
 
   ConsoleIconButton
     id: prevChannelButton
-    size: 22 24
+    size: 20 22
     image-clip: 351 17 18 17
     anchors.left: parent.left
     anchors.top: parent.top
-    margin-top: 2
     visible: true
-    !tooltip: tr('Move channels to the right')
-    $pressed:
-      image-clip: 369 17 18 17
 
   NewConsoleIconButton
     id: readOnly
@@ -199,64 +176,43 @@ ConsolePanel < Panel
 
   ConsoleIconButton
     id: exivaOption
-    size: 22 22
-    image-clip: 351 50 16 16
+    size: 1 1
+    visible: false
     anchors.right: parent.right
     anchors.top: parent.top
-    margin-top: 3
-    margin-right: 2
-    @onClick: if modules.game_exiva_options then modules.game_exiva_options.onRequestExivaOptions() end
-    $on:
-      image-clip: 351 50 16 16
-    $!on:
-      image-clip: 351 34 16 16
-    $pressed:
-      image-clip: 351 66 16 16
-    $pressed !on:
-      image-clip: 351 34 16 16
 
   ConsoleIconButton
     id: ignoreButton
-    size: 22 22
-    image-clip: 48 0 16 16
-    anchors.right: prev.left
-    anchors.top: prev.top
-    margin-right: 2
-    @onClick: modules.game_console.Communication:onClickIgnoreButton()
-    $pressed:
-      image-clip: 48 16 16 16
+    size: 1 1
+    visible: false
+    anchors.right: parent.right
+    anchors.top: parent.top
 
   ConsoleIconButton
     id: channelsButton
-    size: 22 22
+    size: 20 20
     image-clip: 16 0 16 16
-    anchors.right: prev.left
-    anchors.top: prev.top
-    margin-right: 2
-    @onClick: g_game.requestChannels()
-    $pressed:
-      image-clip: 16 16 16 16
-
-  ConsoleIconButton
-    id: closeChannelButton
-    size: 22 22
-    image-clip: 160 0 16 16
-    anchors.right: prev.left
-    anchors.top: prev.top
-    margin-right: 2
-    visible: false
-    @onClick: removeCurrentTab()
-    $pressed:
-      image-clip: 160 16 16 16
-
-  ConsoleIconButton
-    id: nextChannelButton
-    size: 22 24
-    image-clip: 351 0 18 17
-    anchors.right: prev.left
+    anchors.right: parent.right
     anchors.top: parent.top
     margin-top: 2
     margin-right: 2
+    @onClick: g_game.requestChannels()
+
+  ConsoleIconButton
+    id: closeChannelButton
+    size: 20 20
+    image-clip: 160 0 16 16
+    anchors.right: channelsButton.left
+    anchors.top: channelsButton.top
+    margin-right: 2
+    visible: false
+    @onClick: removeCurrentTab()
+
+  ConsoleIconButton
+    id: nextChannelButton
+    size: 20 22
+    image-clip: 351 0 18 17
+    anchors.right: closeChannelButton.left
+    anchors.top: parent.top
+    margin-right: 2
     visible: true
-    $pressed:
-      image-clip: 369 0 18 17

@@ -3739,7 +3739,6 @@
     "data/styles/40-spelllist.otui",
     "data/styles/40-tilewidget.otui",
     "init.lua",
-    "layouts/mobile/images/title.png",
     "layouts/mobile/styles/10-scrollbars.otui",
     "layouts/mobile/styles/20-smallscrollbar.otui",
     "layouts/mobile/styles/30-miniwindow.otui",

@@ -219,6 +219,17 @@ void browserSyncFocusedTextInput(const char *metaJson)
     // clang-format on
 }
 
+void browserNotifyTabProcessed(const char *metaJson)
+{
+    // clang-format off
+    MAIN_THREAD_EM_ASM({
+    if (window.AstraBrowser && typeof window.AstraBrowser.onVirtualTabProcessed === 'function') {
+        window.AstraBrowser.onVirtualTabProcessed(UTF8ToString($0));
+    }
+    }, metaJson);
+    // clang-format on
+}
+
 void browserHideVirtualKeyboard()
 {
     // clang-format off
@@ -515,7 +526,7 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
     g_dispatcher.addEvent([this, eventType, touches = std::move(touches)] {
         if (!m_onInputEvent)
             return;
-        constexpr int DragThresholdPx = 16;
+        const int dragThresholdPx = g_app.isMobile() ? 24 : 16;
         constexpr ticks_t LongPressMs = 450;
 
         auto findSlotById = [this](long id) -> int {
@@ -585,7 +596,7 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
 
                 if (slotIdx == 0) {
                     const int dist = std::max(std::abs(pos.x - slot.startPos.x), std::abs(pos.y - slot.startPos.y));
-                    if (!slot.dragged && !slot.consumed && dist > DragThresholdPx) {
+                    if (!slot.dragged && !slot.consumed && dist > dragThresholdPx) {
                         slot.dragged = true;
                         m_inputEvent.reset(Fw::MouseMoveInputEvent);
                         m_inputEvent.mouseMoved = slot.startPos - m_inputEvent.mousePos;
@@ -870,22 +881,121 @@ int utf8ToUtf16Offset(const std::string &utf8, int byteOffset)
 }
 } // namespace
 
+static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, double cssScaleY, bool normalized = false);
+
+static UIWidgetPtr getDeepestFocusedWidget()
+{
+    UIWidgetPtr current = g_ui.getKeyboardReceiver();
+    while (current) {
+        UIWidgetPtr focusedChild = current->getFocusedChild();
+        if (!focusedChild)
+            break;
+        current = focusedChild;
+    }
+    return current;
+}
+
+static std::vector<UITextEditPtr> collectVisibleTextEdits(const UIWidgetPtr &root)
+{
+    std::vector<UITextEditPtr> edits;
+    if (!root)
+        return edits;
+    std::function<void(const UIWidgetPtr &)> walk = [&](const UIWidgetPtr &widget) {
+        if (!widget || !widget->isVisible() || !widget->isEnabled())
+            return;
+        if (auto edit = std::dynamic_pointer_cast<UITextEdit>(widget)) {
+            if (edit->isEditable() && !edit->getRect().isEmpty())
+                edits.push_back(edit);
+        }
+        for (const auto &child : widget->getChildren())
+            walk(child);
+    };
+    walk(root);
+    return edits;
+}
+
+static UITextEditPtr findVisibleTextEditById(const std::string &id)
+{
+    if (id.empty())
+        return nullptr;
+    for (const auto &edit : collectVisibleTextEdits(g_ui.getRootWidget())) {
+        if (edit && edit->getId() == id)
+            return edit;
+    }
+    return nullptr;
+}
+
+void BrowserWindow::handleFocusTextEdit(std::string widgetId)
+{
+    g_dispatcher.addEvent([this, widgetId = std::move(widgetId)] {
+        if (!m_created || widgetId.empty())
+            return;
+        auto edit = findVisibleTextEditById(widgetId);
+        if (!edit || !edit->isEditable())
+            return;
+        if (!edit->isFocused()) {
+            edit->focus();
+        }
+        g_app.repaint();
+    });
+}
+
+void BrowserWindow::handleNextTextEdit(std::string fromId)
+{
+    g_dispatcher.addEvent([this, fromId = std::move(fromId)] {
+        if (!m_created)
+            return;
+        auto currentEdit = std::dynamic_pointer_cast<UITextEdit>(getDeepestFocusedWidget());
+        if (!currentEdit && !fromId.empty())
+            currentEdit = findVisibleTextEditById(fromId);
+
+        const auto edits = collectVisibleTextEdits(g_ui.getRootWidget());
+        UITextEditPtr nextEdit;
+        if (edits.size() > 1) {
+            int idx = -1;
+            for (size_t i = 0; i < edits.size(); ++i) {
+                if ((currentEdit && edits[i] == currentEdit) ||
+                    (!fromId.empty() && edits[i]->getId() == fromId)) {
+                    idx = static_cast<int>(i);
+                    break;
+                }
+            }
+            if (idx >= 0) {
+                nextEdit = edits[(static_cast<size_t>(idx) + 1) % edits.size()];
+            }
+        }
+
+        if (nextEdit && nextEdit != currentEdit) {
+            nextEdit->focus();
+            g_app.repaint();
+            const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+                ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+                : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+            const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+                ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+                : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+            const std::string meta = serializeTextEditMeta(nextEdit.get(), cssScaleX, cssScaleY, false);
+            browserNotifyTabProcessed(meta.c_str());
+        } else {
+            browserNotifyTabProcessed("");
+        }
+    });
+}
+
 void BrowserWindow::handleVirtualTextReplace(std::string expectedId, std::string text, int selStart, int selEnd)
 {
     g_dispatcher.addEvent([this, expectedId = std::move(expectedId), text = std::move(text), selStart, selEnd] {
         if (!m_created)
             return;
-        UIWidgetPtr current = g_ui.getKeyboardReceiver();
-        while (current) {
-            UIWidgetPtr focusedChild = current->getFocusedChild();
-            if (!focusedChild)
-                break;
-            current = focusedChild;
+        auto edit = std::dynamic_pointer_cast<UITextEdit>(getDeepestFocusedWidget());
+        if (!expectedId.empty() && (!edit || edit->getId() != expectedId)) {
+            auto target = findVisibleTextEditById(expectedId);
+            if (!target || !target->isEditable())
+                return;
+            target->focus();
+            edit = target;
         }
-        auto edit = std::dynamic_pointer_cast<UITextEdit>(current);
         if (!edit || !edit->isEditable())
-            return;
-        if (!expectedId.empty() && edit->getId() != expectedId)
             return;
 
         m_syncingFromBrowser = true;
@@ -932,6 +1042,15 @@ void BrowserWindow::handleVirtualTextReplace(std::string expectedId, std::string
         if (edit->isSelectable())
             edit->setSelection(start, end);
         m_syncingFromBrowser = false;
+        if (applied != text) {
+            const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+                ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+                : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+            const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+                ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+                : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+            browserSyncFocusedTextInput(serializeTextEditMeta(edit.get(), cssScaleX, cssScaleY, true).c_str());
+        }
         g_app.repaint();
     });
 }
@@ -941,6 +1060,20 @@ void BrowserWindow::handleVirtualKey(Fw::Key key)
     g_dispatcher.addEvent([this, key] {
         processKeyDown(key);
         processKeyUp(key);
+        if (key == Fw::KeyTab) {
+            auto edit = std::dynamic_pointer_cast<UITextEdit>(getDeepestFocusedWidget());
+            if (edit && edit->isEditable()) {
+                const double cssScaleX = (m_size.width() > 0 && m_cssWidth > 0.0)
+                    ? (m_cssWidth * static_cast<double>(m_scaling) / static_cast<double>(m_size.width()))
+                    : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+                const double cssScaleY = (m_size.height() > 0 && m_cssHeight > 0.0)
+                    ? (m_cssHeight * static_cast<double>(m_scaling) / static_cast<double>(m_size.height()))
+                    : (static_cast<double>(m_scaling) / static_cast<double>(m_displayDensity));
+                browserNotifyTabProcessed(serializeTextEditMeta(edit.get(), cssScaleX, cssScaleY, false).c_str());
+            } else {
+                browserNotifyTabProcessed("");
+            }
+        }
     });
 }
 
@@ -955,6 +1088,16 @@ EMSCRIPTEN_KEEPALIVE void astra_browser_text_input(const char *text)
 EMSCRIPTEN_KEEPALIVE void astra_browser_set_text(const char *expectedId, const char *text, int selStart, int selEnd)
 {
     g_browserWindow.handleVirtualTextReplace(expectedId ? expectedId : "", text ? text : "", selStart, selEnd);
+}
+
+EMSCRIPTEN_KEEPALIVE void astra_browser_focus_text_edit(const char *widgetId)
+{
+    g_browserWindow.handleFocusTextEdit(widgetId ? widgetId : "");
+}
+
+EMSCRIPTEN_KEEPALIVE void astra_browser_next_text_edit(const char *fromId)
+{
+    g_browserWindow.handleNextTextEdit(fromId ? fromId : "");
 }
 
 EMSCRIPTEN_KEEPALIVE void astra_browser_virtual_key(int key)
@@ -1152,7 +1295,7 @@ void BrowserWindow::requestWebFullscreen()
     // clang-format on
 }
 
-static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, double cssScaleY)
+static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, double cssScaleY, bool normalized)
 {
     const Rect r = edit->getRect();
     const std::string text = edit->getText();
@@ -1175,7 +1318,8 @@ static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, dou
         << ",\"multiline\":" << (edit->isMultiline() ? "true" : "false")
         << ",\"numeric\":" << (isNumericTextEdit(edit) ? "true" : "false")
         << ",\"email\":" << (isEmailTextEdit(edit) ? "true" : "false")
-        << ",\"focused\":" << (edit->isFocused() ? "true" : "false") << "}";
+        << ",\"focused\":" << (edit->isFocused() ? "true" : "false")
+        << ",\"normalized\":" << (normalized ? "true" : "false") << "}";
     return oss.str();
 }
 

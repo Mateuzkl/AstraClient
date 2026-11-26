@@ -7,8 +7,13 @@ Module
   call-name: interface
   scripts: [ widgets/uigamemap, gameinterface ]
   mobile-excluded-load-later:
+    - game_buttons
     - client_stats
     - client_camviewer
+    - game_sidebars
+    - game_topbar
+    - game_stats
+    - game_sidebuttons
     - game_bugreport
     - game_ruleviolation
     - game_prey

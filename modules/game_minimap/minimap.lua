@@ -941,12 +941,70 @@ local function attachMinimapToPanel()
   return false
 end
 
+local function isMobileLite()
+  return g_app and g_app.isMobileLite and g_app.isMobileLite() or false
+end
+
+local function configureMobileLiteMinimap()
+  if not isMobileLite() or not minimapWindow or not minimapWidget then return end
+  minimapWindow:setParent(m_interface.getRootPanel())
+  minimapWindow:breakAnchors()
+  minimapWindow:addAnchor(AnchorTop, 'parent', AnchorTop)
+  minimapWindow:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+  minimapWindow:setMarginTop(4)
+  minimapWindow:setMarginLeft(4)
+  minimapWindow:setSize({ width = 114, height = 114 })
+  minimapWindow:setDraggable(false)
+  minimapWindow:setImageSource('')
+  minimapWindow:setBackgroundColor('#0c0e12d8')
+  minimapWindow:setBorderWidth(1)
+  minimapWindow:setBorderColor('#585e6a')
+
+  minimapWidget:breakAnchors()
+  minimapWidget:fill('parent')
+  minimapWidget:setMargin(1)
+
+  for _, child in ipairs(minimapWindow:getChildren()) do
+    local cid = child:getId()
+    if cid ~= 'minimap' and cid ~= 'zoomInWidget' and cid ~= 'zoomOutWidget' then
+      child:hide()
+    end
+  end
+
+  local zoomIn = minimapWindow:recursiveGetChildById('zoomInWidget')
+  local zoomOut = minimapWindow:recursiveGetChildById('zoomOutWidget')
+  if zoomIn then
+    zoomIn:breakAnchors()
+    zoomIn:addAnchor(AnchorTop, 'parent', AnchorTop)
+    zoomIn:addAnchor(AnchorRight, 'parent', AnchorRight)
+    zoomIn:setMarginTop(26)
+    zoomIn:setMarginRight(4)
+    zoomIn:setSize({ width = 22, height = 22 })
+    zoomIn:setImageSource('/images/mobile_ui/icon_zoom_in')
+    zoomIn:setImageClip('0 0 24 24')
+    zoomIn:show()
+    zoomIn:raise()
+  end
+  if zoomOut then
+    zoomOut:breakAnchors()
+    zoomOut:addAnchor(AnchorTop, 'zoomInWidget', AnchorBottom)
+    zoomOut:addAnchor(AnchorRight, 'parent', AnchorRight)
+    zoomOut:setMarginTop(6)
+    zoomOut:setMarginRight(4)
+    zoomOut:setSize({ width = 22, height = 22 })
+    zoomOut:setImageSource('/images/mobile_ui/icon_zoom_out')
+    zoomOut:setImageClip('0 0 24 24')
+    zoomOut:show()
+    zoomOut:raise()
+  end
+end
+
 function init()
-  minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
+  minimapWindow = g_ui.loadUI('minimap', isMobileLite() and m_interface.getRootPanel() or m_interface.getRightPanel())
   -- The right-hand controls are pinned to the top so vertical expansion only adds map
   -- below them. Compass (46) plus the floor indicator (67) plus the 19px of window
   -- chrome need 132; below that the cyclopedia button falls out of the window.
-  minimapWindow:setHeight(140)
+  minimapWindow:setHeight(isMobileLite() and 114 or 140)
 
   if not minimapWindow.forceOpen then
     minimapButton = modules.client_topmenu.addRightGameToggleButton('minimapButton',
@@ -978,6 +1036,9 @@ function init()
   open()
   if minimapWindow.iconResize then
     minimapWindow:getChildById('iconResize'):hide()
+  end
+  if isMobileLite() then
+    configureMobileLiteMinimap()
   end
 
   -- Expand from the edge that faces the game area. The Astra minimap may be
@@ -1140,11 +1201,25 @@ function terminate()
 end
 
 function toggle()
+  if isMobileLite() then
+    if not minimapWindow then return end
+    if fullmapView then
+      toggleFullMap()
+    end
+    if minimapWindow:isVisible() then
+      minimapWindow:hide()
+    else
+      configureMobileLiteMinimap()
+      minimapWindow:show()
+      minimapWindow:raise()
+    end
+    return
+  end
   if not minimapButton then return end
   if fullmapView then
     toggleFullMap()
   end
-  local sideButton = modules.game_sidebuttons.getButtonById("lenshelpFunction")
+  local sideButton = modules.game_sidebuttons and modules.game_sidebuttons.getButtonById and modules.game_sidebuttons.getButtonById("lenshelpFunction") or nil
   if minimapWindow:isVisible() then
     -- Collapse for the close, but keep the persisted expansion state: closing the minimap
     -- is not the user asking for it to come back collapsed next session.
@@ -1206,7 +1281,11 @@ function online()
       updateFloorImage(cameraPosition.z)
     end
   end
-  scheduleExpansionRestore()
+  if isMobileLite() then
+    configureMobileLiteMinimap()
+  else
+    scheduleExpansionRestore()
+  end
 
   if minimapwidget then
     Party.Reset()
@@ -1437,7 +1516,9 @@ function onPlayerUnload()
   if parent then
     local placeholder = expansion.placeholders[parent]
     index = placeholder and parent:getChildIndex(placeholder) or parent:getChildIndex(minimapWindow)
-    modules.game_sidebars.registerMinimapConfig({contentHeight = minimapWindow:getHeight(), index = index})
+    if modules.game_sidebars and modules.game_sidebars.registerMinimapConfig then
+      modules.game_sidebars.registerMinimapConfig({contentHeight = minimapWindow:getHeight(), index = index})
+    end
   end
 end
 

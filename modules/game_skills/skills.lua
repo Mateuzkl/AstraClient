@@ -699,7 +699,8 @@ function refresh()
   local player = g_game.getLocalPlayer()
   if not player then return end
 
-  skillWidgetsOptions = modules.game_sidebars.getSkillsWidgetConfig()
+  skillWidgetsOptions = (modules.game_sidebars and modules.game_sidebars.getSkillsWidgetConfig)
+    and modules.game_sidebars.getSkillsWidgetConfig() or {}
   if table.empty(skillWidgetsOptions) then
     skillWidgetsOptions = {
       ["contentHeight"] = 0,
@@ -780,14 +781,21 @@ function offline()
 end
 
 function toggle()
-  if modules.game_sidebuttons.isButtonVisible("skillsWidget") then
+  local isOpen = (modules.game_sidebuttons and modules.game_sidebuttons.isButtonVisible)
+    and modules.game_sidebuttons.isButtonVisible("skillsWidget")
+    or (skillsWindow and skillsWindow:isVisible())
+  if isOpen then
     skillsWindow:close()
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+    end
   else
     skillsWindow:open()
     if m_interface.addToPanels(skillsWindow) then
       skillsWindow:getParent():moveChildToIndex(skillsWindow, #skillsWindow:getParent():getChildren())
-      modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
+      if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+        modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
+      end
 
       scheduleEvent(function()
         skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
@@ -805,12 +813,16 @@ function open()
   skillsWindow:open()
   if m_interface.addToPanels(skillsWindow) then
     skillsWindow:getParent():moveChildToIndex(skillsWindow, #skillsWindow:getParent():getChildren())
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
+    end
     scheduleEvent(function()
       skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
     end, 100)
   else
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+    end
   end
 end
 
@@ -833,7 +845,9 @@ function checkExpSpeed()
 end
 
 function onMiniWindowClose()
-  modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+  if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+    modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
+  end
 end
 
 function onExperienceChange(localPlayer, value, oldValue)
@@ -864,7 +878,9 @@ function onLevelChange(localPlayer, value, percent)
   local experienceLabel = skillsWindow:recursiveGetChildById('experience')
   experienceLabel:setTooltip(text)
   setSkillPercent('level', percent)
-  modules.game_topbar.updateLevelTooltip(text)
+  if modules.game_topbar and modules.game_topbar.updateLevelTooltip then
+    modules.game_topbar.updateLevelTooltip(text)
+  end
 end
 
 function onHealthChange(localPlayer, health, maxHealth)
@@ -1454,7 +1470,7 @@ function onBattlePassBonusChange(localPlayer, bonuses)
 end
 
 function onPlayerUnload()
-  if skillWidgetsOptions then
+  if skillWidgetsOptions and modules.game_sidebars and modules.game_sidebars.registerSkillWidgetsConfig then
     modules.game_sidebars.registerSkillWidgetsConfig(skillWidgetsOptions)
   end
 end

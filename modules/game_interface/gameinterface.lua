@@ -7,7 +7,14 @@ gameBottomPanel = nil
 horizontalRightPanel = nil
 horizontalLeftPanel = nil
 
+local function isMobileLite()
+  return g_app and g_app.isMobileLite and g_app.isMobileLite() or false
+end
+
 local function isClassicViewActive()
+  if isMobileLite() then
+    return false
+  end
   return g_settings.getBoolean("classicView") and not g_gameConfig.isExtendedViewUI()
 end
 
@@ -118,6 +125,12 @@ local function getDefaultSidePanelWidth()
 end
 
 function updateBottomSplitterLeftMargin()
+  if isMobileLite() then
+    if gameBottomPanel then
+      gameBottomPanel:setMarginLeft(0)
+    end
+    return
+  end
   local leftPanelCount = getPersistentSidePanelCount(gameLeftPanels)
   local margin = 0
   if not isClassicViewActive() and leftPanelCount == 0 then
@@ -387,11 +400,17 @@ function init()
     onHealthPercentChange = creatureHealthPercentChange,
   })
 
-  gameRootPanel = g_ui.displayUI('gameinterface')
+  gameRootPanel = g_ui.displayUI(isMobileLite() and 'gameinterface_mobile' or 'gameinterface')
   gameRootPanel:hide()
   gameRootPanel:lower()
   gameRootPanel:insertLuaCall("onGeometryChange")
-  gameRootPanel.onGeometryChange = updateStretchShrink
+  gameRootPanel.onGeometryChange = function()
+    if isMobileLite() then
+      updateMobileLiteMapGeometry()
+      return
+    end
+    updateStretchShrink()
+  end
 
   mouseGrabberWidget = gameRootPanel:getChildById('mouseGrabber')
   mouseGrabberWidget.onMouseRelease = onMouseGrabberRelease
@@ -668,15 +687,20 @@ function hide()
 end
 
 function save()
-  local settings = {}
-  settings.splitterMarginBottom = bottomSplitter:getMarginBottom()
-  g_settings.setNode('game_interface', settings)
+  if not isMobileLite() and bottomSplitter then
+    local settings = {}
+    settings.splitterMarginBottom = bottomSplitter:getMarginBottom()
+    g_settings.setNode('game_interface', settings)
+  end
 
   -- call others functions
   onPlayerUnload()
 end
 
 function load()
+  if isMobileLite() then
+    return
+  end
   local settings = g_settings.getNode('game_interface')
   if settings then
     if settings.splitterMarginBottom then
@@ -786,6 +810,10 @@ function tryLogout(prompt)
 end
 
 function updateStretchShrink()
+  if isMobileLite() then
+    updateMobileLiteMapGeometry()
+    return
+  end
   if m_settings.getOption('dontStretchShrink') and not alternativeView then
     gameMapPanel:setVisibleDimension({ width = 15, height = 11 })
     -- Set gameMapPanel size to height = 11 * 32 + 2
@@ -2701,6 +2729,10 @@ local function scheduleHealthCircleResizeUpdates()
 end
 
 function updateTopBar(side)
+  if isMobileLite() then
+    updateMobileLiteMapGeometry()
+    return
+  end
   -- In extended view the map is the full-screen background. Top-bar settings
   -- are reloaded after login and must not restore the classic side/bottom
   -- anchors, otherwise uncovered sidebar and console areas turn black.
@@ -2755,7 +2787,133 @@ function updateTopBar(side)
   scheduleHealthCircleResizeUpdates()
 end
 
+local mobileZoomOffset = 0 -- 0 = auto full-screen fit, -2 = closer, +2 = wider
+local updatingMobileMapGeometry = false
+
+function setMobileZoomOffset(offset)
+  mobileZoomOffset = math.max(-2, math.min(2, tonumber(offset) or 0))
+  updateMobileLiteMapGeometry()
+end
+
+function getMobileZoomOffset()
+  return mobileZoomOffset
+end
+
+function updateMobileLiteMapGeometry()
+  if updatingMobileMapGeometry or not isMobileLite() or not gameRootPanel or not gameMapPanel then
+    return
+  end
+
+  local rw = gameRootPanel:getWidth()
+  local rh = gameRootPanel:getHeight()
+  if rw <= 0 or rh <= 0 then
+    return
+  end
+
+  updatingMobileMapGeometry = true
+
+  -- Enforce edge-to-edge full-screen map with zero Desktop chrome/margins/splitters
+  if gameMapPanel:getWidth() ~= rw or gameMapPanel:getHeight() ~= rh or gameMapPanel:getMarginTop() ~= 0 or gameMapPanel:getMarginBottom() ~= 0 or gameMapPanel:getMarginLeft() ~= 0 or gameMapPanel:getMarginRight() ~= 0 then
+    gameMapPanel:breakAnchors()
+    gameMapPanel:fill('parent')
+    gameMapPanel:setPadding(0)
+    gameMapPanel:setMarginTop(0)
+    gameMapPanel:setMarginBottom(0)
+    gameMapPanel:setMarginLeft(0)
+    gameMapPanel:setMarginRight(0)
+  end
+  if gameMapPanel:isKeepAspectRatioEnabled() then
+    gameMapPanel:setKeepAspectRatio(false)
+  end
+  gameMapPanel:setLimitVisibleRange(false)
+  if not gameMapPanel:isOn() then
+    gameMapPanel:setOn(true)
+  end
+
+  -- Keep floating container panels non-blocking & cleanly sized to viewport
+  if gameRightPanels then
+    local rightH = math.max(120, rh - 140)
+    local targetBottomMargin = math.max(118, rh - rightH)
+    if gameRightPanels:getMarginBottom() ~= targetBottomMargin then
+      gameRightPanels:setMarginBottom(targetBottomMargin)
+    end
+  end
+  if gameBottomPanel then
+    local wide = rw >= 720
+    local chatW = wide and math.min(360, math.max(220, rw - 460)) or math.min(360, math.max(220, rw - 24))
+    local chatH = math.min(136, math.max(104, math.floor(rh * 0.34)))
+    local chatMarginBottom = wide and 8 or 132
+    if gameBottomPanel:getWidth() ~= chatW or gameBottomPanel:getHeight() ~= chatH then
+      gameBottomPanel:setSize({ width = chatW, height = chatH })
+    end
+    if gameBottomPanel:getMarginBottom() ~= chatMarginBottom then
+      gameBottomPanel:setMarginBottom(chatMarginBottom)
+    end
+  end
+
+  -- Compute optimal odd visible dimension strictly within server awareRange.
+  -- MapView::calcFramebufferSource keeps 1:1 square tiles via KeepAspectRatio and centers the player,
+  -- filling 100% of the landscape/tablet viewport with zero stretched sprites and zero void tiles.
+  local aware = g_map.getAwareRange()
+  local awareW = (aware and aware.width and aware.width > 0) and aware.width or 18
+  local awareH = (aware and aware.height and aware.height > 0) and aware.height or 14
+
+  -- Max safe odd width inside awareRange with 1-tile walk buffer (e.g. 15 on 18x14, or 17 when wider)
+  local maxSafeW = awareW - 2
+  if maxSafeW % 2 == 0 then maxSafeW = maxSafeW - 1 end
+  maxSafeW = math.max(9, math.min(maxSafeW, awareW - 1))
+
+  local maxSafeH = awareH - 2
+  if maxSafeH % 2 == 0 then maxSafeH = maxSafeH - 1 end
+  maxSafeH = math.max(7, math.min(maxSafeH, awareH - 1))
+
+  local aspect = rw / rh
+  local targetW = maxSafeW + mobileZoomOffset
+  if targetW % 2 == 0 then targetW = targetW - 1 end
+  targetW = math.max(11, math.min(maxSafeW, targetW))
+
+  -- Choose odd height >= targetW / aspect so horizontal edges fill 100% cleanly without black bars
+  local idealH = math.ceil(targetW / aspect)
+  if idealH % 2 == 0 then idealH = idealH + 1 end
+  local targetH = math.max(7, math.min(maxSafeH, idealH))
+
+  -- Ensure targetW stays inside awareRange when viewport is narrower (e.g. tablet 4:3)
+  if targetH == maxSafeH then
+    local wForH = math.ceil(targetH * aspect)
+    if wForH % 2 == 0 then wForH = wForH + 1 end
+    targetW = math.max(11, math.min(maxSafeW, wForH))
+  end
+
+  gameMapPanel:setMaxZoomOut(maxSafeH)
+  local curDim = gameMapPanel:getVisibleDimension()
+  if not curDim or curDim.width ~= targetW or curDim.height ~= targetH then
+    gameMapPanel:setVisibleDimension({ width = targetW, height = targetH })
+  end
+
+  updatingMobileMapGeometry = false
+  scheduleHealthCircleResizeUpdates()
+end
+
 function refreshViewMode()
+  if isMobileLite() then
+    updatePanelArrowVisibility()
+    if gameLeftActions then gameLeftActions:setVisible(false) end
+    if gameTopBar then gameTopBar:setVisible(false) end
+    if bottomSplitter then bottomSplitter:setVisible(false) end
+    if gameBottomActionPanel then gameBottomActionPanel:setVisible(false) end
+    if gameBottomCooldownPanel then gameBottomCooldownPanel:setVisible(false) end
+    if gameLeftActionPanel then gameLeftActionPanel:setVisible(false) end
+    if gameRightActionPanel then gameRightActionPanel:setVisible(false) end
+    if modules.client_topmenu and modules.client_topmenu.getTopMenu then
+      local tm = modules.client_topmenu.getTopMenu()
+      if tm then tm:hide() end
+    end
+    if modules.game_console and modules.game_console.switchMode then
+      modules.game_console.switchMode(true)
+    end
+    updateMobileLiteMapGeometry()
+    return
+  end
   local classic = isClassicViewActive() -- and not g_app.isMobile()
   updatePanelArrowVisibility()
   local rightPanels = g_settings.getNumber("rightPanels") - getPersistentSidePanelCount(gameRightPanels)
@@ -2897,6 +3055,10 @@ function limitZoom()
 end
 
 function updateSize()
+  if isMobileLite() then
+    updateMobileLiteMapGeometry()
+    return
+  end
   if g_app.isMobile() then return end
 
   local classic = isClassicViewActive()
@@ -2954,6 +3116,10 @@ function updateSize()
 end
 
 function setupLeftActions()
+  if isMobileLite() then
+    if gameLeftActions then gameLeftActions:setVisible(false) end
+    return
+  end
   if not g_app.isMobile() then return end
   for _, widget in ipairs(gameLeftActions:getChildren()) do
     widget.image:setChecked(false)
@@ -3205,6 +3371,10 @@ local function closeRestoredWidget(widget, primordial)
 end
 
 function onPlayerLoad(config)
+  if isMobileLite() then
+    updateMobileLiteMapGeometry()
+    return
+  end
   if not config.leftSidebarCount then
     for i = 1, getPersistentSidePanelCount(gameLeftPanels) do
       removeLeftPanel()
@@ -3472,6 +3642,10 @@ function onPlayerUnload()
       end
       table.insert(config.openWidgetsHorizontalLeft, tt)
     end
+  end
+
+  if isMobileLite() or not modules.game_sidebars then
+    return
   end
 
   modules.game_sidebars.resetConfigs()

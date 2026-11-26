@@ -1,4 +1,4 @@
-// Clean-room Dedicated Mobile Login Screen for AstraClient Web Mobile Lite.
+// Clean-room Classic Dark-Charcoal Dedicated Mobile Login Screen.
 // Loaded ONLY when g_app.isMobile() (Desktop Full entergame.otui is 100% untouched).
 
 UIWindow
@@ -10,56 +10,52 @@ UIWindow
   color: alpha
   @onEnter: EnterGame.doLogin()
 
-  // Top centered golden AstraClient wordmark crest
-  UIWidget
-    id: mobileLoginCrest
-    size: 310 68
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 12
-    image-source: /images/mobile_ui/astra_crest
-    image-smooth: true
-    phantom: true
-    focusable: false
-
-  // Center translucent obsidian-glass 2-column card
-  MobileGlassPanel
+  MobileWindowPanel
     id: mobileLoginCard
-    size: 616 250
-    anchors.top: mobileLoginCrest.bottom
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 10
+    size: 590 256
+    anchors.centerIn: parent
+    phantom: true
+
+  Label
+    id: mobileLoginTitle
+    font: mobile-title-18
+    color: #f0f2f6
+    !text: tr('AstraClient')
+    anchors.top: mobileLoginCard.top
+    anchors.horizontalCenter: mobileLoginCard.horizontalCenter
+    margin-top: 4
+    text-auto-resize: true
     phantom: true
 
   // ---- Left Column: Touch-Sized Inputs (Email, Password, Token) ----
   MobileLoginLabel
     id: emailLabel
-    !text: tr('Email')
+    !text: tr('Email / Account')
     anchors.top: mobileLoginCard.top
     anchors.left: mobileLoginCard.left
-    margin-top: 16
-    margin-left: 22
+    margin-top: 32
+    margin-left: 18
 
   MobileLoginInput
     id: accountNameTextEdit
     anchors.top: emailLabel.bottom
     anchors.left: mobileLoginCard.left
-    margin-top: 4
-    margin-left: 22
-    width: 348
+    margin-top: 3
+    margin-left: 18
+    width: 336
     max-length: 49
     @onTextChange: modules.client_entergame.onTextChange()
 
   UIButton
     id: hidden
-    size: 36 38
+    size: 34 36
     anchors.right: accountNameTextEdit.right
     anchors.verticalCenter: accountNameTextEdit.verticalCenter
-    margin-right: 4
+    margin-right: 3
     focusable: false
     image-source: /images/mobile_ui/eye_toggle
     image-clip: 0 28 28 28
-    image-rect: 6 7 24 24
+    image-rect: 5 6 24 24
     @onClick: chooseTextMode()
 
   MobileLoginLabel
@@ -67,29 +63,29 @@ UIWindow
     !text: tr('Password')
     anchors.top: accountNameTextEdit.bottom
     anchors.left: mobileLoginCard.left
-    margin-top: 10
-    margin-left: 22
+    margin-top: 8
+    margin-left: 18
 
   MobileLoginInput
     id: accountPasswordTextEdit
     anchors.top: passwordLabel.bottom
     anchors.left: mobileLoginCard.left
-    margin-top: 4
-    margin-left: 22
-    width: 348
+    margin-top: 3
+    margin-left: 18
+    width: 336
     max-length: 49
     text-hidden: true
 
   UICheckBox
     id: passwordEyeToggle
-    size: 36 38
+    size: 34 36
     anchors.right: accountPasswordTextEdit.right
     anchors.verticalCenter: accountPasswordTextEdit.verticalCenter
-    margin-right: 4
+    margin-right: 3
     focusable: false
     image-source: /images/mobile_ui/eye_toggle
     image-clip: 0 0 28 28
-    image-rect: 6 7 24 24
+    image-rect: 5 6 24 24
     @onCheckChange: |
       local passEdit = self:getParent():getChildById('accountPasswordTextEdit')
       if passEdit then
@@ -103,29 +99,29 @@ UIWindow
     !text: tr('Token (2FA - Optional)')
     anchors.top: accountPasswordTextEdit.bottom
     anchors.left: mobileLoginCard.left
-    margin-top: 10
-    margin-left: 22
+    margin-top: 8
+    margin-left: 18
 
   MobileLoginInput
     id: accountTokenTextEdit
     height: 36
     anchors.top: tokenLabel.bottom
     anchors.left: mobileLoginCard.left
-    margin-top: 4
-    margin-left: 22
-    width: 348
+    margin-top: 3
+    margin-left: 18
+    width: 336
     max-length: 6
     only-number: true
-    padding: 8 12 6 12
+    padding: 7 10 5 10
 
-  // ---- Right Column: Gold Primary CTA, Server Selector, Checkboxes ----
-  MobileGoldButton
+  // ---- Right Column: Primary Login CTA, Server Selector, Checkboxes ----
+  MobilePrimaryButton
     id: loginButton
     !text: tr('LOG IN')
-    size: 204 46
+    size: 196 42
     anchors.top: accountNameTextEdit.top
     anchors.right: mobileLoginCard.right
-    margin-right: 22
+    margin-right: 18
     @onClick: EnterGame.doLogin()
 
   MobileLoginLabel
@@ -136,7 +132,7 @@ UIWindow
 
   Panel
     id: serverSelectorPanel
-    size: 204 40
+    size: 196 38
     anchors.top: accountPasswordTextEdit.top
     anchors.left: loginButton.left
     on: true
@@ -156,7 +152,7 @@ UIWindow
     anchors.top: tokenLabel.top
     anchors.left: loginButton.left
     anchors.right: loginButton.right
-    height: 26
+    height: 24
     margin-top: 2
     !text: tr('Remember Email')
     @onCheckChange: chooseButtonVisibility()
@@ -166,8 +162,8 @@ UIWindow
     anchors.top: rememberEmailBox.bottom
     anchors.left: loginButton.left
     anchors.right: loginButton.right
-    height: 26
-    margin-top: 6
+    height: 24
+    margin-top: 5
     !text: tr('Remember Password')
     @onCheckChange: chooseButtonVisibility()
 
@@ -176,7 +172,7 @@ UIWindow
     font: mobile-hud-12
     anchors.top: mobileLoginCard.bottom
     anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 8
+    margin-top: 6
     color: #9be8a8
     text-auto-resize: true
     phantom: true

@@ -522,6 +522,16 @@ function EnterGame.init()
   if hiddenEmail == "1" then
     enterGame.accountNameTextEdit:setTextHidden(true)
   end
+  local hiddenButton = enterGame:getChildById('hidden')
+  if hiddenButton and enterGame.accountNameTextEdit and enterGame.accountNameTextEdit.isTextHidden then
+    local isHidden = enterGame.accountNameTextEdit:isTextHidden()
+    isButtonPressed = not isHidden
+    if isMobileClient() then
+      hiddenButton:setImageClip(isHidden and '0 0 28 28' or '0 28 28 28')
+    else
+      hiddenButton:setImageSource(isHidden and "/images/ui/hidden-button" or "/images/ui/hidden-button-down")
+    end
+  end
 
   if g_game.isOnline() then
     return EnterGame.hide()
@@ -971,24 +981,17 @@ end
 
 function chooseTextMode()
   local hiddenButton = enterGame:getChildById('hidden')
-  if not hiddenButton then return end
+  if not hiddenButton or not enterGame.accountNameTextEdit then return end
 
-  isButtonPressed = not isButtonPressed
+  local currentlyHidden = enterGame.accountNameTextEdit.isTextHidden and enterGame.accountNameTextEdit:isTextHidden() or false
+  local nextHidden = not currentlyHidden
+  isButtonPressed = not nextHidden
 
-  if isButtonPressed then
-    if isMobileClient() then
-      hiddenButton:setImageClip('0 28 28 28')
-    else
-      hiddenButton:setImageSource("/images/ui/hidden-button-down")
-    end
-    enterGame.accountNameTextEdit:setTextHidden(false)
+  enterGame.accountNameTextEdit:setTextHidden(nextHidden)
+  if isMobileClient() then
+    hiddenButton:setImageClip(nextHidden and '0 0 28 28' or '0 28 28 28')
   else
-    if isMobileClient() then
-      hiddenButton:setImageClip('0 0 28 28')
-    else
-      hiddenButton:setImageSource("/images/ui/hidden-button")
-    end
-    enterGame.accountNameTextEdit:setTextHidden(true)
+    hiddenButton:setImageSource(nextHidden and "/images/ui/hidden-button" or "/images/ui/hidden-button-down")
   end
 end
 

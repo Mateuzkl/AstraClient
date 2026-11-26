@@ -76,6 +76,12 @@ end
 
 function online()
   local benchmark = g_clock.millis()
+  if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+    hide()
+    if topMenu.onlineLabel then topMenu.onlineLabel:hide() end
+    if topMenu.pingLabel then topMenu.pingLabel:hide() end
+    return
+  end
   if topMenu.hideIngame then
     hide()
   else

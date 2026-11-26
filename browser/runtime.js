@@ -186,6 +186,24 @@
       let touchTapStart = null;
       let lastUserInputAt = 0;
       let awaitingTabFocus = false;
+      let tabFocusTimer = null;
+      const clearTabFocusWait = () => {
+        awaitingTabFocus = false;
+        if (tabFocusTimer && typeof window.clearTimeout === 'function') {
+          window.clearTimeout(tabFocusTimer);
+        }
+        tabFocusTimer = null;
+      };
+      const beginTabFocusWait = () => {
+        clearTabFocusWait();
+        awaitingTabFocus = true;
+        if (typeof window.setTimeout === 'function') {
+          tabFocusTimer = window.setTimeout(() => {
+            tabFocusTimer = null;
+            awaitingTabFocus = false;
+          }, 350);
+        }
+      };
       const listeners = [];
       const listen = (target, type, callback, options) => {
         if (!target || typeof target.addEventListener !== 'function') return;
@@ -239,8 +257,9 @@
         const nextId = meta.id || '';
         const sameWidget = !!(prevId && nextId && prevId === nextId);
         if (!sameWidget) {
-          awaitingTabFocus = false;
+          clearTabFocusWait();
           lastUserInputAt = 0;
+          composing = false;
         }
         currentMeta = meta;
 
@@ -261,7 +280,8 @@
         if (typeof ctrl.removeAttribute === 'function') ctrl.removeAttribute('maxlength');
 
         const nextVal = typeof meta.text === 'string' ? meta.text : '';
-        const skipSync = composing || (preserveIfFocused && sameWidget && document.activeElement === ctrl);
+        const forceNormalized = !!(meta.normalized && sameWidget && (Date.now() - lastUserInputAt) < 120);
+        const skipSync = !forceNormalized && (composing || (preserveIfFocused && sameWidget && document.activeElement === ctrl));
         if (!skipSync) {
           if (ctrl.value !== nextVal) {
             ctrl.value = nextVal;
@@ -327,7 +347,8 @@
       };
 
       const closeMobileBar = (refocusCanvas) => {
-        awaitingTabFocus = false;
+        clearTabFocusWait();
+        composing = false;
         if (!bar || bar.hidden) return;
         bar.hidden = true;
         if (mobileInput && document.activeElement === mobileInput) {
@@ -372,13 +393,25 @@
         try { meta = typeof json === 'string' ? JSON.parse(json) : json; } catch (_) { return; }
         const prevId = currentMeta && currentMeta.id ? currentMeta.id : '';
         const switchedWidget = !!(meta && meta.id && prevId && meta.id !== prevId);
-        const recentlyTyped = !switchedWidget && (Date.now() - lastUserInputAt) < 250;
+        const recentlyTyped = !switchedWidget && !meta.normalized && (Date.now() - lastUserInputAt) < 250;
         const ctrl = configureMobileInput(meta, recentlyTyped);
         if (bar && !bar.hidden) {
           positionBar();
           if (switchedWidget && ctrl && document.activeElement !== ctrl) {
             try { ctrl.focus({ preventScroll: true }); } catch (_) {}
           }
+        }
+      };
+      window.AstraBrowser.onVirtualTabProcessed = (json) => {
+        if (!active) return;
+        clearTabFocusWait();
+        if (!json) return;
+        let meta = null;
+        try { meta = typeof json === 'string' ? JSON.parse(json) : json; } catch (_) { return; }
+        if (!meta || typeof meta !== 'object') return;
+        const ctrl = configureMobileInput(meta, false);
+        if (bar && !bar.hidden && ctrl && document.activeElement !== ctrl) {
+          try { ctrl.focus({ preventScroll: true }); } catch (_) {}
         }
       };
       window.AstraBrowser.hideMobileKeyboard = () => {
@@ -436,6 +469,9 @@
             // Prevent the browser from synthesizing compatibility mousedown on <canvas tabindex="0">,
             // which would otherwise steal DOM focus back from mobileInput and dismiss the native keyboard.
             if (typeof event.preventDefault === 'function') event.preventDefault();
+            if (hit.id && typeof module.ccall === 'function') {
+              try { module.ccall('astra_browser_focus_text_edit', null, ['string'], [hit.id]); } catch (_) {}
+            }
             openMobileBar(hit, true);
           } else if (bar && !bar.hidden) {
             closeMobileBar(false);
@@ -452,21 +488,28 @@
           pushMobileTextToEngine(ctrl);
         });
         listen(ctrl, 'input', () => {
-          if (!active || composing) return;
+          if (!active) return;
+          // Push live value even while Android IME composition (e.g. Gboard underline) is active:
+          // astra_browser_set_text replaces text idempotently without duplicating characters.
           lastUserInputAt = Date.now();
           pushMobileTextToEngine(ctrl);
         });
         listen(ctrl, 'keydown', event => {
-          if (!active || composing || event.isComposing || event.keyCode === 229) return;
+          if (!active) return;
+          if (event.isComposing || event.keyCode === 229) return;
           if (event.key === 'Enter') {
             if (isMultiline) return; // Preserve native newline insertion in multiline textarea.
+            composing = false;
             pushMobileTextToEngine(ctrl);
             module.ccall('astra_browser_virtual_key', null, ['number'], [13]);
             event.preventDefault();
             closeMobileBar(true);
-          } else if (event.key === 'Tab') {
+            return;
+          }
+          if (composing) return;
+          if (event.key === 'Tab') {
             pushMobileTextToEngine(ctrl);
-            awaitingTabFocus = true;
+            if (!isMultiline) beginTabFocusWait();
             module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
             event.preventDefault();
           } else if (event.key === 'Escape') {
@@ -483,9 +526,21 @@
         let lastTouchNextMs = 0;
         const triggerNext = () => {
           if (!active) return;
+          const isMulti = !!(currentMeta && currentMeta.multiline);
+          const fromId = currentMeta && typeof currentMeta.id === 'string' ? currentMeta.id : '';
+          composing = false;
           pushMobileTextToEngine();
-          awaitingTabFocus = true;
-          module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
+          if (!isMulti) beginTabFocusWait();
+          let switchedViaDirectApi = false;
+          if (!isMulti && typeof module.ccall === 'function') {
+            try {
+              module.ccall('astra_browser_next_text_edit', null, ['string'], [fromId]);
+              switchedViaDirectApi = true;
+            } catch (_) {}
+          }
+          if (!switchedViaDirectApi) {
+            module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
+          }
           const ctrl = getActiveControl(currentMeta);
           if (ctrl) {
             try { ctrl.focus({ preventScroll: true }); } catch (_) {}

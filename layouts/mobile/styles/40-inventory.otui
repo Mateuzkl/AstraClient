@@ -1,11 +1,12 @@
-// Clean-room Mobile Obsidian + Gold Inventory & Equipment Window.
+// Clean-room Translucent Dark-Charcoal Floating Equipment Panel matching Image 2.
 InventoryItem < Item
-  background-color: #090e1ad8
+  size: 34 34
+  background-color: #14171cc4
   border-width: 1
-  border-color: #ffffff28
+  border-color: #545b66aa
   $on:
     image-source: /images/ui/item-blessed
-    border-color: #f0be4acc
+    border-color: #d6cca8dd
 
 HeadSlot < InventoryItem
   id: slot1
@@ -79,49 +80,38 @@ AmmoSlot < InventoryItem
 
 PurseButton < UIButton
   id: purseButton
-  size: 36 16
-  !tooltip: tr('Open purse')
+  size: 34 14
   icon-source: /images/game/slots/purse
   icon-clip: 0 0 34 12
-  background-color: #101728cc
+  background-color: #16191ecc
   border-width: 1
-  border-color: #e8b83e66
-
+  border-color: #585e6aaa
   $on:
     icon-clip: 0 12 34 12
-    border-color: #ffd96a
-
   $pressed:
     icon-clip: 0 12 34 12
 
 CombatBox < UICheckBox
-  size: 26 26
+  size: 20 20
   image-clip: 0 0 20 20
-  margin-left: 4
-  border-width: 1
-  border-color: #ffffff28
-
-  $checked:
-    image-clip: 0 20 20 20
-    border-color: #f0be4ae6
+  visible: false
 
 InventoryButton < Button
   font: mobile-hud-12
-  height: 24
-  margin-top: 3
-  text-align: center
+  height: 22
+  visible: false
 
 SoulCapLabel < GameLabel
   text-align: center
-  color: #f3eedc
+  color: #edf0f5
   font: mobile-hud-12
-  margin-top: 4
-  text-offset: 0 2
-  width: 38
-  height: 20
-  background-color: #090e1ad8
+  margin-top: 2
+  text-offset: 0 1
+  width: 36
+  height: 18
+  background-color: #101318cc
   border-width: 1
-  border-color: #ffffff24
+  border-color: #4c525caa
 
 FightOffensiveBox < CombatBox
   image-source: /images/game/combatmodes/fightoffensive
@@ -133,17 +123,16 @@ ChaseModeBox < CombatBox
   image-source: /images/game/combatmodes/chasemode
 SafeFightBox < CombatBox
   image-source: /images/game/combatmodes/safefight
-
 MountButton < CombatBox
   image-source: /images/game/combatmodes/mount
 
 InventoryWindow < MiniWindow
-  icon: /images/mobile_ui/icon_bag
-  height: 242
-  width: 222
+  icon: /images/mobile_ui/icon_equip
+  height: 178
+  width: 128
   id: inventoryWindow
   @onClose: modules.game_inventory.onMiniWindowClose()
-  &save: true
+  &save: false
   &autoOpen: 3
 
   MiniWindowContents
@@ -151,163 +140,115 @@ InventoryWindow < MiniWindow
 
     Panel
       id: inventoryPanel
-      margin-right: 74
-      margin-top: 2
       anchors.fill: parent
+      margin: 2
 
       HeadSlot
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
+        margin-top: 2
 
       BodySlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       LegSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       FeetSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       NeckSlot
         anchors.top: slot1.top
         anchors.right: slot1.left
-        margin-top: 14
-        margin-right: 5
+        margin-top: 10
+        margin-right: 4
 
       LeftSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       FingerSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       BackSlot
         anchors.top: slot1.top
         anchors.left: slot1.right
-        margin-top: 14
-        margin-left: 5
+        margin-top: 10
+        margin-left: 4
 
       RightSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       AmmoSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 4
+        margin-top: 3
 
       SoulCapLabel
         id: soulLabel
-        anchors.top: slot10.bottom
-        anchors.horizontalCenter: slot10.horizontalCenter
+        anchors.top: slot9.bottom
+        anchors.horizontalCenter: slot9.horizontalCenter
 
       SoulCapLabel
         id: capLabel
-        anchors.top: slot9.bottom
-        anchors.horizontalCenter: slot9.horizontalCenter
+        anchors.top: slot10.bottom
+        anchors.horizontalCenter: slot10.horizontalCenter
 
       PurseButton
         anchors.left: slot3.left
         anchors.bottom: slot3.top
-        margin-bottom: 3
+        margin-bottom: 1
 
       Panel
         id: conditionPanel
-        layout:
-          type: horizontalBox
-        height: 22
-        padding: 2
-        anchors.top: slot8.bottom
-        anchors.left: slot6.left
-        anchors.right: slot5.right
-        margin-top: 5
-        border-width: 1
-        border-color: #e8b83e44
-        background-color: #070b14cc
+        size: 1 1
+        visible: false
 
     Panel
-      margin-top: 4
-      anchors.fill: parent
-      anchors.left: prev.right
+      size: 1 1
+      visible: false
 
       FightOffensiveBox
         id: fightOffensiveBox
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 4
-
       ChaseModeBox
         id: chaseModeBox
-        anchors.left: prev.right
-        anchors.top: parent.top
-
+      ChaseModeBox
+        id: chaseModeBoxStand
+      ChaseModeBox
+        id: chaseModeBoxChase
       FightBalancedBox
         id: fightBalancedBox
-        margin-top: 28
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 4
-
       SafeFightBox
         id: safeFightBox
-        margin-top: 28
-        anchors.left: prev.right
-        anchors.top: parent.top
-
       FightDefensiveBox
         id: fightDefensiveBox
-        margin-top: 56
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 4
-
       MountButton
         id: mountButton
-        margin-top: 56
-        anchors.left: prev.right
-        anchors.top: parent.top
-
+      Panel
+        id: pvpModesPanel
+        visible: false
+        UICheckBox
+          id: doveMode
+        UICheckBox
+          id: whiteMode
+        UICheckBox
+          id: yellowMode
+        UICheckBox
+          id: redMode
+      UIButton
+        id: openPvpButton
+        visible: false
       Panel
         id: buttonsPanel
-        margin-top: 6
-        margin-right: 4
-        anchors.fill: parent
-        anchors.top: prev.bottom
-        layout:
-          type: verticalBox
-
-        UIButton
-          id: buttonPvp
-          height: 22
-          icon: /images/game/combatmodes/pvp
-          icon-clip: 0 0 42 20
-
-          $on:
-            icon-clip: 0 20 42 20
-
-        InventoryButton
-          !text: tr('Stop')
-          @onClick: g_game.stop(); g_game.cancelAttackAndFollow()
-
-        InventoryButton
-          !text: tr('Options')
-          @onClick: modules.client_options.toggle()
-
-        InventoryButton
-          !text: tr('Quests')
-          @onClick: g_game.requestQuestLog()
-
-        InventoryButton
-          !text: tr('Logout')
-          @onClick: modules.game_interface.tryLogout()
+        visible: false

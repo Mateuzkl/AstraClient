@@ -2144,7 +2144,9 @@ function onApplyControlButtons()
   Options.updateControlButtons("enabledButtons", activeButtons)
   Options.updateControlButtons("disabledButtons", hideButtons)
   Options.saveData()
-  modules.game_sidebuttons.updateSideButtons()
+  if modules.game_sidebuttons and modules.game_sidebuttons.updateSideButtons then
+    modules.game_sidebuttons.updateSideButtons()
+  end
 end
 
 function resetControl()
@@ -2160,7 +2162,9 @@ function resetControl()
   yesCallback = function()
     Options.resetControlButtons()
     displayControlButtons()
-    modules.game_sidebuttons.updateSideButtons()
+    if modules.game_sidebuttons and modules.game_sidebuttons.updateSideButtons then
+      modules.game_sidebuttons.updateSideButtons()
+    end
     optionsWindow:show(true)
     g_client.setInputLockWidget(optionsWindow)
     if resetWindow then

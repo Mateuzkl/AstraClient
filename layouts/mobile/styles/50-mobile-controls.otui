@@ -1,172 +1,146 @@
-// Clean-room Mobile Obsidian + Brushed Gold HUD, Action Arc, Login & Stage Controls.
-
-MobileGoldButton < UIButton
-  font: mobile-btn-15
-  color: #261404
-  text-align: center
-  image-source: /images/mobile_ui/btn_gold
-  image-clip: 0 0 180 48
-  image-border: 12
-  image-smooth: true
+// Clean-room Classic Dark-Charcoal / Translucent Slate Mobile Controls Style Kit.
+MobileDarkPanel < Panel
+  image-source: /images/mobile_ui/panel_dark
+  image-border: 6
   focusable: false
+
+MobileWindowPanel < Panel
+  image-source: /images/mobile_ui/panel_window
+  image-border: 8
+  image-border-top: 26
+  image-border-bottom: 8
+  focusable: false
+
+MobilePrimaryButton < UIButton
+  font: mobile-btn-15
+  color: #f4faf2
+  text-align: center
+  image-source: /images/mobile_ui/btn_primary
+  image-clip: 0 0 180 48
+  image-border: 8
+  change-cursor-image: false
 
   $hover !disabled:
     image-clip: 0 48 180 48
-    color: #1c0e02
+    color: #ffffff
 
   $pressed:
     image-clip: 0 96 180 48
     text-offset: 0 1
 
-  $disabled:
-    opacity: 0.55
-
 MobileDarkButton < UIButton
   font: mobile-hud-12
-  color: #f3eedc
+  color: #e8ecf2
   text-align: center
   image-source: /images/mobile_ui/btn_dark
   image-clip: 0 0 128 48
-  image-border: 10
-  image-smooth: true
-  focusable: false
+  image-border: 6
+  change-cursor-image: false
 
   $hover !disabled:
     image-clip: 0 48 128 48
-    color: #ffd96a
+    color: #ffffff
+
+  $checked:
+    image-clip: 0 48 128 48
+    color: #f5ebbd
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f5ebbd
 
   $pressed:
     image-clip: 0 96 128 48
     text-offset: 0 1
-    color: #ffd96a
 
-  $checked:
-    image-clip: 0 48 128 48
-    color: #ffd96a
+MobileToolbarBtn < MobileDarkButton
+  size: 30 30
+  icon-rect: 5 5 20 20
+  focusable: false
+
+MobileUtilBtn < MobileDarkButton
+  size: 38 38
+  icon-rect: 7 7 24 24
+  focusable: false
+
+MobileAttackBtn < UIButton
+  size: 38 38
+  icon-rect: 7 7 24 24
+  image-source: /images/mobile_ui/btn_attack
+  image-clip: 0 0 96 48
+  image-border: 6
+  focusable: false
+  change-cursor-image: false
+
+  $hover !disabled:
+    image-clip: 0 48 96 48
 
   $on:
-    image-clip: 0 48 128 48
-    color: #ffd96a
-
-  $disabled:
-    opacity: 0.5
-
-MobileIconButton < MobileDarkButton
-  size: 40 40
-  icon-rect: 8 8 24 24
-  opacity: 0.94
-
-MobileHudPill < MobileDarkButton
-  size: 56 32
-  padding: 2 8 2 8
-
-MobileActionButton < UIButton
-  size: 48 48
-  font: mobile-hud-12
-  color: #f7f4eb
-  text-align: bottom
-  text-offset: 0 -3
-  image-source: /images/mobile_ui/slot_frame
-  image-clip: 0 0 48 48
-  image-border: 8
-  image-smooth: true
-  icon-rect: 12 5 24 24
-  opacity: 0.94
-  focusable: false
-
-  $pressed:
-    image-clip: 48 0 48 48
-    color: #ffd96a
-    opacity: 1.0
+    image-clip: 0 48 96 48
 
   $checked:
-    image-clip: 48 0 48 48
-    color: #ffd96a
-    opacity: 1.0
-
-MobileAttackButton < UIButton
-  size: 60 60
-  font: mobile-hud-12
-  color: #fff6dc
-  text-align: bottom
-  text-offset: 0 -5
-  image-source: /images/mobile_ui/btn_crimson
-  image-clip: 0 0 96 48
-  image-border: 12
-  image-smooth: true
-  icon-source: /images/mobile_ui/icon_swords
-  icon-rect: 16 7 28 28
-  opacity: 0.96
-  focusable: false
+    image-clip: 0 48 96 48
 
   $pressed:
     image-clip: 0 96 96 48
-    text-offset: 0 -4
-    color: #ffd96a
-    opacity: 1.0
 
 MobileHotkeySlot < UIButton
-  size: 42 42
-  font: mobile-hud-12
-  color: #e6ecf8
-  text-align: center
-  image-source: /images/mobile_ui/slot_empty
-  image-border: 8
-  image-smooth: true
-  opacity: 0.92
+  size: 38 38
+  image-source: /images/mobile_ui/slot_frame
+  image-clip: 0 0 48 48
+  image-border: 6
   focusable: false
+  change-cursor-image: false
 
   $pressed:
-    image-source: /images/mobile_ui/slot_frame
     image-clip: 48 0 48 48
-    color: #ffd96a
-    opacity: 1.0
+
+  $checked:
+    image-clip: 48 0 48 48
 
   $on:
-    image-source: /images/mobile_ui/slot_frame
     image-clip: 48 0 48 48
-    color: #ffd96a
 
-MobileGlassPanel < UIWidget
-  image-source: /images/mobile_ui/panel_glass
-  image-border: 12
-  focusable: false
+MobileLoginInput < TextEdit
+  height: 38
+  font: mobile-input-14
+  padding: 8 40 6 10
 
-MobileGoldPanel < UIWidget
-  image-source: /images/mobile_ui/panel_gold
-  image-border: 12
-  focusable: false
+MobileLoginLabel < Label
+  font: mobile-hud-12
+  color: #cfd5df
+  text-auto-resize: true
+  phantom: true
 
-MobileDrawerPanel < MobileGoldPanel
-  padding: 12
-
-MobileDrawerRow < UIWidget
-  height: 34
-  margin-top: 4
-  focusable: false
+MobileSectionLabel < Label
+  font: mobile-hud-12
+  color: #cfd5df
+  text-align: left
   phantom: true
 
 MobileMenuTile < MobileDarkButton
-  size: 108 38
+  size: 112 34
   font: mobile-hud-12
   text-align: center
+  focusable: false
 
-MobileLoginInput < UITextEdit
-  height: 42
-  font: mobile-input-14
-  color: #f6f2e6
-  padding: 10 42 8 12
-  image-source: /images/mobile_ui/input_idle
-  image-border: 10
-  selection-color: #ffffff
-  selection-background-color: #2478d4cc
-  change-cursor-image: false
-
-  $focus:
-    image-source: /images/mobile_ui/input_focus
-
-MobileLoginLabel < UILabel
+MobileSettingsChip < UIButton
+  height: 32
   font: mobile-hud-12
-  color: #f6d475
-  text-auto-resize: true
-  phantom: true
+  color: #e4e8ee
+  text-align: center
+  image-source: /images/mobile_ui/btn_dark
+  image-clip: 0 0 128 48
+  image-border: 6
+  focusable: false
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f6ecbe
+
+  $checked:
+    image-clip: 0 48 128 48
+    color: #f6ecbe
+
+  $pressed:
+    image-clip: 0 96 128 48

@@ -1,7 +1,7 @@
 Font
   name: mobile-btn-15
   texture: mobile-btn-15
-  height: 23
-  glyph-size: 19 23
+  height: 22
+  glyph-size: 18 22
   space-width: 5
   spacing: 1 1

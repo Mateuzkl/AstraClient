@@ -43,10 +43,18 @@ function init()
 
   overlay = g_ui.createWidget('HealthOverlay', m_interface.getMapPanel())
   overlay:insertLuaCall("onGeometryChange")
-  overlay:show()
+  if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+    overlay:hide()
+  else
+    overlay:show()
+  end
 
   topHealthBar = overlay:getChildById('topHealthBar')
   topManaBar = overlay:getChildById('topManaBar')
+  if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+    if topHealthBar then topHealthBar:hide() end
+    if topManaBar then topManaBar:hide() end
+  end
 
   connect(overlay, { onGeometryChange = onOverlayGeometryChange })
 
@@ -76,6 +84,7 @@ function init()
 
   if g_app.isMobile() then
     healthInfoWindow:close()
+    healthInfoWindow:hide()
     if healthInfoButton then
       healthInfoButton:setOn(false)
     end
@@ -121,6 +130,12 @@ end
 
 function online()
   local benchmark = g_clock.millis()
+  if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+    if healthInfoWindow then healthInfoWindow:close(); healthInfoWindow:hide() end
+    if overlay then overlay:hide() end
+    if topHealthBar then topHealthBar:hide() end
+    if topManaBar then topManaBar:hide() end
+  end
   scheduleEvent(onStartGame, 100)
   consoleln("HealthInfo loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end

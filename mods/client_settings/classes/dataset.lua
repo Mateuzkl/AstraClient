@@ -693,10 +693,14 @@ return {
 	topHealtManaBar = {
 		value = true,
         apply = function(value)
-            if not g_app.isMobile() then return true end
+            if not g_app.isMobile() or (g_app.isMobileLite and g_app.isMobileLite()) then return true end
 
-            modules.game_healthinfo.topHealthBar:setVisible(value)
-            modules.game_healthinfo.topManaBar:setVisible(value)
+            if modules.game_healthinfo and modules.game_healthinfo.topHealthBar then
+              modules.game_healthinfo.topHealthBar:setVisible(value)
+            end
+            if modules.game_healthinfo and modules.game_healthinfo.topManaBar then
+              modules.game_healthinfo.topManaBar:setVisible(value)
+            end
             return true
         end,
 	},

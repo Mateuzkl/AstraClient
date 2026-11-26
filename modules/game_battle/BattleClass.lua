@@ -319,7 +319,9 @@ function BattleClass:registerInSideBars()
 		table.insert(configs.battleListFilters, "hideSummons")
   end
 
-	modules.game_sidebars.registerBattleWindow(tostring(self.window.bid - 1), configs)
+	if modules.game_sidebars and modules.game_sidebars.registerBattleWindow then
+		modules.game_sidebars.registerBattleWindow(tostring(self.window.bid - 1), configs)
+	end
 end
 
 function BattleClass:setName(newName)

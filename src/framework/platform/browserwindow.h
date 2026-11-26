@@ -61,6 +61,8 @@ class BrowserWindow final : public PlatformWindow
     void handlePaste(std::string text);
     void handleVirtualText(std::string text);
     void handleVirtualTextReplace(std::string expectedId, std::string text, int selStart, int selEnd);
+    void handleFocusTextEdit(std::string widgetId);
+    void handleNextTextEdit(std::string fromId);
     void handleVirtualKey(Fw::Key key);
     void handleVisibilityChange(bool visible);
     void handleViewportChanged();

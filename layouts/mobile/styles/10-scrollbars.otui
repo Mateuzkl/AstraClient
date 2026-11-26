@@ -1,70 +1,78 @@
-// Clean-room Obsidian + Gold Mobile ScrollBar override.
+// Clean-room Classic Dark-Charcoal Mobile Scrollbars.
+VerticalScrollBarSlider < UIButton
+  id: sliderButton
+  anchors.centerIn: parent
+  size: 12 40
+  background-color: #7c8492cc
+  border-width: 1
+  border-color: #aab2c0cc
+
+  $hover !disabled:
+    background-color: #a6aebccc
+
+  $pressed:
+    background-color: #d6cca8ee
+
 VerticalScrollBar < UIScrollBar
   orientation: vertical
-  width: 10
-  height: 48
+  width: 16
+  height: 60
   pixels-scroll: true
-  background-color: #070b1499
+  background-color: #0e1014b8
   border-width: 1
-  border-color: #ffffff1c
+  border-color: #484e58aa
 
   UIButton
     id: decrementButton
     anchors.top: parent.top
     anchors.left: parent.left
-    size: 10 0
+    size: 16 1
     visible: false
 
   UIButton
     id: incrementButton
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    size: 10 0
+    size: 16 1
     visible: false
 
-  UIButton
-    id: sliderButton
-    anchors.centerIn: parent
-    size: 8 28
-    minimum: 24
-    background-color: #c8a24aaa
-    border-width: 1
-    border-color: #f6d47588
+  VerticalScrollBarSlider
 
-    $pressed:
-      background-color: #f6d475ee
+HorizontalScrollBarSlider < UIButton
+  id: sliderButton
+  anchors.centerIn: parent
+  size: 40 12
+  background-color: #7c8492cc
+  border-width: 1
+  border-color: #aab2c0cc
+
+  $hover !disabled:
+    background-color: #a6aebccc
+
+  $pressed:
+    background-color: #d6cca8ee
 
 HorizontalScrollBar < UIScrollBar
   orientation: horizontal
-  width: 48
-  height: 10
+  height: 16
+  width: 60
   pixels-scroll: true
-  background-color: #070b1499
+  background-color: #0e1014b8
   border-width: 1
-  border-color: #ffffff1c
+  border-color: #484e58aa
 
   UIButton
     id: decrementButton
     anchors.top: parent.top
     anchors.left: parent.left
-    size: 0 10
+    size: 1 16
     visible: false
 
   UIButton
     id: incrementButton
     anchors.top: parent.top
     anchors.right: parent.right
-    size: 0 10
+    size: 1 16
     visible: false
 
-  UIButton
-    id: sliderButton
-    anchors.centerIn: parent
-    size: 28 8
-    minimum: 24
-    background-color: #c8a24aaa
-    border-width: 1
-    border-color: #f6d47588
-
-    $pressed:
-      background-color: #f6d475ee
+  HorizontalScrollBarSlider

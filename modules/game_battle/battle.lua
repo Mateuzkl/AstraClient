@@ -132,13 +132,17 @@ function toggle()
   local mainBattle = getMainBattle().window
   if mainBattle:isVisible() then
     mainBattle:close()
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
+    end
   else
     if not mainBattle:getParent() then
       m_interface.getRightPanel():addChild(mainBattle)
     end
     mainBattle:open()
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
+    end
   end
 end
 
@@ -153,7 +157,9 @@ function open()
     m_interface.getRightPanel():addChild(mainBattle)
   end
   mainBattle:open()
-  modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
+  if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+    modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
+  end
 end
 
 function onMiniWindowClose(window)

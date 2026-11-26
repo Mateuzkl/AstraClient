@@ -1,0 +1,221 @@
+// Dedicated independent Web Mobile Lite Game Interface (selected ONLY when g_app.isMobileLite()).
+// Desktop Full and Native Android continue using gameinterface.otui unchanged.
+
+GameSidePanel < UIMiniWindowContainer
+  background-color: alpha
+  border-width: 0
+  padding: 0
+  margin: 0
+  width: 174
+  focusable: false
+  phantom: true
+  on: true
+  layout:
+    type: verticalBox
+    spacing: 3
+
+GameMapPanel < UIGameMap
+  padding: 0
+  margin: 0
+  border-width: 0
+  background-color: #000000
+
+UIWidget
+  id: gameRootPanel
+  anchors.fill: parent
+  background-color: #000000
+
+  // 100% full-viewport playable map (zero Desktop sidebars, splitters, or bottom reserves)
+  GameMapPanel
+    id: gameMapPanel
+    anchors.fill: parent
+    focusable: false
+
+    UIWidget
+      id: mapTemplate
+      anchors.fill: parent
+      phantom: true
+      focusable: false
+
+      UIWidget
+        id: prestigeGameInfoHUD
+        size: 0 0
+        visible: false
+        phantom: true
+      UIWidget
+        id: blinkWarningPanel
+        size: 0 0
+        visible: false
+        phantom: true
+      UIWidget
+        id: castInterfacePanel
+        anchors.fill: parent
+        visible: false
+        phantom: true
+      UIWidget
+        id: prestigeCountdownPanel
+        anchors.fill: parent
+        visible: false
+        phantom: true
+      UIWidget
+        id: searchingQueueMinWindow
+        size: 0 0
+        visible: false
+        phantom: true
+
+  // Floating transparent Top-Right column for open Containers / Backpacks directly over the map
+  Panel
+    id: gameRightPanels
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-top: 4
+    margin-right: 4
+    margin-bottom: 132
+    background-color: alpha
+    focusable: false
+    phantom: true
+    layout:
+      type: horizontalBox
+      fit-children: true
+      spacing: 2
+
+  // Floating transparent Left column (below top-left minimap) for on-demand Battle / Skills / VIP
+  Panel
+    id: gameLeftPanels
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-top: 122
+    margin-left: 4
+    margin-bottom: 152
+    background-color: alpha
+    focusable: false
+    phantom: true
+    layout:
+      type: horizontalBox
+      fit-children: true
+      spacing: 2
+
+  // On-demand floating semi-transparent Chat drawer (HIDDEN by default -> zero reserved black space)
+  Panel
+    id: gameBottomPanel
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 8
+    size: 400 132
+    visible: false
+    focusable: false
+
+  UIWidget
+    id: mouseGrabber
+    focusable: false
+    visible: false
+
+  // Hidden zero-size compatibility stubs (zero layout impact, zero hitboxes)
+  Panel
+    id: gameLeftActions
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  GameSidePanel
+    id: horizontalLeftPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  GameSidePanel
+    id: horizontalRightPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameLeftTopBar
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameRightTopBar
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameLeftActionPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameRightActionPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  UIWidget
+    id: lockLeftPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    Button
+      id: leftLock
+      size: 0 0
+      visible: false
+
+  UIWidget
+    id: lockRightPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    Button
+      id: rightLock
+      size: 0 0
+      visible: false
+
+  Splitter
+    id: bottomSplitter
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameBottomActionPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  UIWidget
+    id: lockPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    Button
+      id: bottomLock
+      size: 0 0
+      visible: false
+
+  Panel
+    id: gameBottomCooldownPanel
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false
+
+  Panel
+    id: gameTopBar
+    size: 0 0
+    visible: false
+    phantom: true
+    focusable: false

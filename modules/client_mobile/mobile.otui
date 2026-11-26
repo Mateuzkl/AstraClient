@@ -1,4 +1,50 @@
-// Clean-room Dedicated Mobile HUD, Floating Vitals, Target Bar, Joystick, MOBA Arc & Scrollable Settings.
+// Clean-room Classic Dark-Charcoal Mobile HUD, Joystick, Real Item/Spell Hotkey Grid & Combat Controls.
+// Faithfully organized over 100% full-screen map with zero Desktop chrome behind it.
+
+MobileRealHotkeySlot < MobileHotkeySlot
+  size: 38 38
+
+  UIItem
+    id: slotItem
+    size: 32 32
+    anchors.centerIn: parent
+    virtual: true
+    phantom: true
+    focusable: false
+    visible: false
+
+  UIWidget
+    id: slotSpell
+    size: 30 30
+    anchors.centerIn: parent
+    phantom: true
+    focusable: false
+    visible: false
+
+  Label
+    id: slotFallback
+    font: mobile-hud-12
+    color: #b4bcc8
+    anchors.centerIn: parent
+    text-align: center
+    phantom: true
+    focusable: false
+    text: ''
+
+  Label
+    id: slotCount
+    font: mobile-hud-12
+    color: #ffffff
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-bottom: 1
+    margin-right: 2
+    text-align: right
+    text-auto-resize: true
+    phantom: true
+    focusable: false
+    text: ''
+
 UIWidget
   anchors.fill: parent
   focusable: false
@@ -6,8 +52,8 @@ UIWidget
 
   UIProgressRect
     id: cursor
-    size: 56 56
-    background: #f0be4a
+    size: 52 52
+    background: #d6cca8
     percent: 100
     visible: false
     x: 0
@@ -16,35 +62,47 @@ UIWidget
     phantom: true
 
   // ---- Login / Character Select Top-Right Settings Icon ----
-  MobileIconButton
+  MobileToolbarBtn
     id: mobileLoginSettingsBtn
+    size: 34 34
+    icon-rect: 6 6 22 22
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 12
-    margin-right: 14
+    margin-top: 10
+    margin-right: 12
     icon-source: /images/mobile_ui/icon_settings
     visible: true
 
-  // ---- In-Game Top-Left Floating Vitals HUD (HP / MP / XP / Lv / Ping / FPS) ----
-  MobileGlassPanel
+  // ---- Top-Left-Center Compact Transparent Vitals HUD (right of 114x114 Minimap, NO box!) ----
+  UIWidget
     id: mobileVitalsHud
-    size: 196 74
+    size: 168 58
     anchors.top: parent.top
     anchors.left: parent.left
-    margin-top: 10
-    margin-left: 12
-    padding: 7 9 6 9
+    margin-top: 5
+    margin-left: 122
     visible: false
     phantom: true
+    focusable: false
+
+    UIWidget
+      id: hpIcon
+      size: 13 13
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 1
+      image-source: /images/mobile_ui/icon_heart
+      phantom: true
 
     UIWidget
       id: hpTrack
-      height: 16
+      size: 102 12
       anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: parent.right
+      anchors.left: hpIcon.right
+      margin-top: 1
+      margin-left: 4
       image-source: /images/mobile_ui/bar_track
-      image-border: 5
+      image-border: 2
       phantom: true
 
       UIWidget
@@ -52,30 +110,41 @@ UIWidget
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        width: 176
+        width: 100
         margin: 1
         image-source: /images/mobile_ui/bar_hp
-        image-border: 4
+        image-border: 2
         phantom: true
 
-      Label
-        id: hpLabel
-        font: mobile-hud-12
-        color: #ffffff
-        text-align: center
-        anchors.fill: parent
-        text: HP
-        phantom: true
+    Label
+      id: hpText
+      font: mobile-hud-12
+      color: #ffffff
+      anchors.verticalCenter: hpTrack.verticalCenter
+      anchors.left: hpTrack.right
+      margin-left: 4
+      text-auto-resize: true
+      text: '100'
+      phantom: true
+
+    UIWidget
+      id: mpIcon
+      size: 13 13
+      anchors.top: hpIcon.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      image-source: /images/mobile_ui/icon_mana
+      phantom: true
 
     UIWidget
       id: mpTrack
-      height: 16
+      size: 102 12
       anchors.top: hpTrack.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 4
+      anchors.left: mpIcon.right
+      margin-top: 5
+      margin-left: 4
       image-source: /images/mobile_ui/bar_track
-      image-border: 5
+      image-border: 2
       phantom: true
 
       UIWidget
@@ -83,30 +152,31 @@ UIWidget
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        width: 176
+        width: 100
         margin: 1
         image-source: /images/mobile_ui/bar_mp
-        image-border: 4
+        image-border: 2
         phantom: true
 
-      Label
-        id: mpLabel
-        font: mobile-hud-12
-        color: #ffffff
-        text-align: center
-        anchors.fill: parent
-        text: MP
-        phantom: true
+    Label
+      id: mpText
+      font: mobile-hud-12
+      color: #ffffff
+      anchors.verticalCenter: mpTrack.verticalCenter
+      anchors.left: mpTrack.right
+      margin-left: 4
+      text-auto-resize: true
+      text: '100'
+      phantom: true
 
     UIWidget
       id: xpTrack
-      height: 7
+      size: 102 5
       anchors.top: mpTrack.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
+      anchors.left: mpTrack.left
       margin-top: 4
       image-source: /images/mobile_ui/bar_track
-      image-border: 3
+      image-border: 2
       phantom: true
 
       UIWidget
@@ -114,86 +184,63 @@ UIWidget
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        width: 1
+        width: 0
         margin: 1
         image-source: /images/mobile_ui/bar_xp
-        image-border: 3
+        image-border: 1
         phantom: true
 
     Label
-      id: levelLabel
+      id: statsMetaLabel
       font: mobile-hud-12
-      color: #f6d475
-      text-align: left
-      text-auto-resize: true
+      color: #e4e8f0
       anchors.top: xpTrack.bottom
       anchors.left: parent.left
-      margin-top: 2
-      text: Lv. 1
-      phantom: true
-
-    Label
-      id: statusMetricsLabel
-      font: mobile-hud-12
-      color: #b7c4dc
-      text-align: right
+      margin-top: 1
       text-auto-resize: true
-      anchors.top: xpTrack.bottom
-      anchors.right: parent.right
-      margin-top: 2
-      text: 45 FPS
+      text: 'Lv.1'
       phantom: true
 
-  // ---- In-Game Top-Center Dynamic Target Bar ----
-  MobileGoldPanel
+  // ---- Dynamic Target Bar (visible ONLY when targeting a creature) ----
+  MobileDarkPanel
     id: mobileTargetBar
-    size: 210 52
+    size: 184 36
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 10
-    padding: 5 8 5 6
+    margin-top: 5
+    padding: 4 7 4 7
     visible: false
     phantom: true
 
-    UIWidget
-      id: targetPortraitBg
-      size: 40 40
+    Label
+      id: targetNameLabel
+      font: mobile-hud-12
+      color: #ff9c94
+      anchors.top: parent.top
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      image-source: /images/mobile_ui/slot_empty
-      image-border: 6
+      anchors.right: targetPctLabel.left
+      text-align: left
+      text: ''
       phantom: true
 
-      UICreature
-        id: targetCreature
-        anchors.fill: parent
-        margin: 3
-        animate: true
-        phantom: true
-
     Label
-      id: targetName
+      id: targetPctLabel
       font: mobile-hud-12
-      color: #ffe494
-      text-align: left
-      height: 16
+      color: #ffffff
       anchors.top: parent.top
-      anchors.left: targetPortraitBg.right
       anchors.right: parent.right
-      margin-left: 7
-      margin-top: 2
+      text-auto-resize: true
+      text: '100%'
       phantom: true
 
     UIWidget
       id: targetHpTrack
-      height: 16
+      height: 10
       anchors.bottom: parent.bottom
-      anchors.left: targetPortraitBg.right
+      anchors.left: parent.left
       anchors.right: parent.right
-      margin-left: 7
-      margin-bottom: 3
       image-source: /images/mobile_ui/bar_track
-      image-border: 4
+      image-border: 2
       phantom: true
 
       UIWidget
@@ -201,91 +248,72 @@ UIWidget
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        width: 140
+        width: 168
         margin: 1
         image-source: /images/mobile_ui/bar_hp
-        image-border: 4
+        image-border: 2
         phantom: true
 
-      Label
-        id: targetHpPercent
-        font: mobile-hud-12
-        color: #ffffff
-        text-align: center
-        anchors.fill: parent
-        text: 100%
-        phantom: true
-
-  // ---- In-Game Top-Right Quick Cluster (Map | Bag | Menu) ----
+  // ---- Top-Right 4-Icon Toolbar above Equipment (matches Image 2!) ----
   UIWidget
     id: mobileTopRightBar
-    size: 132 42
+    size: 128 32
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 10
-    margin-right: 12
+    margin-top: 4
+    margin-right: 182
     visible: false
     focusable: false
     phantom: true
     layout:
       type: horizontalBox
-      spacing: 6
+      spacing: 2
 
-    MobileIconButton
-      id: topQuickMap
-      icon-source: /images/mobile_ui/icon_map
-      !tooltip: tr('Minimap')
-
-    MobileIconButton
-      id: topQuickBag
-      icon-source: /images/mobile_ui/icon_bag
-      !tooltip: tr('Inventory')
-
-    MobileIconButton
+    MobileToolbarBtn
       id: topMenuToggle
       icon-source: /images/mobile_ui/icon_menu
-      !tooltip: tr('Menu')
 
-  // ---- Collapsible 2-Column Obsidian-Gold Menu Grid ----
-  MobileGoldPanel
+    MobileToolbarBtn
+      id: topLockBtn
+      icon-source: /images/mobile_ui/icon_lock
+
+    MobileToolbarBtn
+      id: topSettingsBtn
+      icon-source: /images/mobile_ui/icon_settings
+
+    MobileToolbarBtn
+      id: topEquipToggle
+      icon-source: /images/mobile_ui/icon_equip
+
+  // ---- Collapsible Menu Popover (opens below Top-Right Toolbar) ----
+  MobileWindowPanel
     id: mobileMenuPanel
-    size: 242 254
+    size: 242 204
     anchors.top: mobileTopRightBar.bottom
     anchors.right: mobileTopRightBar.right
-    margin-top: 6
-    padding: 10
+    margin-top: 4
+    padding: 8
     visible: false
-    phantom: false
+    focusable: false
 
-    Label
-      id: menuHeader
-      !text: tr('MENU')
-      font: mobile-hud-12
-      color: #f6d475
-      text-align: center
-      height: 18
-      anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      phantom: true
-
-    Panel
+    UIWidget
       id: menuGrid
-      anchors.top: menuHeader.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      margin-top: 6
+      anchors.fill: parent
+      focusable: false
       phantom: true
       layout:
         type: grid
-        cell-size: 108 38
+        cell-size: 108 34
         cell-spacing: 6
         num-columns: 2
 
       MobileMenuTile
+        id: hudMinimap
+        !text: tr('Minimap')
+
+      MobileMenuTile
         id: hudInventory
-        !text: tr('Inventory')
+        !text: tr('Equipment')
 
       MobileMenuTile
         id: hudBattle
@@ -298,10 +326,6 @@ UIWidget
       MobileMenuTile
         id: hudVip
         !text: tr('VIP List')
-
-      MobileMenuTile
-        id: hudMinimap
-        !text: tr('Minimap')
 
       MobileMenuTile
         id: hudHotkeys
@@ -323,401 +347,425 @@ UIWidget
         id: hudLogout
         !text: tr('Logout')
 
-  // ---- Bottom-Left Obsidian-Gold Analog Joystick ----
+  // ---- Bottom-Left Classic Metallic-Charcoal Circular Analog Joystick ----
   UIWidget
     id: keypad
-    size: 152 152
+    size: 136 136
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    margin-left: 14
-    margin-bottom: 14
-    phantom: false
-    focusable: false
-    visible: false
+    margin-left: 10
+    margin-bottom: 8
     image-source: /images/mobile_ui/joystick_base
     image-smooth: true
-    image-fixed-ratio: true
+    visible: false
+    focusable: false
 
     UIWidget
       id: pointer
-      size: 52 52
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.horizontalCenter: parent.horizontalCenter
+      size: 56 56
+      anchors.centerIn: parent
       image-source: /images/mobile_ui/joystick_knob
       image-smooth: true
-      image-fixed-ratio: true
       phantom: true
       focusable: false
 
-  // ---- Quick Chat & Combat Stance beside Joystick ----
+  // ---- Utility Buttons right beside the Joystick (matches Image 2!) ----
   UIWidget
     id: leftQuickCluster
-    size: 92 44
+    size: 80 80
     anchors.bottom: parent.bottom
     anchors.left: keypad.right
-    margin-left: 10
-    margin-bottom: 16
+    margin-left: 8
+    margin-bottom: 8
     visible: false
     focusable: false
     phantom: true
-    layout:
-      type: horizontalBox
-      spacing: 6
-
-    MobileIconButton
-      id: quickChatBtn
-      size: 42 42
-      icon-source: /images/mobile_ui/icon_chat
-      icon-rect: 9 9 24 24
-      !tooltip: tr('Chat')
 
     MobileDarkButton
       id: quickStanceBtn
-      size: 42 42
+      size: 38 38
+      anchors.top: parent.top
+      anchors.left: parent.left
       font: mobile-hud-12
       text: BAL
-      !tooltip: tr('Combat Stance')
+      focusable: false
 
-  // ---- Bottom-Right MOBA Semicircular Action Arc + Paginated Hotkeys ----
+    MobileUtilBtn
+      id: quickEquipBtn
+      anchors.top: parent.top
+      anchors.left: quickStanceBtn.right
+      margin-left: 4
+      icon-source: /images/mobile_ui/icon_equip
+
+    MobileUtilBtn
+      id: quickBagBtn
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      icon-source: /images/mobile_ui/icon_bag
+
+    MobileUtilBtn
+      id: quickChatBtn
+      anchors.bottom: parent.bottom
+      anchors.left: quickBagBtn.right
+      margin-left: 4
+      icon-source: /images/mobile_ui/icon_chat
+
+  // ---- Bottom-Right Real Spell/Item Hotkey Grid + Combat Buttons (matches Image 2!) ----
   UIWidget
     id: rightControls
-    size: 266 174
+    size: 204 122
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    margin-right: 12
-    margin-bottom: 12
+    margin-right: 6
+    margin-bottom: 6
     visible: false
     focusable: false
     phantom: true
 
+    // Row 1 (top): [1/4 Page] + 3 Real Hotkey Slots (hk1..hk3)
     UIWidget
-      id: hotkeyRow
-      size: 266 42
+      id: hkRowTop
+      size: 162 38
       anchors.top: parent.top
       anchors.right: parent.right
       focusable: false
       phantom: true
       layout:
         type: horizontalBox
-        spacing: 4
+        spacing: 3
 
       MobileDarkButton
         id: hkPageBtn
-        size: 36 40
+        size: 38 38
         font: mobile-hud-12
-        color: #f6d475
-        text: 1/2
+        color: #f0e6bc
+        text: '1/4'
+        focusable: false
 
-      MobileHotkeySlot
+      MobileRealHotkeySlot
         id: hkSlot1
-        size: 36 40
-        text: F1
 
-      MobileHotkeySlot
+      MobileRealHotkeySlot
         id: hkSlot2
-        size: 36 40
-        text: F2
 
-      MobileHotkeySlot
+      MobileRealHotkeySlot
         id: hkSlot3
-        size: 36 40
-        text: F3
 
-      MobileHotkeySlot
-        id: hkSlot4
-        size: 36 40
-        text: F4
-
-      MobileHotkeySlot
-        id: hkSlot5
-        size: 36 40
-        text: F5
-
-      MobileHotkeySlot
-        id: hkSlot6
-        size: 36 40
-        text: F6
-
+    // Row 2 (middle): 4 Real Hotkey Slots (hk4..hk7)
     UIWidget
-      id: actionCluster
-      size: 184 124
+      id: hkRowMid
+      size: 162 38
+      anchors.top: hkRowTop.bottom
+      anchors.right: parent.right
+      margin-top: 3
+      focusable: false
+      phantom: true
+      layout:
+        type: horizontalBox
+        spacing: 3
+
+      MobileRealHotkeySlot
+        id: hkSlot4
+
+      MobileRealHotkeySlot
+        id: hkSlot5
+
+      MobileRealHotkeySlot
+        id: hkSlot6
+
+      MobileRealHotkeySlot
+        id: hkSlot7
+
+    // Row 3 (bottom corner): [? Look] [Turn] [Follow] [Use] [Attack]
+    UIWidget
+      id: combatRow
+      size: 204 38
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       focusable: false
       phantom: true
+      layout:
+        type: horizontalBox
+        spacing: 3
 
-      MobileAttackButton
-        id: btnAttack
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        text: ATK
-
-      MobileActionButton
-        id: btnUse
-        anchors.bottom: parent.bottom
-        anchors.right: btnAttack.left
-        margin-right: 8
-        margin-bottom: 2
-        icon-source: /images/mobile_ui/icon_use
-        text: USE
-
-      MobileActionButton
-        id: btnFollow
-        anchors.bottom: btnAttack.top
-        anchors.right: parent.right
-        margin-bottom: 8
-        margin-right: 4
-        icon-source: /images/mobile_ui/icon_follow
-        text: FLW
-
-      MobileActionButton
+      MobileUtilBtn
         id: btnLook
-        anchors.bottom: btnUse.top
-        anchors.right: btnFollow.left
-        margin-right: 8
-        margin-bottom: 8
         icon-source: /images/mobile_ui/icon_look
-        text: LOK
 
-      MobileActionButton
-        id: btnStop
-        size: 42 42
-        anchors.bottom: parent.bottom
-        anchors.right: btnUse.left
-        margin-right: 8
-        margin-bottom: 4
-        icon-source: /images/mobile_ui/icon_stop
-        icon-rect: 10 4 22 22
-        text: STP
+      MobileUtilBtn
+        id: btnTurn
+        icon-source: /images/mobile_ui/icon_turn
+
+      MobileUtilBtn
+        id: btnFollow
+        icon-source: /images/mobile_ui/icon_follow
+
+      MobileUtilBtn
+        id: btnUse
+        icon-source: /images/mobile_ui/icon_use
+
+      MobileAttackBtn
+        id: btnAttack
+        icon-source: /images/mobile_ui/icon_swords
 
   // ---- Viewport-Safe Scrollable Mobile Settings Drawer ----
-  MobileDrawerPanel
+  MobileWindowPanel
     id: mobileSettingsDrawer
-    size: 354 304
+    size: 372 306
     anchors.centerIn: parent
+    padding: 8 10 8 10
     visible: false
-    phantom: false
+    focusable: true
 
     Label
-      id: drawerTitle
-      !text: tr('MOBILE SETTINGS')
+      id: settingsTitle
       font: mobile-title-18
-      color: #f6d475
-      text-align: center
-      height: 24
+      color: #f0f2f6
+      !text: tr('Mobile Settings')
       anchors.top: parent.top
       anchors.left: parent.left
-      anchors.right: parent.right
+      anchors.right: settingsCloseBtn.left
+      margin-top: 0
+      text-align: center
       phantom: true
 
-    MobileIconButton
-      id: cfgCloseTop
-      size: 28 28
-      icon-source: /images/mobile_ui/icon_close
-      icon-rect: 6 6 16 16
+    MobileToolbarBtn
+      id: settingsCloseBtn
+      size: 26 26
+      icon-rect: 5 5 16 16
       anchors.top: parent.top
       anchors.right: parent.right
-
-    HorizontalSeparator
-      id: drawerDivider
-      anchors.top: drawerTitle.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 6
-
-    VerticalScrollBar
-      id: drawerScrollBar
-      anchors.top: drawerDivider.bottom
-      anchors.bottom: parent.bottom
-      anchors.right: parent.right
-      margin-top: 6
-      step: 36
-      pixels-scroll: true
+      icon-source: /images/mobile_ui/icon_close
 
     ScrollablePanel
-      id: drawerScroll
-      anchors.top: drawerDivider.bottom
+      id: settingsScroll
+      anchors.top: settingsCloseBtn.bottom
       anchors.bottom: parent.bottom
       anchors.left: parent.left
-      anchors.right: drawerScrollBar.left
-      margin-top: 6
+      anchors.right: settingsScrollBar.left
+      margin-top: 8
       margin-right: 4
-      vertical-scrollbar: drawerScrollBar
+      vertical-scrollbar: settingsScrollBar
       layout:
         type: verticalBox
-        spacing: 5
+        spacing: 8
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: Controls
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgScaleSm
-          size: 52 30
-          text: 0.8x
-        MobileHudPill
-          id: cfgScaleMd
-          size: 52 30
-          text: 1.0x
-        MobileHudPill
-          id: cfgScaleLg
-          size: 54 30
-          text: 1.25x
-        MobileHudPill
-          id: cfgScaleXl
-          size: 52 30
-          text: 1.5x
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Controls')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 4
+            fit-children: false
+          MobileSettingsChip
+            id: cfgScaleSm
+            width: 54
+            text: 0.8x
+          MobileSettingsChip
+            id: cfgScaleMd
+            width: 54
+            text: 1.0x
+          MobileSettingsChip
+            id: cfgScaleLg
+            width: 56
+            text: 1.25x
+          MobileSettingsChip
+            id: cfgScaleXl
+            width: 54
+            text: 1.5x
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: UI Scale
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgUiDown
-          size: 68 30
-          text: -
-        MobileHudPill
-          id: cfgUiAuto
-          size: 74 30
-          text: Auto
-        MobileHudPill
-          id: cfgUiUp
-          size: 68 30
-          text: +
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Joystick')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 6
+          MobileSettingsChip
+            id: cfgJoyLeft
+            width: 112
+            !text: tr('Left')
+          MobileSettingsChip
+            id: cfgJoyRight
+            width: 112
+            !text: tr('Right')
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: Joystick
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgStickLeft
-          size: 108 30
-          text: Left
-        MobileHudPill
-          id: cfgStickRight
-          size: 108 30
-          text: Right
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Map Zoom')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 6
+          MobileSettingsChip
+            id: cfgZoomIn
+            width: 72
+            !text: tr('Closer')
+          MobileSettingsChip
+            id: cfgZoomAuto
+            width: 72
+            !text: tr('Auto')
+          MobileSettingsChip
+            id: cfgZoomOut
+            width: 72
+            !text: tr('Wider')
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: FPS Cap
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgFps30
-          size: 68 30
-          text: 30
-        MobileHudPill
-          id: cfgFps45
-          size: 74 30
-          text: 45
-        MobileHudPill
-          id: cfgFps60
-          size: 68 30
-          text: 60
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('FPS Cap')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 6
+          MobileSettingsChip
+            id: cfgFps30
+            width: 72
+            text: 30
+          MobileSettingsChip
+            id: cfgFps45
+            width: 72
+            text: 45
+          MobileSettingsChip
+            id: cfgFps60
+            width: 72
+            text: 60
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: Quality
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgDpr10
-          size: 52 30
-          text: 1.0x
-        MobileHudPill
-          id: cfgDpr15
-          size: 52 30
-          text: 1.5x
-        MobileHudPill
-          id: cfgDpr175
-          size: 54 30
-          text: 1.75x
-        MobileHudPill
-          id: cfgDpr20
-          size: 52 30
-          text: 2.0x
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Quality')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 4
+          MobileSettingsChip
+            id: cfgDpr10
+            width: 54
+            text: 1.0x
+          MobileSettingsChip
+            id: cfgDpr15
+            width: 54
+            text: 1.5x
+          MobileSettingsChip
+            id: cfgDpr175
+            width: 56
+            text: 1.75x
+          MobileSettingsChip
+            id: cfgDpr20
+            width: 54
+            text: 2.0x
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: Effects
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgLights
-          size: 108 30
-          text: Lights: On
-        MobileHudPill
-          id: cfgFloorFade
-          size: 108 30
-          text: Fade: On
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Effects')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 6
+          MobileSettingsChip
+            id: cfgLights
+            width: 112
+            !text: tr('Lights: On')
+          MobileSettingsChip
+            id: cfgFade
+            width: 112
+            !text: tr('Fade: On')
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 5
-        Label
-          text: Web
-          font: mobile-hud-12
-          width: 74
-          color: #e6ecf8
-          text-align: left
-        MobileHudPill
-          id: cfgWebFull
-          size: 72 30
-          text: Fullscr
-        MobileHudPill
-          id: cfgWebDiag
-          size: 62 30
-          text: Diag
-        MobileHudPill
-          id: cfgWebDesktop
-          size: 76 30
-          text: Desktop
+      Panel
+        height: 32
+        phantom: true
+        MobileSectionLabel
+          !text: tr('Web')
+          width: 84
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+        Panel
+          anchors.left: prev.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          phantom: true
+          layout:
+            type: horizontalBox
+            spacing: 6
+          MobileSettingsChip
+            id: cfgWebFullscreen
+            width: 72
+            !text: tr('Fullscr')
+          MobileSettingsChip
+            id: cfgWebDiag
+            width: 72
+            !text: tr('Diag')
+          MobileSettingsChip
+            id: cfgWebDesktop
+            width: 72
+            !text: tr('Desktop')
 
-      MobileDrawerRow
-        layout:
-          type: horizontalBox
-          spacing: 6
-        MobileHudPill
-          id: cfgTrimCache
-          size: 162 30
-          text: Free Texture Cache
-        MobileGoldButton
-          id: cfgCloseDrawer
-          font: mobile-hud-12
-          size: 132 30
-          text: Done
+    VerticalScrollBar
+      id: settingsScrollBar
+      anchors.top: settingsCloseBtn.bottom
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      margin-top: 8
+      step: 36
+      pixels-scroll: true

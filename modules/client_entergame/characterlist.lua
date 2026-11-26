@@ -215,7 +215,9 @@ local function updateAutoReconnectButton()
   local enabled = g_settings.getBoolean('autoReconnect', false)
   autoReconnectButton:setOn(enabled)
   local status = enabled and 'On' or 'Off'
-  if GameEnterGameShowAppearance and not g_game.getFeature(GameEnterGameShowAppearance) then
+  if g_app and g_app.isMobile and g_app.isMobile() then
+    autoReconnectButton:setText('Reconnect: ' .. status)
+  elseif GameEnterGameShowAppearance and not g_game.getFeature(GameEnterGameShowAppearance) then
     autoReconnectButton:setText('Auto reconnect:\n ' .. status)
   else
     autoReconnectButton:setText('Auto reconnect: ' .. status)
@@ -627,6 +629,10 @@ function CharacterList.terminate()
   CharacterList = nil
 end
 
+local function isMobileCharWindow()
+  return charactersWindow and (charactersWindow:recursiveGetChildById('heroStageColumn') ~= nil or charactersWindow.mobileStage ~= nil)
+end
+
 function CharacterList.create(characters, account, otui)
   removeAutoReconnectEvent()
   if not otui then otui = (g_app and g_app.isMobile and g_app.isMobile()) and 'characterlist_mobile' or 'characterlist' end
@@ -635,9 +641,9 @@ function CharacterList.create(characters, account, otui)
   end
 
   charactersWindow = g_ui.displayUI(otui)
-  characterList = charactersWindow:getChildById('characters')
-  panelSort = charactersWindow:getChildById('characterTable')
-  autoReconnectButton = charactersWindow:getChildById('autoReconnect')
+  characterList = charactersWindow:recursiveGetChildById('characters')
+  panelSort = charactersWindow:recursiveGetChildById('characterTable')
+  autoReconnectButton = charactersWindow:recursiveGetChildById('autoReconnect')
   updateAutoReconnectButton()
   if charactersWindow.recordPanel then
     CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
@@ -657,10 +663,12 @@ function CharacterList.create(characters, account, otui)
   if showOutfit == nil then
     showOutfit = true
   end
-  if not showOutfit then
-    charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
-  else
-    charactersWindow.characterTable.characterSort:setTextOffset("-73 0")
+  if panelSort and panelSort.characterSort then
+    if not showOutfit then
+      panelSort.characterSort:setTextOffset("-206 0")
+    else
+      panelSort.characterSort:setTextOffset("-73 0")
+    end
   end
 
   local outfitCheckBox = charactersWindow:recursiveGetChildById('checkBoxOutfit')
@@ -680,26 +688,30 @@ function CharacterList.create(characters, account, otui)
     status = tr(' (Suspended)')
   end
 
-  local accountStatusLabel = charactersWindow:getChildById('accountStatusLabel')
-  accountStatusLabel:setImageShader("")
-  if account.subStatus == SubscriptionStatus.Free and account.premDays < 1 then
-    accountStatusLabel:setText(('%s%s'):format(tr('Free Account'), status))
-    charactersWindow.accountStatusIcon:setImageSource("/images/game/entergame/nopremium")
-  else
-    if account.premDays == 0 or account.premDays == 65535 then
-      accountStatusLabel:setText(('%s%s'):format(tr('VIP Account (Free days left)', account.premDays), status))
-      charactersWindow.accountStatusIcon:setImageSource("/images/game/entergame/premium")
+  local accountStatusLabel = charactersWindow:recursiveGetChildById('accountStatusLabel')
+  local accountStatusIcon = charactersWindow:recursiveGetChildById('accountStatusIcon')
+  local compactStatus = isMobileCharWindow()
+  if accountStatusLabel then
+    accountStatusLabel:setImageShader("")
+    if account.subStatus == SubscriptionStatus.Free and account.premDays < 1 then
+      accountStatusLabel:setText(('%s%s'):format(tr(compactStatus and 'Free' or 'Free Account'), status))
+      if accountStatusIcon then accountStatusIcon:setImageSource("/images/game/entergame/nopremium") end
     else
-      accountStatusLabel:setText(('%s%s'):format(tr('VIP Account (%s days left)', account.premDays), status))
-      accountStatusLabel:setImageShader("text_green")
-      charactersWindow.accountStatusIcon:setImageSource("/images/game/entergame/premium")
+      if account.premDays == 0 or account.premDays == 65535 then
+        accountStatusLabel:setText(('%s%s'):format(tr(compactStatus and 'VIP (Free)' or 'VIP Account (Free days left)', account.premDays), status))
+        if accountStatusIcon then accountStatusIcon:setImageSource("/images/game/entergame/premium") end
+      else
+        accountStatusLabel:setText(('%s%s'):format(tr(compactStatus and 'VIP (%sd)' or 'VIP Account (%s days left)', account.premDays), status))
+        accountStatusLabel:setImageShader("text_green")
+        if accountStatusIcon then accountStatusIcon:setImageSource("/images/game/entergame/premium") end
+      end
     end
-  end
 
-  if account.premDays > 0 and account.premDays <= 7 then
-    accountStatusLabel:setOn(true)
-  else
-    accountStatusLabel:setOn(false)
+    if account.premDays > 0 and account.premDays <= 7 then
+      accountStatusLabel:setOn(true)
+    else
+      accountStatusLabel:setOn(false)
+    end
   end
 end
 
@@ -875,18 +887,27 @@ function CharacterList.cancelWait()
 end
 
 local function updateMobileHeroStage(row)
-  if not charactersWindow or not charactersWindow.mobileStage or not row then return end
-  local stageName = charactersWindow:recursiveGetChildById('stageName')
-  local stageDetails = charactersWindow:recursiveGetChildById('stageDetails')
+  if not charactersWindow or not row then return end
+  local stageName = charactersWindow:recursiveGetChildById('mobileHeroName') or charactersWindow:recursiveGetChildById('stageName')
+  local stageMeta = charactersWindow:recursiveGetChildById('mobileHeroMeta') or charactersWindow:recursiveGetChildById('stageDetails')
   local stageWorldLabel = charactersWindow:recursiveGetChildById('stageWorldLabel')
-  local stageCreature = charactersWindow:recursiveGetChildById('stageCreature')
+  local stageCreature = charactersWindow:recursiveGetChildById('mobileHeroOutfit') or charactersWindow:recursiveGetChildById('stageCreature')
   if stageName then
     stageName:setText(tostring(row.characterName or ''))
   end
-  if stageDetails then
-    local lvl = row.characterLevel and ('Level ' .. tostring(row.characterLevel)) or ''
-    local voc = tostring(row.vocationName or '')
-    stageDetails:setText(lvl ~= '' and voc ~= '' and (lvl .. ' - ' .. voc) or (lvl .. voc))
+  if stageMeta then
+    local parts = {}
+    if row.characterLevel and tonumber(row.characterLevel) and tonumber(row.characterLevel) > 0 then
+      parts[#parts + 1] = 'Lv.' .. tostring(row.characterLevel)
+    end
+    if row.vocationName and tostring(row.vocationName) ~= '' then
+      parts[#parts + 1] = tostring(row.vocationName)
+    end
+    local wName = tostring(row.gameworldName or row.worldName or '')
+    if wName ~= '' and not stageWorldLabel then
+      parts[#parts + 1] = wName
+    end
+    stageMeta:setText(table.concat(parts, ' - '))
   end
   if stageWorldLabel then
     stageWorldLabel:setText(tostring(row.gameworldName or row.worldName or ''))
@@ -899,26 +920,30 @@ local function updateMobileHeroStage(row)
   end
 end
 
+CharacterList.updateMobileHeroStage = updateMobileHeroStage
+
 function onUpdateOnStates(self)
   if not self:isFocused() then
     return
   end
 
-  if charactersWindow and charactersWindow.mobileStage then
-    self:setBackgroundColor("#e8b83e2e")
-    self:setBorderColor("#f0be4ae6")
-    if self.name then self.name:setColor("#ffffff") end
-    if self.level then self.level:setColor("#ffd96a") end
-    if self.vocation then self.vocation:setColor("#eef2ff") end
+  if isMobileCharWindow() then
+    self:setBackgroundColor("#2c313ce8")
+    self:setBorderColor("#d6cca8ee")
+    local nameLbl = self:getChildById('name')
+    local worldLbl = self:getChildById('worldName')
+    if nameLbl and nameLbl.setColor then nameLbl:setColor("#ffffff") end
+    if worldLbl and worldLbl.setColor then worldLbl:setColor("#d6dae4") end
     if self.pin then self.pin:setVisible(true) end
 
     if lastWidget and lastWidget ~= self then
-      lastWidget:setBackgroundColor(lastWidget.realColor or "#0b111ecc")
-      lastWidget:setBorderColor("#ffffff1f")
+      lastWidget:setBackgroundColor(lastWidget.realColor or "#16191ecc")
+      lastWidget:setBorderColor("#464c5699")
       if lastWidget.pin then lastWidget.pin:setVisible(false) end
-      if lastWidget.name then lastWidget.name:setColor("#f3eedc") end
-      if lastWidget.level then lastWidget.level:setColor("#f0c85c") end
-      if lastWidget.vocation then lastWidget.vocation:setColor("#b7c2d6") end
+      local prevName = lastWidget:getChildById('name')
+      local prevWorld = lastWidget:getChildById('worldName')
+      if prevName and prevName.setColor then prevName:setColor("#eef0f5") end
+      if prevWorld and prevWorld.setColor then prevWorld:setColor("#a8b0be") end
     end
     lastWidget = self
     updateMobileHeroStage(self)
@@ -999,8 +1024,8 @@ function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverri
   local firstWidget
   for i, characterInfo in ipairs(characters) do
     local widget = g_ui.createWidget(showOutfit and 'CharacterWidgetOn' or 'CharacterWidgetOff', characterList)
-    if charactersWindow and charactersWindow.mobileStage then
-      widget.realColor = i % 2 == 0 and '#0d1424cc' or '#090e1acc'
+    if isMobileCharWindow() then
+      widget.realColor = i % 2 == 0 and '#1a1e24cc' or '#14171ccc'
     else
       widget.realColor = i % 2 == 0 and '#414141' or '#484848'
     end
@@ -1013,10 +1038,12 @@ function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverri
       if key == 'name' then
         widget:setId('ui_' .. value)
       elseif key == 'mainCharacter' then
-        widget.main:setVisible(value)
+        if widget.main then widget.main:setVisible(value) end
       elseif key == 'dailyRewardState' then
-        local source = value and 'dailyreward_collected' or 'dailyreward_notcollected'
-        widget.statusDailyReward:setImageSource('/images/game/entergame/' .. source)
+        if widget.statusDailyReward then
+          local source = value and 'dailyreward_collected' or 'dailyreward_notcollected'
+          widget.statusDailyReward:setImageSource('/images/game/entergame/' .. source)
+        end
       end
 
       if subWidget then
@@ -1065,6 +1092,9 @@ function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverri
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
     characterList:ensureChildVisible(focusLabel)
+    if isMobileCharWindow() then
+      updateMobileHeroStage(focusLabel)
+    end
     local currentList = characterList
     local visibleName, visibleWorld = focusLabel.characterName, focusLabel.worldName
     addEvent(function()

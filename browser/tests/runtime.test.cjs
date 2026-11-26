@@ -276,11 +276,12 @@ test('mobile touch on synced text input rect synchronously focuses native input 
     { id: 'accountNameTextEdit', x: 200, y: 100, w: 180, h: 28, text: '', email: true, password: false, numeric: false, multiline: false, maxLen: 49 }
   ]));
 
-  // Tap directly on Email field -> bar opens, touchend prevents canvas focus steal, and mobileInput.focus() runs SYNCHRONOUSLY!
+  // Tap directly on Email field -> focuses widget in C++, opens bar, prevents canvas focus steal, and focuses mobileInput SYNCHRONOUSLY!
   let touchEndPrevented = 0;
   canvas.dispatch('touchstart', { changedTouches: [{ identifier: 1, clientX: 250, clientY: 134 }] });
   canvas.dispatch('touchend', { changedTouches: [{ identifier: 1, clientX: 252, clientY: 135 }], preventDefault() { touchEndPrevented++; } });
   assert.equal(touchEndPrevented, 1);
+  assert.deepEqual(calls[0], ['astra_browser_focus_text_edit', 'accountNameTextEdit']);
   assert.equal(bar.hidden, false);
   assert.equal(mobileInput.hidden, false);
   assert.equal(mobileTextarea.hidden, true);
@@ -289,14 +290,16 @@ test('mobile touch on synced text input rect synchronously focuses native input 
   assert.equal(mobileInput.inputMode, 'email');
   assert.equal(bar.style.bottom, '200px');
 
-  // Typing via Gboard/iOS IME calls astra_browser_set_text with expectedId + exact value + selection.
+  // Typing via Gboard/Android IME (even while compositionstart is active!) calls astra_browser_set_text with expectedId + exact value + selection.
+  mobileInput.dispatch('compositionstart', {});
   mobileInput.value = 'player@astra.gg';
   mobileInput.selectionStart = 15;
   mobileInput.selectionEnd = 15;
   mobileInput.dispatch('input', {});
-  assert.deepEqual(calls[0], ['astra_browser_set_text', 'accountNameTextEdit', 'player@astra.gg', 15, 15]);
+  assert.deepEqual(calls[1], ['astra_browser_set_text', 'accountNameTextEdit', 'player@astra.gg', 15, 15]);
+  mobileInput.dispatch('compositionend', {});
 
-  // Enter during IME composition must be ignored (does not send Enter or close bar).
+  // Enter during CJK IME composition must be ignored (does not send Enter or close bar).
   mobileInput.dispatch('keydown', { key: 'Enter', isComposing: true, preventDefault() {} });
   assert.equal(bar.hidden, false);
   assert.equal(calls.filter(c => c[0] === 'astra_browser_virtual_key' && c[1] === 13).length, 0);
@@ -305,28 +308,37 @@ test('mobile touch on synced text input rect synchronously focuses native input 
   api.showMobileKeyboard(JSON.stringify({ id: 'accountNameTextEdit', text: '', email: true }));
   assert.equal(mobileInput.value, 'player@astra.gg');
 
+  // Engine-normalized text echo (e.g. numeric field rejecting letters) immediately updates mobileInput.
+  api.syncFocusedTextInput(JSON.stringify({ id: 'accountNameTextEdit', text: 'player@astra.gg', selStart: 15, selEnd: 15, normalized: true }));
+  assert.equal(mobileInput.value, 'player@astra.gg');
+
   // C++ setCursorPos / setSelection updates caret even when text didn't change (after recent-input window).
   api.syncFocusedTextInput(JSON.stringify({ id: 'other', text: 'abcd', selStart: 4, selEnd: 4 }));
   api.syncFocusedTextInput(JSON.stringify({ id: 'other', text: 'abcd', selStart: 0, selEnd: 0 }));
   assert.equal(mobileInput.selectionStart, 0);
   assert.equal(mobileInput.selectionEnd, 0);
 
-  // Tapping Next via touch (touchend) sends Tab (key 9) and suppresses stale input until target widget switches.
+  // Tapping Next via touch (touchend) flushes text, asks C++ to advance focus, suppresses stale input until onVirtualTabProcessed fires.
   let nextTouchPrevented = 0;
   nextBtn.dispatch('touchend', { preventDefault() { nextTouchPrevented++; } });
   nextBtn.dispatch('click', {});
   assert.equal(nextTouchPrevented, 1);
-  assert.equal(calls.filter(c => c[0] === 'astra_browser_virtual_key' && c[1] === 9).length, 1);
+  assert.equal(calls.filter(c => c[0] === 'astra_browser_next_text_edit').length, 1);
   const countAfterNext = calls.length;
   mobileInput.value = 'stale-typing-before-tab';
   mobileInput.dispatch('input', {});
   assert.equal(calls.length, countAfterNext, 'Input typed after Next before Tab settles must not overwrite next widget');
+  api.onVirtualTabProcessed(JSON.stringify({ id: 'other', text: 'abcd', selStart: 4, selEnd: 4 }));
+  mobileInput.value = 'abcd2';
+  mobileInput.dispatch('input', {});
+  assert.equal(calls.length, countAfterNext + 1, 'onVirtualTabProcessed must unlock editing even when Tab stays on same widget');
 
-  // Multiline fields switch to <textarea> and preserve line breaks both ways.
+  // Multiline fields switch to <textarea>, preserve line breaks, and pressing Next never blocks subsequent edits.
   api.showMobileKeyboard(JSON.stringify({ id: 'bookText', text: 'Line 1\nLine 2', multiline: true, selStart: 13, selEnd: 13 }));
   assert.equal(mobileInput.hidden, true);
   assert.equal(mobileTextarea.hidden, false);
   assert.equal(mobileTextarea.value, 'Line 1\nLine 2');
+  nextBtn.dispatch('click', {});
   mobileTextarea.value = 'Line 1\nLine 2\nLine 3';
   mobileTextarea.selectionStart = 20;
   mobileTextarea.selectionEnd = 20;

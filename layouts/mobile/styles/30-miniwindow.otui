@@ -1,53 +1,49 @@
-// Sleek Obsidian + Gold Mobile MiniWindow overrides preserving all AstraClient child IDs.
+// Clean-room Translucent Dark-Charcoal Mobile MiniWindows (floating cleanly over full-screen map).
 MiniWindow < UIMiniWindow
   font: mobile-hud-12
-  color: #f3d988
-  icon-rect: 6 6 14 14
-  width: 212
-  height: 224
-  text-offset: 24 4
+  icon-rect: 5 3 16 16
+  width: 174
+  height: 186
+  text-offset: 24 3
   text-align: topLeft
-  image-source: /images/mobile_ui/panel_miniwindow
-  image-border: 10
-  image-border-top: 26
-  image-border-bottom: 10
+  image-source: /images/mobile_ui/panel_window
+  image-border: 8
+  image-border-top: 22
+  image-border-bottom: 6
   focusable: false
-  &minimizedHeight: 28
-  icon-offset-y: 0
+  color: #e6e9ef
+  &minimizedHeight: 24
 
   $on:
-    image-border-top: 26
-    image-border-bottom: 10
-    image-border: 10
+    image-border-bottom: 4
 
   UIWidget
     id: miniwindowTopBar
     anchors.top: parent.top
     anchors.right: parent.right
     anchors.left: parent.left
-    margin-right: 4
-    margin-left: 4
+    margin-right: 2
+    margin-left: 2
     margin-top: 2
-    height: 24
+    size: 168 20
     phantom: true
 
   UIButton
     id: closeButton
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 4
-    margin-right: 5
+    margin-top: 2
+    margin-right: 3
     size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 29 1 12 12
-    tooltip: Close this window
-    tooltip-delayed: true
-
+    icon-source: /images/mobile_ui/icon_close
+    icon-rect: 3 3 12 12
+    background-color: #242830cc
+    border-width: 1
+    border-color: #5c6370aa
     $hover:
-      image-clip: 29 15 12 12
-
+      background-color: #9e2d32dd
     $pressed:
-      image-clip: 29 29 12 12
+      background-color: #c2383eee
 
   UIButton
     id: minimizeButton
@@ -55,94 +51,14 @@ MiniWindow < UIMiniWindow
     anchors.right: closeButton.left
     margin-right: 3
     size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 1 1 12 12
-    tooltip: Maximise or minimise window
-    tooltip-delayed: true
-
-    $hover:
-      image-clip: 1 15 12 12
-
-    $pressed:
-      image-clip: 1 29 12 12
-
+    font: mobile-hud-12
+    color: #d6dae2
+    text: -
+    background-color: #242830cc
+    border-width: 1
+    border-color: #5c6370aa
     $on:
-      image-clip: 15 1 12 12
-
-    $on hover:
-      image-clip: 15 15 12 12
-
-    $on pressed:
-      image-clip: 15 29 12 12
-
-  UIButton
-    id: filterBattleButton
-    anchors.top: lockButton.top
-    anchors.right: lockButton.left
-    margin-right: 4
-    size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 99 1 12 12
-    $hover:
-      image-clip: 99 15 12 12
-    $pressed:
-      image-clip: 99 29 12 12
-    $on:
-      image-clip: 99 29 12 12
-
-  UIButton
-    id: redirectBattleButton
-    anchors.top: prev.top
-    anchors.right: prev.left
-    margin-right: 3
-    size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 57 1 12 12
-
-    $hover:
-      image-clip: 57 15 12 12
-
-    $pressed:
-      image-clip: 57 29 12 12
-
-    $on:
-      image-clip: 57 29 12 12
-
-  UIButton
-    id: extraBattleButton
-    anchors.top: prev.top
-    anchors.right: prev.left
-    margin-right: 3
-    size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 113 1 12 12
-
-    $hover:
-      image-clip: 113 15 12 12
-
-    $pressed:
-      image-clip: 113 29 12 12
-
-    $on:
-      image-clip: 113 29 12 12
-
-  UIButton
-    id: redirectButton
-    anchors.top: extraButton.top
-    anchors.right: extraButton.left
-    margin-right: 3
-    size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 57 1 12 12
-
-    $hover:
-      image-clip: 57 15 12 12
-
-    $pressed:
-      image-clip: 57 29 12 12
-
-    $on:
-      image-clip: 57 29 12 12
+      text: +
 
   UIButton
     id: lockButton
@@ -150,71 +66,31 @@ MiniWindow < UIMiniWindow
     anchors.right: minimizeButton.left
     margin-right: 3
     size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 71 1 12 12
-    tooltip: Lock or unlock window
-    tooltip-delayed: true
-
-    $hover:
-      image-clip: 71 15 12 12
-
-    $pressed:
-      image-clip: 71 29 12 12
-
-    $on:
-      image-clip: 85 1 12 12
-
-    $on hover:
-      image-clip: 85 15 12 12
-
-    $on pressed:
-      image-clip: 85 29 12 12
+    visible: false
 
   UIButton
-    id: extraButton
-    anchors.top: lockButton.top
-    anchors.right: lockButton.left
-    margin-right: 4
-    size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 113 1 12 12
-
-    $hover:
-      image-clip: 113 15 12 12
-
-    $pressed:
-      image-clip: 113 29 12 12
-
-    $on:
-      image-clip: 113 29 12 12
-
-  UIButton
-    id: filterContainer
-    anchors.top: lockButton.top
-    anchors.right: lockButton.left
+    id: upButton
+    anchors.top: minimizeButton.top
+    anchors.right: minimizeButton.left
     margin-right: 3
     size: 18 18
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 113 1 12 12
-
-    $hover:
-      image-clip: 113 15 12 12
-
-    $pressed:
-      image-clip: 113 29 12 12
-
-    $on:
-      image-clip: 113 29 12 12
+    font: mobile-hud-12
+    color: #e2e6ec
+    text: ^
+    background-color: #242830cc
+    border-width: 1
+    border-color: #5c6370aa
+    visible: false
 
   VerticalScrollBar
     id: miniwindowScrollBar
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    step: 22
-    margin-top: 26
-    margin-right: 4
-    margin-bottom: 6
+    step: 24
+    margin-top: 23
+    margin-right: 2
+    margin-bottom: 4
     pixels-scroll: true
 
     $!on:
@@ -225,20 +101,42 @@ MiniWindow < UIMiniWindow
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 8
-    minimum: 56
-    margin-left: 6
-    margin-right: 6
-    background: #e8b83e44
+    height: 4
+    minimum: 48
+    margin-left: 3
+    margin-right: 3
+    background: #ffffff22
+
+  UIWidget
+    id: miniborder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    size: 6 6
+    margin-left: 2
+    margin-bottom: 2
+    phantom: true
 
 MiniWindowContents < ScrollablePanel
   id: contentsPanel
   anchors.fill: parent
   anchors.right: miniwindowScrollBar.left
-  margin-left: 5
-  margin-bottom: 8
-  margin-top: 27
-  margin-right: 3
+  margin-left: 4
+  margin-bottom: 4
+  margin-top: 23
+  margin-right: 2
   vertical-scrollbar: miniwindowScrollBar
+  background-color: alpha
 
-HeadlessMiniWindow < MiniWindow
+MiniWindowHeader < Panel
+  id: miniwindowHeader
+  anchors.top: parent.top
+  anchors.left: parent.left
+  anchors.right: parent.right
+  margin-top: 22
+  margin-left: 4
+  margin-right: 4
+  background-color: #16191ecc
+
+BorderlessGameWindow < UIWindow
+  focusable: false
+  margin: 2

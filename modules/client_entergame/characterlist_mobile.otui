@@ -1,338 +1,296 @@
-// Clean-room Dedicated Mobile Character Selection Stage for AstraClient Web Mobile Lite.
+// Clean-room Classic Dark-Charcoal Dedicated Mobile Character Selection Screen.
 // Loaded ONLY when g_app.isMobile() (Desktop Full characterlist.otui is 100% untouched).
 
-CharacterWidgetOn < UIWidget
-  height: 56
-  background-color: #0b111ecc
+CharacterWidget < UIWidget
+  height: 54
+  background-color: #16191ecc
   border-width: 1
-  border-color: #ffffff1f
-  @onFocusChange: modules.client_entergame.onUpdateOnStates(self)
-  @onSetup: modules.client_entergame.onUpdateOnStates(self)
+  border-color: #464c5699
+  margin-bottom: 4
+  padding: 5
+  &updateOnStates: |
+    function(self)
+      local children = self:getChildren()
+      for i=1,#children do
+        children[i]:setOn(self:isFocused())
+      end
+    end
+  @onFocusChange: |
+    self:updateOnStates()
+    onUpdateOnStates(self)
+  @onSetup: self:updateOnStates()
+
+  $focus:
+    background-color: #2c313ce8
+    border-color: #d6cca8ee
 
   UICreature
     id: outfit
-    size: 48 48
-    anchors.verticalCenter: parent.verticalCenter
+    size: 42 42
     anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
     margin-left: 2
-    idle-animate: true
     phantom: true
 
   Label
     id: name
-    font: mobile-input-14
-    color: #f3eedc
+    font: mobile-btn-15
+    color: #eef0f5
     anchors.top: parent.top
     anchors.left: outfit.right
+    anchors.right: parent.right
     margin-left: 8
-    margin-top: 8
+    margin-top: 3
     text-align: left
-    text-auto-resize: true
     phantom: true
+    $on:
+      color: #ffffff
 
-  UIWidget
-    id: main
-    size: 9 8
-    anchors.verticalCenter: name.verticalCenter
-    anchors.left: name.right
-    margin-left: 5
-    image-source: /images/game/entergame/maincharacter
-    visible: false
+  Label
+    id: worldName
+    font: mobile-hud-12
+    color: #a8b0be
+    anchors.bottom: parent.bottom
+    anchors.left: outfit.right
+    anchors.right: parent.right
+    margin-left: 8
+    margin-bottom: 3
+    text-align: left
     phantom: true
 
   Label
     id: level
-    font: mobile-hud-12
-    color: #f0c85c
-    anchors.bottom: parent.bottom
-    anchors.left: outfit.right
-    margin-left: 8
-    margin-bottom: 8
-    text-align: left
-    text-auto-resize: true
+    size: 1 1
+    visible: false
     phantom: true
 
   Label
     id: vocation
-    font: mobile-hud-12
-    color: #b7c2d6
-    anchors.verticalCenter: level.verticalCenter
-    anchors.left: level.right
-    margin-left: 8
-    text-align: left
-    text-auto-resize: true
+    size: 1 1
+    visible: false
     phantom: true
 
   UIWidget
-    id: worldName
-    size: 1 1
-    visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
-    &baseText: '%s (%s)'
-
-  CheckBox
-    id: pin
-    size: 28 28
-    anchors.right: parent.right
-    anchors.verticalCenter: parent.verticalCenter
-    margin-right: 6
-    visible: false
-    @onCheckChange: onPinCharacter(self, self:isChecked())
-
-  Label
     id: statusDailyReward
     size: 1 1
     visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
+    phantom: true
 
-  Label
-    id: statusHidden
+  UIWidget
+    id: main
     size: 1 1
     visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
+    phantom: true
 
-CharacterWidgetOff < CharacterWidgetOn
+  UIWidget
+    id: hiddenCharacter
+    size: 1 1
+    visible: false
+    phantom: true
+
+  UIWidget
+    id: pin
+    size: 1 1
+    visible: false
+    phantom: true
+
+CharacterWidgetOn < CharacterWidget
+
+CharacterWidgetOff < CharacterWidget
 
 UIWindow
   id: charactersWindow
   anchors.fill: parent
   draggable: false
   phantom: true
-  visible: false
   color: alpha
-  &mobileStage: true
   @onEnter: CharacterList.doLogin()
   @onEscape: CharacterList.hide(true)
-  @onSetup: |
-    g_keyboard.bindKeyPress('Up', function() self:getChildById('characters'):focusPreviousChild(KeyboardFocusReason) end, self)
-    g_keyboard.bindKeyPress('Down', function() self:getChildById('characters'):focusNextChild(KeyboardFocusReason) end, self)
 
-  // ---- Left Sidebar: Translucent Obsidian Character List ----
-  MobileGlassPanel
-    id: charListSidebar
-    width: 308
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    anchors.left: parent.left
-    margin-top: 14
-    margin-bottom: 14
-    margin-left: 14
-    phantom: true
-
-  UILabel
-    id: charListTitle
-    !text: tr('SELECT CHARACTER')
-    font: mobile-title-18
-    color: #f6d475
-    text-auto-resize: true
-    anchors.top: charListSidebar.top
-    anchors.horizontalCenter: charListSidebar.horizontalCenter
-    margin-top: 10
-    phantom: true
-
-  HorizontalSeparator
-    id: charListDivider
-    anchors.top: charListTitle.bottom
-    anchors.left: charListSidebar.left
-    anchors.right: charListSidebar.right
-    margin-top: 6
-    margin-left: 14
-    margin-right: 14
-
-  VerticalScrollBar
-    id: characterListScrollBar
-    anchors.top: charListDivider.bottom
-    anchors.bottom: accountStatusLabel.top
-    anchors.right: charListSidebar.right
-    margin-top: 8
-    margin-bottom: 6
-    margin-right: 6
-    step: 58
-    pixels-scroll: true
-
-  TextList
-    id: characters
-    background-color: alpha
-    border-width: 0
+  MobileWindowPanel
+    id: charSelectCard
+    size: 620 296
+    anchors.centerIn: parent
     padding: 0
-    anchors.top: charListDivider.bottom
-    anchors.bottom: accountStatusLabel.top
-    anchors.left: charListSidebar.left
-    anchors.right: characterListScrollBar.left
-    margin-top: 8
-    margin-bottom: 6
-    margin-left: 10
-    margin-right: 4
-    focusable: false
-    vertical-scrollbar: characterListScrollBar
-    auto-focus: first
-    layout:
-      type: verticalBox
-      spacing: 5
 
-  Label
-    id: accountStatusLabel
-    !text: tr('Free Account')
-    font: mobile-hud-12
-    color: #d6deee
-    text-align: center
-    height: 18
-    anchors.left: charListSidebar.left
-    anchors.right: charListSidebar.right
-    anchors.bottom: autoReconnect.top
-    margin-left: 10
-    margin-right: 10
-    margin-bottom: 6
-    phantom: true
-    $on:
-      color: #ff7b72
-
-  MobileDarkButton
-    id: autoReconnect
-    height: 34
-    anchors.left: charListSidebar.left
-    anchors.right: charListSidebar.right
-    anchors.bottom: charListSidebar.bottom
-    margin-left: 12
-    margin-right: 12
-    margin-bottom: 10
-    @onClick: CharacterList.toggleAutoReconnect()
-
-  // ---- Center-Right Stage: Live 2x Hero Showcase + Pedestal + CTA ----
-  Panel
-    id: heroStagePanel
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    anchors.left: charListSidebar.right
-    anchors.right: parent.right
-    margin-left: 14
-    margin-right: 14
-    phantom: true
-    focusable: false
-
-    UILabel
-      id: stageName
+    Label
+      id: charListTitle
       font: mobile-title-18
-      color: #72f290
+      color: #eef0f5
+      !text: tr('Select Character')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 3
       text-auto-resize: true
-      anchors.bottom: stagePedestal.top
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-bottom: 62
       phantom: true
 
-    UIWidget
-      id: stagePedestal
-      size: 168 58
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 10
-      image-source: /images/mobile_ui/stage_pedestal
-      image-smooth: true
-      phantom: true
+    // Left Column: Scrollable Character List
+    Panel
+      id: charListColumn
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      width: 316
+      margin-top: 30
+      margin-bottom: 12
+      margin-left: 12
+      background-color: #0e1014c8
+      border-width: 1
+      border-color: #484e58aa
+      padding: 6
 
-    UICreature
-      id: stageCreature
-      size: 112 112
-      anchors.bottom: stagePedestal.verticalCenter
-      anchors.horizontalCenter: stagePedestal.horizontalCenter
-      margin-bottom: -14
-      animate: true
-      phantom: true
+      TextList
+        id: characters
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: characterListScrollBar.left
+        anchors.bottom: accountStatusCaption.top
+        margin-right: 4
+        margin-bottom: 6
+        background-color: alpha
+        border-width: 0
+        padding: 2
+        focusable: false
+        vertical-scrollbar: characterListScrollBar
+        auto-focus: first
 
-    UILabel
-      id: stageDetails
-      font: mobile-input-14
-      color: #f3eedc
-      text-auto-resize: true
-      anchors.top: stagePedestal.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 6
-      phantom: true
+      VerticalScrollBar
+        id: characterListScrollBar
+        anchors.top: parent.top
+        anchors.bottom: accountStatusCaption.top
+        anchors.right: parent.right
+        margin-bottom: 6
+        step: 28
+        pixels-scroll: true
 
-    MobileGlassPanel
-      id: stageWorldBadge
-      size: 186 28
-      anchors.top: stageDetails.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 8
-      phantom: true
-
-      UILabel
-        id: stageWorldLabel
+      Label
+        id: accountStatusCaption
         font: mobile-hud-12
-        color: #f6d475
-        anchors.fill: parent
+        color: #b4bcc8
+        !text: tr('Account Status:')
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        text-auto-resize: true
+
+      Label
+        id: accountStatusLabel
+        font: mobile-hud-12
+        color: #9be8a8
+        !text: tr('Free Account')
+        anchors.bottom: parent.bottom
+        anchors.left: accountStatusCaption.right
+        anchors.right: parent.right
+        margin-left: 6
+        text-align: left
+
+    // Right Column: Character Preview + Enter Game / Back
+    Panel
+      id: heroStageColumn
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: charListColumn.right
+      anchors.right: parent.right
+      margin-top: 30
+      margin-bottom: 12
+      margin-left: 10
+      margin-right: 12
+      background-color: #101318cc
+      border-width: 1
+      border-color: #484e58aa
+
+      UICreature
+        id: mobileHeroOutfit
+        size: 96 96
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        margin-top: 14
+        phantom: true
+
+      Label
+        id: mobileHeroName
+        font: mobile-title-18
+        color: #ffffff
+        text: ''
+        anchors.top: mobileHeroOutfit.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 6
         text-align: center
         phantom: true
 
-  MobileGoldButton
-    id: buttonOk
-    !text: tr('ENTER GAME')
-    size: 176 44
-    anchors.bottom: parent.bottom
-    anchors.right: heroStagePanel.horizontalCenter
-    margin-right: 6
-    margin-bottom: 24
-    @onClick: CharacterList.doLogin()
+      Label
+        id: mobileHeroMeta
+        font: mobile-hud-12
+        color: #b4bcc8
+        text: ''
+        anchors.top: mobileHeroName.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 3
+        text-align: center
+        phantom: true
 
-  MobileDarkButton
-    id: buttonCancel
-    !text: tr('Back')
-    font: mobile-btn-15
-    size: 116 44
-    anchors.bottom: parent.bottom
-    anchors.left: heroStagePanel.horizontalCenter
-    margin-left: 6
-    margin-bottom: 24
-    @onClick: CharacterList.hide(true)
+      MobilePrimaryButton
+        id: buttonOk
+        !text: tr('ENTER GAME')
+        height: 40
+        anchors.bottom: bottomActionsRow.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-left: 14
+        margin-right: 14
+        margin-bottom: 8
+        @onClick: CharacterList.doLogin()
 
-  // ---- Hidden desktop compatibility widgets required by characterlist.lua ----
-  Label
-    id: accountStatusIcon
-    size: 1 1
-    visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
+      Panel
+        id: bottomActionsRow
+        height: 34
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-left: 14
+        margin-right: 14
+        margin-bottom: 10
 
-  UIWidget
+        MobileDarkButton
+          id: buttonCancel
+          !text: tr('Back')
+          width: 78
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          @onClick: CharacterList.hide(true)
+
+        MobileDarkButton
+          id: autoReconnect
+          !text: tr('Reconnect: Off')
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: buttonCancel.right
+          anchors.right: parent.right
+          margin-left: 6
+          @onClick: CharacterList.toggleAutoReconnect()
+
+  // Hidden compatibility stubs required by characterlist.lua
+  Panel
     id: characterTable
     size: 1 1
     visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
-
     UIButton
       id: characterSort
-      size: 1 1
-      visible: false
     UIButton
       id: statusSort
-      size: 1 1
-      visible: false
     UIButton
       id: levelSort
-      size: 1 1
-      visible: false
     UIButton
       id: vocationSort
-      size: 1 1
-      visible: false
     UIButton
       id: worldSort
-      size: 1 1
-      visible: false
 
   Panel
     id: recordPanel
     size: 1 1
     visible: false
-    anchors.top: parent.top
-    anchors.left: parent.left
-
     CheckBox
       id: recordSession
-      size: 1 1
-      visible: false
+      checked: false
