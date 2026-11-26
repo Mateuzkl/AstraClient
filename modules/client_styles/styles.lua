@@ -24,6 +24,10 @@ function init()
     end)
     safeCall("load cursors", function()
         g_mouse.loadCursors('/data/cursors/cursors')
+        local layout = (g_resources.getLayout and g_resources.getLayout()) or ""
+        if layout:len() > 0 and g_resources.fileExists and g_resources.fileExists('/layouts/' .. layout .. '/cursors/cursors.otml') then
+            g_mouse.loadCursors('/layouts/' .. layout .. '/cursors/cursors')
+        end
     end)
 end
 
@@ -35,23 +39,46 @@ function importResources(dir, type)
     if not loader then
         return
     end
-    local path = '/' .. dir .. '/'
-    if not g_resources.directoryExists(path) then
-        return
-    end
 
-    local function importFrom(path)
-        local files = g_resources.listDirectoryFiles(path, true)
-        for _, file in pairs(files) do
-            if g_resources.isFileType(file, type) then
-                loader(file)
-            elseif g_resources.directoryExists(file) then
-                importFrom(file)
+    local function collectSorted(baseRoot)
+        local collected = {}
+        local function visit(currentDir)
+            if not g_resources.directoryExists(currentDir) then
+                return
+            end
+            local files = g_resources.listDirectoryFiles(currentDir, true, true)
+            for _, file in pairs(files) do
+                if g_resources.isFileType(file, type) then
+                    table.insert(collected, file)
+                elseif g_resources.directoryExists(file) then
+                    visit(file)
+                end
             end
         end
+        visit(baseRoot)
+        table.sort(collected)
+        return collected
     end
 
-    importFrom(path)
+    -- Prefer explicit /data/<dir>, falling back to /<dir>/ for mocked test environments.
+    local dataRoot = '/data/' .. dir
+    if not g_resources.directoryExists(dataRoot) then
+        dataRoot = '/' .. dir .. '/'
+    end
+
+    -- Load all base /data/<dir> files first, then apply all /layouts/<layout>/<dir>
+    -- overrides afterwards so layout definitions always take precedence regardless of filename.
+    for _, file in ipairs(collectSorted(dataRoot)) do
+        loader(file)
+    end
+
+    local layout = (g_resources.getLayout and g_resources.getLayout()) or ""
+    if layout:len() > 0 then
+        local layoutRoot = '/layouts/' .. layout .. '/' .. dir
+        for _, file in ipairs(collectSorted(layoutRoot)) do
+            loader(file)
+        end
+    end
 end
 
 function reloadParticles()

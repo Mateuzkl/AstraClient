@@ -4,7 +4,12 @@
 
 #include "platformwindow.h"
 
+#include <array>
+#include <atomic>
 #include <emscripten/html5.h>
+#include <vector>
+
+class UITextEdit;
 
 class BrowserWindow final : public PlatformWindow
 {
@@ -34,6 +39,7 @@ class BrowserWindow final : public PlatformWindow
     void setVerticalSync(bool enable) override;
     void setIcon(const std::string &iconFile) override;
     void setClipboardText(const std::string &text) override;
+    void setMaxPixelRatio(float maxRatio) override;
 
     Size getDisplaySize() override;
     std::string getClipboardText() override;
@@ -41,19 +47,56 @@ class BrowserWindow final : public PlatformWindow
 
     void showTextEditor(const std::string &title, const std::string &description, const std::string &text,
                         int flags) override;
+    void hideTextEditor() override;
+    void consumeTouchGesture() override;
+    void openWebProfile(const std::string &profile) override;
+    void toggleWebDiagnostics() override;
+    void requestWebFullscreen() override;
+
+    void onTextEditActivated(UITextEdit *edit);
+    void onTextEditFocusChanged(UITextEdit *edit, bool focused);
+    void onTextEditChanged(UITextEdit *edit);
+    void syncTextInputRects(bool force = false);
+
     void handlePaste(std::string text);
     void handleVirtualText(std::string text);
+    void handleVirtualTextReplace(std::string expectedId, std::string text, int selStart, int selEnd);
+    void handleFocusTextEdit(std::string widgetId);
+    void handleNextTextEdit(std::string fromId);
     void handleVirtualKey(Fw::Key key);
+    void handleVisibilityChange(bool visible);
+    void handleViewportChanged();
+    void handleContextLost(bool lost);
+    bool isContextLost() const { return m_contextLost.load(); }
 
   private:
+    struct TouchSample {
+        long identifier = -1;
+        double targetX = 0.0;
+        double targetY = 0.0;
+        bool isChanged = false;
+    };
+
+    struct TouchSlot {
+        bool active = false;
+        long identifier = -1;
+        Point startPos;
+        Point lastPos;
+        bool dragged = false;
+        bool consumed = false;
+        ticks_t pressTime = 0;
+    };
+
     int internalLoadMouseCursor(const ImagePtr &image, const Point &hotSpot) override;
     void installCallbacks();
     void removeCallbacks();
     void updateCanvasSize();
+    Point cssToWindowPos(double targetX, double targetY) const;
     void dispatchMouseButton(int eventType, const EmscriptenMouseEvent &event);
     void dispatchMouseMove(int targetX, int targetY);
     void dispatchWheel(double deltaY, int targetX, int targetY);
-    void dispatchTouch(int eventType, int targetX, int targetY);
+    void dispatchTouchEvent(int eventType, std::vector<TouchSample> touches);
+    void releaseAllTouches();
     void dispatchKeyboard(int eventType, std::string code, std::string key, bool repeat, bool ctrl, bool alt,
                           bool shift, bool meta);
     void dispatchFocus(bool focused);
@@ -64,9 +107,15 @@ class BrowserWindow final : public PlatformWindow
     int m_cursorCount = 0;
     bool m_callbacksInstalled = false;
     bool m_usingTouch = false;
-    bool m_touchMoved = false;
-    Point m_touchStart;
-    Timer m_touchTimer;
+    ticks_t m_lastTouchTicks = 0;
+    double m_cssWidth = 0.0;
+    double m_cssHeight = 0.0;
+    std::atomic_bool m_contextLost = false;
+    std::atomic<uint64_t> m_contextLostGeneration = 0;
+    bool m_syncingFromBrowser = false;
+    ticks_t m_lastTextRectSyncTicks = 0;
+    std::string m_lastTextRectsJson;
+    std::array<TouchSlot, 3> m_touchSlots;
 };
 
 extern BrowserWindow &g_browserWindow;

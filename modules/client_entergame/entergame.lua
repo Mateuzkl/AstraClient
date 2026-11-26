@@ -444,10 +444,14 @@ function EnterGame.addTestServer()
   return EnterGame.onError(tr('Legacy HTTP test servers are disabled. Configure a verified HTTPS endpoint in init.lua.'))
 end
 
+local function isMobileClient()
+  return g_app and g_app.isMobile and g_app.isMobile() or false
+end
+
 -- public functions
 function EnterGame.init()
   if USE_NEW_ENERGAME then return end
-  enterGame = g_ui.displayUI('entergame')
+  enterGame = g_ui.displayUI(isMobileClient() and 'entergame_mobile' or 'entergame')
   if LOGPASS ~= nil then
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
   end
@@ -517,6 +521,16 @@ function EnterGame.init()
   EnterGame.onAutoLoginChange()
   if hiddenEmail == "1" then
     enterGame.accountNameTextEdit:setTextHidden(true)
+  end
+  local hiddenButton = enterGame:getChildById('hidden')
+  if hiddenButton and enterGame.accountNameTextEdit and enterGame.accountNameTextEdit.isTextHidden then
+    local isHidden = enterGame.accountNameTextEdit:isTextHidden()
+    isButtonPressed = not isHidden
+    if isMobileClient() then
+      hiddenButton:setImageClip(isHidden and '0 0 28 28' or '0 28 28 28')
+    else
+      hiddenButton:setImageSource(isHidden and "/images/ui/hidden-button" or "/images/ui/hidden-button-down")
+    end
   end
 
   if g_game.isOnline() then
@@ -967,16 +981,17 @@ end
 
 function chooseTextMode()
   local hiddenButton = enterGame:getChildById('hidden')
-  local hidden = enterGame.accountNameTextEdit:isTextHidden()
+  if not hiddenButton or not enterGame.accountNameTextEdit then return end
 
-  isButtonPressed = not isButtonPressed
+  local currentlyHidden = enterGame.accountNameTextEdit.isTextHidden and enterGame.accountNameTextEdit:isTextHidden() or false
+  local nextHidden = not currentlyHidden
+  isButtonPressed = not nextHidden
 
-  if isButtonPressed then
-    hiddenButton:setImageSource("/images/ui/hidden-button-down")
-    enterGame.accountNameTextEdit:setTextHidden(false)
+  enterGame.accountNameTextEdit:setTextHidden(nextHidden)
+  if isMobileClient() then
+    hiddenButton:setImageClip(nextHidden and '0 0 28 28' or '0 28 28 28')
   else
-    hiddenButton:setImageSource("/images/ui/hidden-button")
-    enterGame.accountNameTextEdit:setTextHidden(true)
+    hiddenButton:setImageSource(nextHidden and "/images/ui/hidden-button" or "/images/ui/hidden-button-down")
   end
 end
 
@@ -986,16 +1001,12 @@ function chooseButtonVisibility()
   local buttonMail = enterGame:getChildById('buttonInformation')
   local buttonPass = enterGame:getChildById('passwordInformation')
 
-  if checkboxEmail:isChecked() then
-    buttonMail:setVisible(true)
-  else
-    buttonMail:setVisible(false)
+  if not isMobileClient() and buttonMail and checkboxEmail then
+    buttonMail:setVisible(checkboxEmail:isChecked())
   end
 
-  if checkbox:isChecked() then
-    buttonPass:setVisible(true)
-  else
-    buttonPass:setVisible(false)
+  if not isMobileClient() and buttonPass and checkbox then
+    buttonPass:setVisible(checkbox:isChecked())
   end
   if autoLoginBox then
     EnterGame.onAutoLoginChange()
@@ -1022,6 +1033,7 @@ local function isValidEmail(value)
 end
 
 function onTextChange()
+  if isMobileClient() or not enterGame or not enterGame.emailStatus then return end
   if not isValidEmail(enterGame.accountNameTextEdit:getText()) then
     enterGame.emailStatus:setVisible(true)
   else

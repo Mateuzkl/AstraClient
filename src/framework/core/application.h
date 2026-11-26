@@ -71,6 +71,11 @@ public:
         return m_mobile;
     }
 
+    bool isMobileLite()
+    {
+        return m_mobileLite;
+    }
+
 protected:
     void registerLuaFunctions();
 
@@ -84,6 +89,7 @@ protected:
     stdext::boolean<false> m_stopping;
     stdext::boolean<false> m_terminated;
     stdext::boolean<false> m_mobile;
+    stdext::boolean<false> m_mobileLite;
 };
 
 #ifdef FW_GRAPHICS

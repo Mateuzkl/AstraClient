@@ -145,22 +145,30 @@ function clear()
   if not g_game.isOnline() then
     vipCache = {}
     vipGroups = {}
-    modules.game_sidebars.registerVipListConfig(settings)
-    modules.game_sidebars.saveConfigJson(true)
+    if modules.game_sidebars and modules.game_sidebars.registerVipListConfig then
+      modules.game_sidebars.registerVipListConfig(settings)
+      modules.game_sidebars.saveConfigJson(true)
+    end
   end
 end
 
 function toggle()
   if vipWindow:isVisible() then
     vipWindow:close()
-    modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+    if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+      modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+    end
   else
     if m_interface.addToPanels(vipWindow) then
-      modules.game_sidebuttons.setButtonVisible("vipWidget", true)
+      if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+        modules.game_sidebuttons.setButtonVisible("vipWidget", true)
+      end
       vipWindow:getParent():moveChildToIndex(vipWindow, #vipWindow:getParent():getChildren())
       vipWindow:open()
     else
-      modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+      if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+        modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+      end
     end
   end
 end
@@ -170,7 +178,9 @@ function close()
 end
 
 function onMiniWindowClose()
-  modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+  if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
+    modules.game_sidebuttons.setButtonVisible("vipWidget", false)
+  end
 end
 
 function onReceiveVipGroups(groups, maxGroups, editableGroups)

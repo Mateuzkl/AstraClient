@@ -2,6 +2,7 @@
 #include "framebuffermanager.h"
 #include "painter.h"
 #include "graphics.h"
+#include <framework/core/application.h>
 #include <framework/core/clock.h>
 #include <framework/platform/platform.h>
 
@@ -9,8 +10,10 @@ Atlas g_atlas;
 
 void Atlas::init()
 {
-    // If you don't care about players with old computers (~5% of players) you can change 4096 to 6144 or8192
-    m_size = std::min<size_t>(4096, g_graphics.getMaxTextureSize());
+    // Mobile profile uses a 2048x2048 sprite atlas (16 MiB VRAM vs 64 MiB on desktop).
+    // Desktop preserves the 4096x4096 atlas unchanged.
+    const size_t preferredSize = g_app.isMobile() ? 2048 : 4096;
+    m_size = std::min<size_t>(preferredSize, g_graphics.getMaxTextureSize());
     g_logger.info(stdext::format("[Atlas] Texture size is: %ix%i (max: %ix%i)", m_size, m_size, g_graphics.getMaxTextureSize(), g_graphics.getMaxTextureSize()));
 
     for(size_t i = 0; i < 2; ++i) {
@@ -115,13 +118,18 @@ void Atlas::release()
 
 Point Atlas::cacheFont(const TexturePtr& fontTexture)
 {
+    if (!fontTexture || !m_atlas[1]) {
+        return Point(-1, -1);
+    }
     fontTexture->update();
     int index = calculateIndex(fontTexture->getSize());
     if (index < 0) {
-        g_logger.fatal("[Atlas] Too big font texture. Max is 2048x2048");
+        g_logger.warning("[Atlas] Font texture exceeds 2048x2048; rendering with standalone texture");
+        return Point(-1, -1);
     }
     if (m_locations[1][index].empty() && !findSpace(1, index)) {
-        g_logger.fatal("[Atlas] Out of space for new fonts, compile with BIG_FONTS or DONT_CACHE_FONTS definition");
+        g_logger.warning("[Atlas] Font atlas full; rendering font with standalone texture");
+        return Point(-1, -1);
     }
     Point location = m_locations[1][index].front();
     m_locations[1][index].pop_front();

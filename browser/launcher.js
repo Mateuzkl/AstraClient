@@ -3,18 +3,32 @@
   'use strict';
   const el = id => document.getElementById(id);
   const api = AstraAssetCache;
+  const platformApi = window.AstraPlatform || null;
+  const sprPagerApi = window.AstraSprPager || null;
   let manifest, store, current = 'checking', running = false, engineStarted = false;
   let finishStartup, cancelSplashFade, clientReady = false, startupFailed = false;
-  let releasePreload, engineScript;
+  let releasePreload, engineScript, sprPager = null, viewportController = null;
+  let activeProfile = 'desktop';
+  let profileResolution = null;
+  let profileBase = '';
+  let profileScript = '';
+  let profilesIndex = null;
   const repairKey = `astra-full-verify:${location.pathname}`;
   let fullVerify = true; // Denied sessionStorage conservatively verifies each handoff.
   try { fullVerify = sessionStorage.getItem(repairKey) === 'on'; } catch (_) {}
   const closeStore = () => {
     if (store) { const previous = store; store = null; previous.close(); }
   };
+  const disposeSprPager = () => {
+    if (sprPager) { const previous = sprPager; sprPager = null; previous.dispose(); }
+    if (window.Module && window.Module.astraRequestSprPage) window.Module.astraRequestSprPage = null;
+  };
   const clearEngineCallbacks = () => {
     if (engineScript) { engineScript.onload = engineScript.onerror = null; engineScript = null; }
   };
+  const profileBaseUrl = () => new URL(profileBase || '.', location.href);
+  const resolveProfileAsset = (relative) => new URL(relative, profileBaseUrl()).href;
+  const safeLocalStorage = () => { try { return window.localStorage; } catch (_) { return null; } };
   const started = performance.now();
   const telemetry = { launcherMs: 0, downloadBytes: 0, cacheVerifiedBytes: 0, startupMs: null };
   let performanceEnabled = window.ASTRA_CONFIG.performance === true;
@@ -28,6 +42,7 @@
   const report = () => {
     el('astra-performance').hidden = !performanceEnabled;
     if (!performanceEnabled) return;
+    if (sprPager) telemetry.sprPager = sprPager.getStats();
     el('astra-performance-values').textContent = JSON.stringify(telemetry, null, 2);
   };
   el('launcher-performance-toggle').addEventListener('change', event => {
@@ -45,6 +60,63 @@
     el('launcher-performance-toggle').checked = false;
     el('launcher-performance-toggle').dispatchEvent(new Event('change'));
   });
+  function applyProfileAttributes(profile) {
+    const overlay = el('astra-launcher');
+    if (overlay && typeof overlay.setAttribute === 'function') overlay.setAttribute('data-profile', profile);
+    if (document.body && typeof document.body.setAttribute === 'function') document.body.setAttribute('data-profile', profile);
+    const webOptions = el('astra-web-options');
+    if (webOptions) webOptions.hidden = profile === 'mobile';
+    const label = el('launcher-profile-label');
+    if (label) {
+      const detectedNote = profileResolution && profileResolution.source === 'manual' ? ' (manual)' : '';
+      label.textContent = (profile === 'mobile' ? 'Web Mobile Lite' : 'Web Desktop Full') + detectedNote;
+    }
+  }
+  function wireProfileSelects(available, savedPreference) {
+    if (!platformApi || available.length <= 1) return;
+    const launcherRow = el('launcher-profile-row');
+    const launcherSelect = el('launcher-profile-select');
+    const webRow = el('web-profile-option');
+    const webSelect = el('web-profile-select');
+    const onSelectChange = (event) => {
+      const choice = event.target.value;
+      platformApi.writeSavedPreference(safeLocalStorage(), location.pathname, choice);
+      window.location.reload();
+    };
+    if (launcherRow) launcherRow.hidden = false;
+    if (webRow) webRow.hidden = false;
+    for (const select of [launcherSelect, webSelect]) {
+      if (!select) continue;
+      select.value = savedPreference || 'auto';
+      select.addEventListener('change', onSelectChange);
+    }
+  }
+  function setupMobileViewport() {
+    if (!platformApi || activeProfile !== 'mobile' || viewportController) return;
+    const rotateOverlay = el('astra-rotate-overlay');
+    const rotateLockBtn = el('astra-rotate-lock');
+    const rotateDismissBtn = el('astra-rotate-dismiss');
+    viewportController = platformApi.createMobileViewportController({
+      window,
+      document,
+      onViewportChange() {
+        if (window.Module && typeof window.Module._astra_browser_viewport_changed === 'function') {
+          window.Module._astra_browser_viewport_changed();
+        }
+      },
+      onOrientationState(state) {
+        telemetry.orientation = state.orientationType;
+        if (rotateOverlay) rotateOverlay.hidden = !state.showRotateOverlay;
+      }
+    });
+    viewportController.install(el('canvas'));
+    if (rotateLockBtn) {
+      rotateLockBtn.addEventListener('click', () => { viewportController.requestFullscreenAndLandscape(); });
+    }
+    if (rotateDismissBtn) {
+      rotateDismissBtn.addEventListener('click', () => { viewportController.dismissRotatePrompt(); });
+    }
+  }
   function message(text, error = false) {
     el('launcher-message').textContent = text;
     el('launcher-message').classList.toggle('error', error);
@@ -89,7 +161,10 @@
     const labels = { checking: 'Checking game data', missing: 'Not installed', installed: 'Ready to Play',
       outdated: 'Update available', unavailable: 'Storage unavailable', error: 'Repair required', starting: 'Opening client' };
     el('launcher-state').textContent = labels[current];
-    if (manifest) el('launcher-size').textContent = `${(manifest.size / 1048576).toFixed(1)} MiB · ${current === 'installed' ? 'cached in your browser' : 'game data package'}`;
+    if (manifest) {
+      const sprNote = manifest.sprMode === 'paged' ? ' · on-demand sprites' : '';
+      el('launcher-size').textContent = `${(manifest.size / 1048576).toFixed(1)} MiB · ${current === 'installed' ? 'cached in your browser' : 'game data package'}${sprNote}`;
+    }
     el('launcher-state').className = current === 'installed' ? 'ready' : current === 'error' ? 'error' : '';
     el('launcher-install').disabled = running || !store || current === 'installed';
     el('launcher-update').disabled = running || !store;
@@ -102,16 +177,126 @@
     bar.hidden = false; bar.max = total; bar.value = bytes;
     message(`${running === 'verify' ? 'Verifying' : 'Installing'} game data · ${(bytes / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MiB`);
   }
+  async function resolveDeploymentProfile() {
+    if (!platformApi) {
+      applyProfileAttributes(activeProfile);
+      return;
+    }
+    // Detect before downloading any bundle manifest or assets.
+    let available = ['desktop'];
+    try {
+      const response = await fetch('profiles.json', { cache: 'no-store', credentials: 'same-origin' });
+      if (response.ok) {
+        const parsed = await response.json();
+        if (parsed && parsed.schema === 1 && parsed.profiles && typeof parsed.profiles === 'object') {
+          const keys = Object.keys(parsed.profiles).filter(k => k === 'desktop' || k === 'mobile');
+          if (keys.length) {
+            profilesIndex = parsed;
+            available = keys;
+          }
+        }
+      }
+    } catch (_) {}
+
+    profileResolution = platformApi.resolveProfile({
+      window,
+      navigator,
+      screen,
+      pathname: location.pathname,
+      storage: safeLocalStorage()
+    }, available);
+    activeProfile = profileResolution.selected;
+    telemetry.profile = activeProfile;
+    telemetry.platform = {
+      os: profileResolution.info.os,
+      formFactor: profileResolution.info.formFactor,
+      reason: profileResolution.info.reason,
+      source: profileResolution.source,
+      fallback: profileResolution.fallback
+    };
+
+    if (profilesIndex && profilesIndex.profiles[activeProfile]) {
+      const entry = profilesIndex.profiles[activeProfile];
+      profileBase = entry.base || '';
+      profileScript = entry.script || 'astraclient.js';
+    } else {
+      profileBase = '';
+      profileScript = '';
+    }
+
+    if (window.Module) {
+      window.Module.arguments = activeProfile === 'mobile' ? ['-mobile-lite'] : [];
+      if (profileBase) {
+        const base = profileBaseUrl();
+        window.Module.locateFile = (filePath) => new URL(filePath, base).href;
+      }
+    }
+    applyProfileAttributes(activeProfile);
+    wireProfileSelects(available, profileResolution.preference);
+    setupMobileViewport();
+  }
   async function loadManifest() {
-    const response = await fetch('asset-manifest.json', { cache: 'no-store', credentials: 'same-origin' });
+    const manifestName = (profilesIndex && profilesIndex.profiles[activeProfile] && profilesIndex.profiles[activeProfile].manifest) || 'asset-manifest.json';
+    const manifestUrl = profileBase ? resolveProfileAsset(manifestName) : manifestName;
+    const response = await fetch(manifestUrl, { cache: 'no-store', credentials: 'same-origin' });
     if (!response.ok) throw new Error('Game data manifest is missing. Rebuild the browser bundle.');
     manifest = api.validateManifest(await response.json());
     el('launcher-version').textContent = manifest.version;
+    telemetry.bootPackageBytes = manifest.size;
+    if (manifest.sprMode) telemetry.sprMode = manifest.sprMode;
+  }
+  async function prepareSprPager() {
+    disposeSprPager();
+    if (!manifest || manifest.sprMode !== 'paged') return;
+    if (!manifest.sprManifest || !sprPagerApi) {
+      throw new Error('On-demand sprite pager is unavailable for paged mobile bundle.');
+    }
+    const sprManifestUrl = resolveProfileAsset(manifest.sprManifest);
+    const response = await fetch(sprManifestUrl, { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) throw new Error('On-demand sprite manifest is missing.');
+    const sprManifest = sprPagerApi.validateSprManifest(await response.json());
+    const sprNamespace = `${location.pathname}:${activeProfile}`;
+    if (fullVerify && typeof sprPagerApi.clearProfilePages === 'function') {
+      await sprPagerApi.clearProfilePages(window.indexedDB, sprNamespace).catch(() => {});
+    }
+    const pageStore = await sprPagerApi.openPageStore(window.indexedDB, sprNamespace);
+    sprPager = sprPagerApi.createPager({
+      manifest: sprManifest,
+      baseUrl: profileBaseUrl().href,
+      store: pageStore,
+      fetcher: (url, init) => fetch(url, init),
+      onDeliver(pageIndex, bytes, ok) {
+        if (!window.Module || typeof window.Module._astra_spr_page_loaded !== 'function') return;
+        if (!ok || !bytes || !bytes.byteLength) {
+          window.Module._astra_spr_page_loaded(pageIndex >>> 0, 0, 0, 0);
+          return;
+        }
+        const ptr = window.Module._malloc(bytes.byteLength);
+        if (!ptr) {
+          window.Module._astra_spr_page_loaded(pageIndex >>> 0, 0, 0, 0);
+          return;
+        }
+        try {
+          const heapView = window.Module.wasmMemory
+            ? new Uint8Array(window.Module.wasmMemory.buffer)
+            : window.Module.HEAPU8;
+          heapView.set(bytes, ptr);
+          window.Module._astra_spr_page_loaded(pageIndex >>> 0, ptr, bytes.byteLength >>> 0, 1);
+        } finally {
+          window.Module._free(ptr);
+        }
+        if (performanceEnabled) report();
+      }
+    });
+    window.Module.astraRequestSprPage = (pageIndex) => {
+      if (sprPager) sprPager.requestPage(pageIndex >>> 0);
+    };
   }
   async function download() {
     if (!store) throw new Error('Persistent storage is unavailable. Use Play to load without installation.');
     running = 'install'; update();
-    await api.install(store, manifest, () => fetch(manifest.file, { cache: 'no-cache', credentials: 'same-origin' }),
+    const dataUrl = profileBase ? resolveProfileAsset(manifest.file) : manifest.file;
+    await api.install(store, manifest, () => fetch(dataUrl, { cache: 'no-cache', credentials: 'same-origin' }),
       (bytes, total) => { telemetry.downloadBytes = bytes; progress(bytes, total); });
     current = 'installed';
     message('Game data installed successfully. Your adventure is ready.');
@@ -134,7 +319,9 @@
     }
     catch (error) {
       if (releasePreload) releasePreload();
+      disposeSprPager();
       if (engineStarted) { window.AstraLauncher.failed(error.message || String(error)); return; }
+      if (viewportController) viewportController.deactivate();
       current = 'error'; message(error.message || String(error), true);
       mode('error'); el('launcher-reload').hidden = false;
     }
@@ -154,10 +341,19 @@
   });
   el('launcher-cancel-remove').addEventListener('click', () => { el('launcher-confirm').hidden = true; });
   el('launcher-confirm-remove').addEventListener('click', () => task(async () => {
-    await store.remove(); current = 'missing'; message('Game data removed. Your saved settings were kept.');
+    await store.remove();
+    if (sprPagerApi && typeof sprPagerApi.clearProfilePages === 'function') {
+      await sprPagerApi.clearProfilePages(window.indexedDB, `${location.pathname}:${activeProfile}`).catch(() => {});
+    }
+    current = 'missing'; message('Game data removed. Your saved settings were kept.');
   }));
   el('launcher-play').addEventListener('click', () => {
     if (running || engineStarted) return;
+    // Request fullscreen + landscape synchronously inside the user gesture before awaiting storage/network.
+    if (viewportController) {
+      viewportController.activate();
+      viewportController.requestFullscreenAndLandscape();
+    }
     mode('loading'); message('Preparing game data…');
     telemetry.playClickedAtMs = Math.round(performance.now() - started);
     return task(async () => {
@@ -181,8 +377,9 @@
       running = 'install'; update();
       telemetry.cacheIntegrityMode = 'download';
       const downloadStarted = performance.now();
+      const dataUrl = profileBase ? resolveProfileAsset(manifest.file) : manifest.file;
       data = await api.fetchPackage(store, manifest,
-        () => fetch(manifest.file, { cache: 'no-cache', credentials: 'same-origin' }),
+        () => fetch(dataUrl, { cache: 'no-cache', credentials: 'same-origin' }),
         (bytes, total) => {
           telemetry.downloadBytes = bytes;
           const bar = el('splash-progress'); bar.max = total; bar.value = bytes;
@@ -191,13 +388,14 @@
         () => { telemetry.persistentCacheUnavailable = true; });
       telemetry.downloadMs = Math.round(performance.now() - downloadStarted);
     }
+    await prepareSprPager();
     // Clear the request only after hashing the cached package or a fresh download.
     try { sessionStorage.removeItem(repairKey); } catch (_) {}
     fullVerify = false;
     telemetry.preloadedPackageMiB = data.byteLength / 1048576;
+    const expectedPackageUrl = resolveProfileAsset(manifest.file);
     Module.getPreloadedPackage = (url, size) => {
-      const expected = new URL(manifest.file, location.href).href;
-      if (!data || new URL(url, location.href).href !== expected || size !== data.byteLength)
+      if (!data || new URL(url, location.href).href !== expectedPackageUrl || size !== data.byteLength)
         throw new Error('Browser engine/package mismatch. Refresh the deployment.');
       const result = data;
       data = null; // FS owns views into this buffer after the SDK consumes it.
@@ -210,11 +408,17 @@
     el('launcher-progress').hidden = true;
     el('splash-progress').removeAttribute('value');
     message(store ? 'Opening Astra Web…' : 'Loading without persistent storage. Game data will be downloaded for this session.');
-    const source = el('astra-engine').content.querySelector('script[src]');
-    if (!source) throw new Error('Browser engine script is missing. Rebuild the bundle.');
+    let engineSrc = '';
+    if (profileBase && profileScript) {
+      engineSrc = resolveProfileAsset(profileScript);
+    } else {
+      const source = el('astra-engine').content.querySelector('script[src]');
+      if (!source) throw new Error('Browser engine script is missing. Rebuild the bundle.');
+      engineSrc = source.src;
+    }
     const script = document.createElement('script');
     engineScript = script;
-    script.src = source.src;
+    script.src = engineSrc;
     script.onload = () => {
       clearEngineCallbacks();
       if (!startupFailed) window.AstraLauncher.phase('engineScriptFetchLoad', performance.now() - engineStart);
@@ -241,8 +445,10 @@
       if (startupFailed) return;
       startupFailed = true; mode('error');
       if (cancelSplashFade) cancelSplashFade();
+      if (viewportController) viewportController.deactivate();
       current = 'error'; message(text, true);
       if (releasePreload) releasePreload();
+      disposeSprPager();
       clearEngineCallbacks();
       closeStore();
       update();
@@ -272,7 +478,24 @@
       message('Loading client resources…');
       report();
     },
-    frameStats(stats) { telemetry.render = stats; report(); }
+    frameStats(stats) { telemetry.render = stats; report(); },
+    getProfile() { return activeProfile; },
+    getTelemetry() { return telemetry; },
+    switchProfile(choice) {
+      if (!platformApi) return;
+      const target = choice === 'desktop' || choice === 'mobile' || choice === 'auto' ? choice : 'auto';
+      platformApi.writeSavedPreference(safeLocalStorage(), location.pathname, target);
+      window.location.reload();
+    },
+    toggleDiagnostics() {
+      const toggle = el('launcher-performance-toggle');
+      if (!toggle) return;
+      toggle.checked = !toggle.checked;
+      toggle.dispatchEvent(new Event('change'));
+    },
+    requestFullscreen() {
+      if (viewportController) viewportController.requestFullscreenAndLandscape();
+    }
   };
   el('launcher-reload').addEventListener('click', () => {
     try { sessionStorage.setItem(repairKey, 'on'); } catch (_) {}
@@ -280,6 +503,8 @@
   });
   window.addEventListener('pagehide', () => {
     closeStore();
+    disposeSprPager();
+    if (viewportController) viewportController.dispose();
     if (cancelSplashFade) cancelSplashFade();
     if (clientReady && !startupFailed) el('astra-launcher').hidden = true;
   });
@@ -290,6 +515,7 @@
   });
   (async () => {
     try {
+      await resolveDeploymentProfile();
       await loadManifest();
       try {
         store = await api.openStore(window.indexedDB, location.pathname, manifest.packageName);

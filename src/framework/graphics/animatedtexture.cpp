@@ -67,6 +67,19 @@ void AnimatedTexture::setRepeat(bool repeat)
     m_repeat = repeat;
 }
 
+void AnimatedTexture::replaceFrames(const std::vector<ImagePtr>& frames)
+{
+    const size_t count = std::min(m_frames.size(), frames.size());
+    for (size_t i = 0; i < count; ++i) {
+        if (m_frames[i] && frames[i])
+            m_frames[i]->replace(frames[i]);
+    }
+    if (!m_frames.empty() && m_currentFrame < m_frames.size() && m_frames[m_currentFrame]) {
+        m_id = m_frames[m_currentFrame]->getId();
+        m_uniqueId = m_frames[m_currentFrame]->getUniqueId();
+    }
+}
+
 void AnimatedTexture::update()
 {
     if (m_animTimer.ticksElapsed() >= m_framesDelay[m_currentFrame]) {

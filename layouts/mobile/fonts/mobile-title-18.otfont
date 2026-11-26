@@ -1,0 +1,7 @@
+Font
+  name: mobile-title-18
+  texture: mobile-title-18
+  height: 25
+  glyph-size: 21 25
+  space-width: 5
+  spacing: 1 1

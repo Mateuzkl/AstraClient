@@ -4,9 +4,25 @@ const setAstraStatus = (message) => {
   if (window.AstraLauncher) AstraLauncher.status(message);
 };
 
+const initialAstraProfile = (() => {
+  if (window.AstraPlatform) {
+    const resolved = AstraPlatform.resolveProfile({
+      window,
+      navigator,
+      screen,
+      pathname: location.pathname,
+      storage: (() => { try { return window.localStorage; } catch (_) { return null; } })()
+    });
+    return resolved.selected;
+  }
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+})();
+
+let runtimeReady = false;
+
 var Module = {
   canvas: document.getElementById('canvas'),
-  arguments: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? ['-mobile'] : [],
+  arguments: initialAstraProfile === 'mobile' ? ['-mobile-lite'] : [],
   locateFile: (path) => new URL(path, self.location.href).href,
   print: (...values) => console.log(...values),
   printErr: (...values) => console.error(...values),
@@ -50,6 +66,7 @@ var Module = {
   }],
 
   onRuntimeInitialized: () => {
+    runtimeReady = true;
     AstraLauncher.runtimeInitialized();
     setAstraStatus('');
     Module.canvas.focus();
@@ -58,11 +75,35 @@ var Module = {
     Module.astraReload = persistence.reload;
     if (Module.astraStopPersistence) Module.astraStopPersistence();
     Module.astraStopPersistence = AstraBrowser.installPersistenceHooks(persistence.sync);
+    if (typeof Module._astra_browser_set_visibility === 'function') {
+      Module._astra_browser_set_visibility(document.hidden ? 0 : 1);
+    }
+    if (typeof Module._astra_browser_viewport_changed === 'function') {
+      Module._astra_browser_viewport_changed();
+    }
   }
 };
 
+if (typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (!runtimeReady) return;
+    if (typeof Module._astra_browser_set_visibility === 'function') {
+      Module._astra_browser_set_visibility(document.hidden ? 0 : 1);
+    }
+  });
+}
+
 Module.canvas.addEventListener('webglcontextlost', (event) => {
   event.preventDefault();
-  setAstraStatus('WebGL context lost. Reload the page to continue.');
+  if (runtimeReady && typeof Module._astra_browser_context_lost === 'function') {
+    Module._astra_browser_context_lost(1);
+  }
+  setAstraStatus('WebGL context lost — waiting to restore…');
+});
+Module.canvas.addEventListener('webglcontextrestored', () => {
+  if (runtimeReady && typeof Module._astra_browser_context_lost === 'function') {
+    Module._astra_browser_context_lost(0);
+  }
+  setAstraStatus('');
 });
 Module.canvas.addEventListener('contextmenu', event => event.preventDefault());

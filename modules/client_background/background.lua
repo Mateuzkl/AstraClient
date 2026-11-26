@@ -127,6 +127,12 @@ function onRun()
 end
 
 function showPanel()
+  if g_app.isMobile() then
+    if background and background.loadAfter then
+      background.loadAfter:setVisible(false)
+    end
+    return
+  end
   background.loadAfter:setVisible(true)
   applyBoostedInfo()
 end

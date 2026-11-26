@@ -53,7 +53,7 @@ function EventSchedule:configureEvent(widget)
 		ui:setText(data.name)
 		ui:setBackgroundColor(data.colorlight)
 		ui:setTooltip(activeTooltip)
-		ui.onClick = modules.game_schedule.toggle
+		ui.onClick = function() if modules.game_schedule and modules.game_schedule.toggle then modules.game_schedule.toggle() end end
 	end
 
 	widget.panel2.upcomingEvent:destroyChildren()
@@ -62,7 +62,7 @@ function EventSchedule:configureEvent(widget)
 		ui:setText(data.name)
 		ui:setBackgroundColor(data.colordark)
 		ui:setTooltip(upcomingTooltip)
-		ui.onClick = modules.game_schedule.toggle
+		ui.onClick = function() if modules.game_schedule and modules.game_schedule.toggle then modules.game_schedule.toggle() end end
 	end
 end
 

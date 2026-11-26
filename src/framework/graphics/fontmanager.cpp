@@ -47,6 +47,14 @@ void FontManager::clearFonts()
     m_defaultFont = std::make_shared<BitmapFont>("emptyfont");
 }
 
+void FontManager::reload()
+{
+    for (const BitmapFontPtr& font : m_fonts) {
+        if (font)
+            font->reload();
+    }
+}
+
 void FontManager::importFont(std::string file)
 {
     if (g_graphicsThreadId != std::this_thread::get_id()) {

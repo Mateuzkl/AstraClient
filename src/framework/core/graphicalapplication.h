@@ -43,6 +43,8 @@ public:
     void run();
 #ifdef __EMSCRIPTEN__
     void browserMainLoop();
+    void onBrowserContextRestored();
+    void setOnContextRestored(std::function<void()> callback) { m_onContextRestored = std::move(callback); }
 #endif
     void poll();
     void pollGraphics();
@@ -103,6 +105,7 @@ private:
   std::atomic_bool m_startupFinished = false;
   bool m_startupDiagnostics = false;
   std::chrono::steady_clock::time_point m_startupBegin;
+  std::function<void()> m_onContextRestored;
   void runBrowser();
 #endif
   int m_iteration = 0;

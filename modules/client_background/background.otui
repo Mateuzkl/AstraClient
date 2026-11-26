@@ -139,7 +139,7 @@ UIWidget
       image-source: /images/ui/popupwindow
       image-border: 4
       margin-left: 1
-      @onClick: modules.game_schedule.toggle()
+      @onClick: if modules.game_schedule and modules.game_schedule.toggle then modules.game_schedule.toggle() end
       Label
         !text: tr('Event Schedule')
         text-auto-resize: true

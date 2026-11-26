@@ -185,20 +185,24 @@ function loadConfigJson()
   m_interface.onLoadHorizontalPanels(SideBars.horizontalLeftOptions, SideBars.horizontalRightOptions)
   modules.game_viplist.onPlayerLoad(SideBars.vipWidgetOptions)
   modules.game_battle.onPlayerLoad(SideBars.battleListsOptions)
-  modules.game_party_list.onPlayerLoad(SideBars.partyListsOptions)
-  modules.game_trackers.onPlayerLoad(SideBars.bestiaryTrackerWidgetOptions, SideBars.bossTrackerWidgetOptions)
+  if modules.game_party_list and modules.game_party_list.onPlayerLoad then
+    modules.game_party_list.onPlayerLoad(SideBars.partyListsOptions)
+  end
+  if modules.game_trackers and modules.game_trackers.onPlayerLoad then
+    modules.game_trackers.onPlayerLoad(SideBars.bestiaryTrackerWidgetOptions, SideBars.bossTrackerWidgetOptions)
+  end
 end
 
 function saveConfigJson(callUnload)
   if not LoadedPlayer:isLoaded() then return end
 
   if not callUnload then
-    modules.game_battle.onPlayerUnload()
-    modules.game_analyser.onPlayerUnload()
-    modules.game_minimap.onPlayerUnload()
-	modules.game_trackers.onPlayerUnload()
-	modules.game_console.onPlayerUnload()
-	modules.game_skills.onPlayerUnload()
+    if modules.game_battle and modules.game_battle.onPlayerUnload then modules.game_battle.onPlayerUnload() end
+    if modules.game_analyser and modules.game_analyser.onPlayerUnload then modules.game_analyser.onPlayerUnload() end
+    if modules.game_minimap and modules.game_minimap.onPlayerUnload then modules.game_minimap.onPlayerUnload() end
+    if modules.game_trackers and modules.game_trackers.onPlayerUnload then modules.game_trackers.onPlayerUnload() end
+    if modules.game_console and modules.game_console.onPlayerUnload then modules.game_console.onPlayerUnload() end
+    if modules.game_skills and modules.game_skills.onPlayerUnload then modules.game_skills.onPlayerUnload() end
   end
 
   local config = SideBars

@@ -33,6 +33,7 @@ public:
 
     void terminate();
     void clearFonts();
+    void reload();
 
     void importFont(std::string file);
 

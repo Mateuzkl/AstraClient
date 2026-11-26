@@ -1,0 +1,154 @@
+// Clean-room Classic Dark-Charcoal / Translucent Slate Global Mobile Theme.
+// Loaded ONLY when layout == 'mobile' (zero impact on Desktop Full).
+
+MainWindow < UIWindow
+  font: mobile-title-18
+  color: #edf0f5
+  size: 320 240
+  opacity: 1
+  padding-top: 32
+  padding-left: 14
+  padding-right: 14
+  padding-bottom: 12
+  image-source: /images/mobile_ui/panel_window
+  image-border: 8
+  image-border-top: 26
+  image-border-bottom: 8
+  text-offset: 0 5
+  text-align: top
+  draggable: true
+  anchors.centerIn: parent
+
+  $disabled:
+    color: #8c929c
+
+StaticMainWindow < MainWindow
+  draggable: false
+
+Button < UIButton
+  font: mobile-btn-15
+  color: #edf0f5
+  size: 112 36
+  text-offset: 0 0
+  text-align: center
+  image-source: /images/mobile_ui/btn_dark
+  image-color: #ffffffff
+  image-clip: 0 0 128 48
+  image-border: 6
+  padding: 4 10 4 10
+  opacity: 1.0
+  change-cursor-image: false
+
+  $hover !disabled:
+    image-clip: 0 48 128 48
+    color: #ffffff
+
+  $pressed:
+    image-clip: 0 96 128 48
+    text-offset: 0 1
+    color: #e4dcb8
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f0e6bc
+
+  $disabled:
+    color: #8c929c88
+    opacity: 0.6
+
+TextEdit < UITextEdit
+  font: mobile-input-14
+  color: #f0f2f5
+  size: 160 36
+  text-offset: 0 0
+  opacity: 1
+  padding: 7 10 5 10
+  image-source: /images/mobile_ui/input_idle
+  image-border: 6
+  selection-color: #ffffff
+  selection-background-color: #3a6ea5cc
+  change-cursor-image: false
+
+  $focus:
+    image-source: /images/mobile_ui/input_focus
+
+  $disabled:
+    color: #8c929c88
+    opacity: 0.6
+
+CheckBox < UICheckBox
+  font: mobile-hud-12
+  size: 22 22
+  text-align: left
+  text-offset: 28 1
+  color: #e2e6ec
+  image-color: #ffffffff
+  image-rect: 0 0 22 22
+  image-source: /images/mobile_ui/checkbox
+  image-clip: 0 0 24 24
+  change-cursor-image: false
+
+  $checked !disabled:
+    image-clip: 0 24 24 24
+    color: #ffffff
+
+  $disabled:
+    image-clip: 0 48 24 24
+    color: #8c929c88
+
+ComboBox < UIComboBox
+  font: mobile-input-14
+  color: #edf0f5
+  size: 140 36
+  text-offset: 10 0
+  text-align: left
+  image-source: /images/mobile_ui/btn_dark
+  image-clip: 0 0 128 48
+  image-border: 6
+  padding-right: 26
+
+  $hover !disabled:
+    image-clip: 0 48 128 48
+    color: #ffffff
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f0e6bc
+
+  $disabled:
+    color: #8c929c88
+    opacity: 0.6
+
+ComboBoxPopupMenu < UIPopupMenu
+  background-color: #14171cf4
+  border-width: 1
+  border-color: #626976
+  padding: 4
+
+ComboBoxPopupMenuButton < UIButton
+  height: 36
+  font: mobile-input-14
+  color: #edf0f5
+  text-align: left
+  text-offset: 10 0
+  background-color: alpha
+
+  $hover:
+    background-color: #3a404c99
+    color: #ffffff
+
+  $pressed:
+    background-color: #4d5564bb
+    color: #ffffff
+
+HorizontalSeparator < UIWidget
+  height: 1
+  background-color: #5a606c88
+  phantom: true
+  focusable: false
+
+VerticalSeparator < UIWidget
+  width: 1
+  background-color: #5a606c88
+  phantom: true
+  focusable: false

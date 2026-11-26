@@ -31,8 +31,10 @@
 #include "const.h"
 #include "negativeoffset.h"
 
+#include <framework/core/application.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#include <framework/graphics/texturemanager.h>
 #ifdef __EMSCRIPTEN__
 #include <framework/core/startuptimer.h>
 #endif
@@ -179,20 +181,34 @@ void ThingTypeManager::unloadTextures()
 }
 
 void ThingTypeManager::check()
-{    
-    // removes unused textures from memory after 60s, 500 checks / s
+{
+    // Desktop: removes unused textures after 60s, 100 checks/category/s.
+    // Mobile: tighter 25s eviction, 200 checks/category/s + periodic unreferenced UI texture trim.
     m_checkEvent = g_dispatcher.scheduleEvent(std::bind(&ThingTypeManager::check, &g_things), 1000);
 
+    const bool mobile = g_app.isMobile();
+    const size_t step = mobile ? 200 : 100;
+    const ticks_t idleSeconds = mobile ? 25 : 60;
+    const ticks_t nowSeconds = g_clock.seconds();
+
     for (size_t i = 0; i < ThingLastCategory; ++i) {
-        size_t limit = std::min<size_t>(m_checkIndex[i] + 100, m_thingTypes[i].size());
+        size_t limit = std::min<size_t>(m_checkIndex[i] + step, m_thingTypes[i].size());
         for (size_t j = m_checkIndex[i]; j < limit; ++j) {
-            if (m_thingTypes[i][j]->isLoaded() && m_thingTypes[i][j]->getLastUsage() + 60 < g_clock.seconds()) {
+            if (m_thingTypes[i][j]->isLoaded() && m_thingTypes[i][j]->getLastUsage() + idleSeconds < nowSeconds) {
                 m_thingTypes[i][j]->unload();
             }
         }
         m_checkIndex[i] = limit;
         if (m_checkIndex[i] >= m_thingTypes[i].size()) {
             m_checkIndex[i] = 0;
+        }
+    }
+
+    if (mobile) {
+        static uint32 mobileTrimTicks = 0;
+        if (++mobileTrimTicks >= 15) {
+            mobileTrimTicks = 0;
+            g_textures.trimCache(30);
         }
     }
 }

@@ -21,6 +21,7 @@
  */
 
 #include "module.h"
+#include "application.h"
 #include "modulemanager.h"
 #include "resourcemanager.h"
 
@@ -244,16 +245,23 @@ void Module::discover(const OTMLNodePtr& moduleNode)
 
     if(OTMLNodePtr node = moduleNode->get("load-later")) {
         for(const OTMLNodePtr& tmp : node->children()) {
+            bool excluded = false;
 #ifdef __EMSCRIPTEN__
             // Exclusao explicita de ferramentas nativas de desenvolvimento nao publicadas no Web.
-            bool excluded = false;
             if (const auto exclusions = moduleNode->get("browser-excluded-load-later")) {
                 for (const auto& entry : exclusions->children()) {
                     if (entry->value() == tmp->value()) { excluded = true; break; }
                 }
             }
-            if (excluded) continue;
 #endif
+            if (!excluded && g_app.isMobileLite()) {
+                if (const auto mobileExclusions = moduleNode->get("mobile-excluded-load-later")) {
+                    for (const auto& entry : mobileExclusions->children()) {
+                        if (entry->value() == tmp->value()) { excluded = true; break; }
+                    }
+                }
+            }
+            if (excluded) continue;
             m_loadLaterModules.push_back(tmp->value());
         }
     }

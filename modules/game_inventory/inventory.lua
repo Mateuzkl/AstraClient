@@ -168,6 +168,64 @@ local function resetMonkMirrorSlot(clearItem)
   end
 end
 
+local function isMobileLite()
+  return g_app and g_app.isMobileLite and g_app.isMobileLite() or false
+end
+
+function setMobileRightMargin(marginPx)
+  if not isMobileLite() or not inventoryWindow then return end
+  inventoryWindow:setMarginRight(math.max(4, tonumber(marginPx) or 4))
+end
+
+local function configureMobileLiteInventory()
+  if not isMobileLite() or not inventoryWindow then return end
+  inventoryWindow:setParent(m_interface.getRootPanel())
+  inventoryWindow:breakAnchors()
+  inventoryWindow:addAnchor(AnchorTop, 'parent', AnchorTop)
+  inventoryWindow:addAnchor(AnchorRight, 'parent', AnchorRight)
+  inventoryWindow:setMarginTop(38)
+  inventoryWindow:setMarginRight(4)
+  inventoryWindow:setSize({ width = 126, height = 186 })
+  inventoryWindow:setDraggable(false)
+  inventoryWindow:setImageSource('/images/mobile_ui/panel_dark')
+  inventoryWindow:setImageBorder(6)
+  inventoryWindow:setBackgroundColor('#00000000')
+  inventoryWindow:setText('Equipment')
+  inventoryWindow:setTextAlign(AlignTopCenter)
+  inventoryWindow:setTextOffset({ x = 0, y = 3 })
+  inventoryWindow:setColor('#edf0f5')
+
+  -- Hide all Desktop miniwindow chrome buttons (top bar controls stay in mobileTopRightBar)
+  for _, child in ipairs(inventoryWindow:getChildren()) do
+    local cid = child:getId()
+    if cid ~= 'contentsPanel' then
+      child:hide()
+    end
+  end
+
+  local keepIds = {
+    slot1 = true, slot2 = true, slot3 = true, slot4 = true, slot5 = true,
+    slot6 = true, slot7 = true, slot8 = true, slot9 = true, slot10 = true,
+    soulLabel = true, capLabel = true
+  }
+  local contents = inventoryWindow:getChildById('contentsPanel')
+  if contents then
+    contents:breakAnchors()
+    contents:fill('parent')
+    contents:setMarginTop(20)
+    contents:setMarginLeft(2)
+    contents:setMarginRight(2)
+    contents:setMarginBottom(3)
+    contents:setBackgroundColor('#00000000')
+    for _, child in ipairs(contents:getChildren()) do
+      local cid = child:getId()
+      if not keepIds[cid] then
+        child:hide()
+      end
+    end
+  end
+end
+
 function init()
   connect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
@@ -175,7 +233,7 @@ function init()
     onVocationChange = onVocationChange
   })
 
-  inventoryWindow = g_ui.loadUI('inventory', m_interface.getRightPanel())
+  inventoryWindow = g_ui.loadUI('inventory', isMobileLite() and m_interface.getRootPanel() or m_interface.getRightPanel())
   inventoryWindow:disableResize()
   inventoryPanel = inventoryWindow:getChildById('contentsPanel')
   inventoryWindow:setHeight(167)
@@ -277,6 +335,9 @@ function init()
   refresh()
   inventoryWindow:setup()
   inventoryWindow:open()
+  if isMobileLite() then
+    configureMobileLiteInventory()
+  end
 end
 
 function terminate()
@@ -357,6 +418,17 @@ function refresh()
 end
 
 function toggle()
+  if isMobileLite() then
+    if not inventoryWindow then return end
+    if inventoryWindow:isVisible() then
+      inventoryWindow:hide()
+    else
+      configureMobileLiteInventory()
+      inventoryWindow:show()
+      inventoryWindow:raise()
+    end
+    return
+  end
   if not inventoryButton then
     return
   end
@@ -367,6 +439,10 @@ function toggle()
     inventoryWindow:open()
     inventoryButton:setOn(true)
   end
+end
+
+function isOpen()
+  return inventoryWindow and inventoryWindow:isVisible() or false
 end
 
 function onMiniWindowClose()
@@ -657,10 +733,12 @@ function online()
     local lastCombatControls = g_settings.getNode('LastCombatControls')
 
     -- Check if the world is OpenPVP and Enable buttonPvp
-    if g_game.getCanChangePvpFrameOption() then
+    if buttonPvp then
+      if g_game.getCanChangePvpFrameOption() then
         buttonPvp:setOn(true)
       else
         buttonPvp:setOn(false)
+      end
     end
 
     if not table.empty(lastCombatControls) then
@@ -685,6 +763,9 @@ function online()
   update()
   refresh()
   scheduleMonkMirrorUpdate(true)
+  if isMobileLite() then
+    configureMobileLiteInventory()
+  end
   consoleln("Inventory controls refreshed in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
@@ -984,5 +1065,7 @@ function onLeftSlotChange(itemId)
   if not g_game.isOnline() then
     return
   end
-  modules.game_topbar.onUpdateProficiencyWidget(itemId == 0)
+  if modules.game_topbar and modules.game_topbar.onUpdateProficiencyWidget then
+    modules.game_topbar.onUpdateProficiencyWidget(itemId == 0)
+  end
 end

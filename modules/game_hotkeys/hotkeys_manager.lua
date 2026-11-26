@@ -967,6 +967,20 @@ function addKeyCombo(keyCombo, keySettings, focus)
   return hotkeyLabel
 end
 
+function getHotkeyEntry(keyCombo)
+  local entry = hotkeysByCombo[keyCombo]
+  if not entry then return nil end
+  return {
+    keyCombo = keyCombo,
+    value = entry.value,
+    autoSend = entry.autoSend,
+    itemId = entry.itemId,
+    subType = entry.subType,
+    useType = entry.useType,
+    action = entry.action
+  }
+end
+
 function doKeyCombo(keyCombo)
   if not g_game.isOnline() or not canPerformKeyCombo(keyCombo) then
     return

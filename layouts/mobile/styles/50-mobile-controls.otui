@@ -1,0 +1,146 @@
+// Clean-room Classic Dark-Charcoal / Translucent Slate Mobile Controls Style Kit.
+MobileDarkPanel < Panel
+  image-source: /images/mobile_ui/panel_dark
+  image-border: 6
+  focusable: false
+
+MobileWindowPanel < Panel
+  image-source: /images/mobile_ui/panel_window
+  image-border: 8
+  image-border-top: 26
+  image-border-bottom: 8
+  focusable: false
+
+MobilePrimaryButton < UIButton
+  font: mobile-btn-15
+  color: #f4faf2
+  text-align: center
+  image-source: /images/mobile_ui/btn_primary
+  image-clip: 0 0 180 48
+  image-border: 8
+  change-cursor-image: false
+
+  $hover !disabled:
+    image-clip: 0 48 180 48
+    color: #ffffff
+
+  $pressed:
+    image-clip: 0 96 180 48
+    text-offset: 0 1
+
+MobileDarkButton < UIButton
+  font: mobile-hud-12
+  color: #e8ecf2
+  text-align: center
+  image-source: /images/mobile_ui/btn_dark
+  image-clip: 0 0 128 48
+  image-border: 6
+  change-cursor-image: false
+
+  $hover !disabled:
+    image-clip: 0 48 128 48
+    color: #ffffff
+
+  $checked:
+    image-clip: 0 48 128 48
+    color: #f5ebbd
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f5ebbd
+
+  $pressed:
+    image-clip: 0 96 128 48
+    text-offset: 0 1
+
+MobileToolbarBtn < MobileDarkButton
+  size: 30 30
+  icon-rect: 5 5 20 20
+  focusable: false
+
+MobileUtilBtn < MobileDarkButton
+  size: 38 38
+  icon-rect: 7 7 24 24
+  focusable: false
+
+MobileAttackBtn < UIButton
+  size: 38 38
+  icon-rect: 7 7 24 24
+  image-source: /images/mobile_ui/btn_attack
+  image-clip: 0 0 96 48
+  image-border: 6
+  focusable: false
+  change-cursor-image: false
+
+  $hover !disabled:
+    image-clip: 0 48 96 48
+
+  $on:
+    image-clip: 0 48 96 48
+
+  $checked:
+    image-clip: 0 48 96 48
+
+  $pressed:
+    image-clip: 0 96 96 48
+
+MobileHotkeySlot < UIButton
+  size: 38 38
+  image-source: /images/mobile_ui/slot_frame
+  image-clip: 0 0 48 48
+  image-border: 6
+  focusable: false
+  change-cursor-image: false
+
+  $pressed:
+    image-clip: 48 0 48 48
+
+  $checked:
+    image-clip: 48 0 48 48
+
+  $on:
+    image-clip: 48 0 48 48
+
+MobileLoginInput < TextEdit
+  height: 38
+  font: mobile-input-14
+  padding: 8 40 6 10
+
+MobileLoginLabel < Label
+  font: mobile-hud-12
+  color: #cfd5df
+  text-auto-resize: true
+  phantom: true
+
+MobileSectionLabel < Label
+  font: mobile-hud-12
+  color: #cfd5df
+  text-align: left
+  phantom: true
+
+MobileMenuTile < MobileDarkButton
+  size: 112 34
+  font: mobile-hud-12
+  text-align: center
+  focusable: false
+
+MobileSettingsChip < UIButton
+  height: 32
+  font: mobile-hud-12
+  color: #e4e8ee
+  text-align: center
+  image-source: /images/mobile_ui/btn_dark
+  image-clip: 0 0 128 48
+  image-border: 6
+  focusable: false
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #f6ecbe
+
+  $checked:
+    image-clip: 0 48 128 48
+    color: #f6ecbe
+
+  $pressed:
+    image-clip: 0 96 128 48

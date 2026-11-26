@@ -55,6 +55,12 @@ void MinimapBlock::clean()
     m_mustUpdate = false;
 }
 
+void MinimapBlock::invalidateBlockTextures()
+{
+    m_texture.reset();
+    m_mustUpdate = true;
+}
+
 void MinimapBlock::update()
 {
     if(!m_mustUpdate)
@@ -112,6 +118,19 @@ void Minimap::clean()
     std::lock_guard<std::mutex> lock(m_lock);
     for (auto& tileBlocks : m_tileBlocks)
         tileBlocks.clear();
+}
+
+void Minimap::invalidateBlockTextures()
+{
+    clearSpriteCache();
+    clearSatelliteTextures();
+    std::lock_guard<std::mutex> lock(m_lock);
+    for (auto& floorBlocks : m_tileBlocks) {
+        for (auto& entry : floorBlocks) {
+            if (entry.second)
+                entry.second->invalidateBlockTextures();
+        }
+    }
 }
 
 void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color)

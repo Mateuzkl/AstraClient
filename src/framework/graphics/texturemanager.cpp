@@ -30,6 +30,7 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/apngloader.h>
 #include <framework/util/stats.h>
+#include <unordered_set>
 
 TextureManager g_textures;
 
@@ -45,6 +46,45 @@ void TextureManager::terminate()
 void TextureManager::clearCache()
 {
     m_textures.clear();
+}
+
+size_t TextureManager::trimCache(int maxIdleSeconds)
+{
+    if (m_textures.empty())
+        return 0;
+
+    std::unordered_map<const Texture*, long> internalRefCounts;
+    internalRefCounts.reserve(m_textures.size());
+    for (const auto& entry : m_textures) {
+        if (entry.second)
+            ++internalRefCounts[entry.second.get()];
+    }
+
+    const ticks_t now = stdext::time();
+    size_t removed = 0;
+    for (auto it = m_textures.begin(); it != m_textures.end();) {
+        const TexturePtr& tex = it->second;
+        if (!tex) {
+            it = m_textures.erase(it);
+            continue;
+        }
+        const auto refIt = internalRefCounts.find(tex.get());
+        const long mapRefs = refIt != internalRefCounts.end() ? refIt->second : 1;
+        const bool unreferencedExternally = tex.use_count() <= mapRefs;
+        const bool idleEnough = maxIdleSeconds <= 0 || (now - tex->getTime() >= static_cast<ticks_t>(maxIdleSeconds));
+        if (unreferencedExternally && idleEnough) {
+            const Texture* raw = tex.get();
+            // Decrement map ref count so sibling alias (filePath vs fileName) is also dropped safely.
+            if (refIt != internalRefCounts.end() && refIt->second > 0)
+                --refIt->second;
+            it = m_textures.erase(it);
+            ++removed;
+            (void)raw;
+        } else {
+            ++it;
+        }
+    }
+    return removed;
 }
 
 bool TextureManager::unload(const std::string& fileName)
@@ -68,9 +108,35 @@ bool TextureManager::unload(const std::string& fileName)
 
 void TextureManager::reload()
 {
+    std::unordered_set<const Texture*> reloaded;
     for(auto& it : m_textures) {
-        const std::string& path = g_resources.guessFilePath(it.first, "png");
         const TexturePtr& tex = it.second;
+        if(!tex || !reloaded.insert(tex.get()).second)
+            continue;
+
+        const std::string& path = g_resources.guessFilePath(g_resources.resolvePath(it.first), "png");
+        if (tex->isAnimatedTexture()) {
+            try {
+                std::stringstream fin;
+                g_resources.readFileStream(path, fin);
+                apng_data apng;
+                if (load_apng(fin, &apng) == 0) {
+                    Size imageSize(apng.width, apng.height);
+                    if (apng.num_frames > 1) {
+                        std::vector<ImagePtr> frames;
+                        frames.reserve(apng.num_frames);
+                        for (uint i = 0; i < apng.num_frames; ++i) {
+                            uchar* frameData = apng.pdata + ((apng.first_frame + i) * apng.height * apng.width * apng.bpp);
+                            frames.push_back(std::make_shared<Image>(imageSize, apng.bpp, frameData));
+                        }
+                        static_cast<AnimatedTexture*>(tex.get())->replaceFrames(frames);
+                        tex->setTime(stdext::time());
+                    }
+                    free_apng(&apng);
+                }
+            } catch(...) {}
+            continue;
+        }
 
         ImagePtr image = Image::load(path);
         if(!image)
@@ -84,6 +150,8 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
 {
     auto it = m_textures.find(fileName);
     if (it != m_textures.end()) {
+        if (it->second)
+            it->second->setTime(stdext::time());
         return it->second;
     }
 
@@ -96,6 +164,8 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
     it = m_textures.find(filePath);
     if(it != m_textures.end()) {
         texture = it->second;
+        if (texture)
+            texture->setTime(stdext::time());
     }
 
     // texture not found, load it

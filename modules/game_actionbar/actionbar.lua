@@ -588,6 +588,15 @@ function terminate()
 end
 
 function online()
+	if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+		player = g_game.getLocalPlayer()
+		activeActionBars = {}
+		resizeLockButtons()
+		updateGameMapPanelMargin()
+		isLoaded = true
+		return
+	end
+
 	local benchmark = g_clock.millis()
 	dragItem = nil
 	dragButton = nil
@@ -641,6 +650,13 @@ function offline()
 end
 
 function onCreateActionBars()
+	if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+		activeActionBars = {}
+		resizeLockButtons()
+		updateGameMapPanelMargin()
+		return true
+	end
+
 	local gameMapPanel = m_interface.gameMapPanel
 	if not gameMapPanel then
 		return true
@@ -705,10 +721,22 @@ function createActionBars()
 		actionBars[i].n = i
 		actionBars[i].isVertical = isVertical
 		parent:moveChildToIndex(actionBars[i], index)
+		if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+			actionBars[i]:setVisible(false)
+		end
 	end
 end
 
 function resizeLockButtons()
+	if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+		local rlp = m_interface.getRightLockPanel and m_interface.getRightLockPanel()
+		local blp = m_interface.getBottomLockPanel and m_interface.getBottomLockPanel()
+		local llp = m_interface.getLeftLockPanel and m_interface.getLeftLockPanel()
+		if rlp then rlp:setVisible(false) end
+		if blp then blp:setVisible(false) end
+		if llp then llp:setVisible(false) end
+		return
+	end
 	local rightLockPanel = m_interface.getRightLockPanel()
 	local rightCount = getActiveRightBars()
 	rightLockPanel:setVisible(true)
@@ -2816,6 +2844,12 @@ function switchChatMode(enabled)
 end
 
 function updateVisibleWidgets()
+	if g_app and g_app.isMobileLite and g_app.isMobileLite() then
+		for _, actionBar in pairs(actionBars) do
+			if actionBar then actionBar:setVisible(false) end
+		end
+		return
+	end
 	for _, actionBar in pairs(actionBars) do
 		if actionBar:isVisible() then
 			local tabBar = actionBar.tabBar

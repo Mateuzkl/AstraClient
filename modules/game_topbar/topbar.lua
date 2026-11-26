@@ -1200,6 +1200,7 @@ function onUpdateProficiencyData(itemCache, hasUnnusedPerk, thingType)
         proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(thingType)
     end
     if not proficiencyId or proficiencyId <= 0 then return end
+    if not (modules.game_proficiency and modules.game_proficiency.ProficiencyData) then return end
 
     local highlightButton = topBar:recursiveGetChildById('highlightProficiencyButton')
     local percentBar = topBar:recursiveGetChildById('starProgress')

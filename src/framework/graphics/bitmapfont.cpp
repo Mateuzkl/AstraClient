@@ -37,6 +37,8 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
     OTMLNodePtr textureNode = fontNode->at("texture");
     std::string textureFile = stdext::resolve_path(textureNode->value(), textureNode->source());
     Size glyphSize = fontNode->valueAt<Size>("glyph-size");
+    m_textureFile = textureFile;
+    m_glyphSize = glyphSize;
     m_glyphHeight = fontNode->valueAt<int>("height");
     m_yOffset = fontNode->valueAt("y-offset", 0);
     m_firstGlyph = fontNode->valueAt("first-glyph", 32);
@@ -87,13 +89,48 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
     Point offset(0, 0);
 #else
     Point offset = g_atlas.cacheFont(m_texture);
-    m_texture = g_atlas.get(1);
+    if (offset.x >= 0 && offset.y >= 0) {
+        m_texture = g_atlas.get(1);
+    } else {
+        offset = Point(0, 0);
+    }
 #endif
     for (int glyph = m_firstGlyph; glyph < 256; ++glyph) {
         m_glyphsTextureCoords[glyph].setRect(((glyph - m_firstGlyph) % numHorizontalGlyphs) * glyphSize.width() + offset.x,
                                                 ((glyph - m_firstGlyph) / numHorizontalGlyphs) * glyphSize.height() + offset.y,
                                                 m_glyphsSize[glyph].width(),
                                                 m_glyphHeight);
+    }
+}
+
+void BitmapFont::reload()
+{
+    if (m_textureFile.empty() || m_glyphSize.width() <= 0 || m_glyphSize.height() <= 0)
+        return;
+    TexturePtr sourceTexture = g_textures.getTexture(m_textureFile);
+    if (!sourceTexture)
+        return;
+    sourceTexture->update();
+    const int numHorizontalGlyphs = sourceTexture->getSize().width() / m_glyphSize.width();
+    if (numHorizontalGlyphs <= 0)
+        return;
+#ifdef DONT_CACHE_FONTS
+    Point offset(0, 0);
+    m_texture = sourceTexture;
+#else
+    Point offset = g_atlas.cacheFont(sourceTexture);
+    if (offset.x >= 0 && offset.y >= 0) {
+        m_texture = g_atlas.get(1);
+    } else {
+        offset = Point(0, 0);
+        m_texture = sourceTexture;
+    }
+#endif
+    for (int glyph = m_firstGlyph; glyph < 256; ++glyph) {
+        m_glyphsTextureCoords[glyph].setRect(((glyph - m_firstGlyph) % numHorizontalGlyphs) * m_glyphSize.width() + offset.x,
+                                             ((glyph - m_firstGlyph) / numHorizontalGlyphs) * m_glyphSize.height() + offset.y,
+                                             m_glyphsSize[glyph].width(),
+                                             m_glyphHeight);
     }
 }
 

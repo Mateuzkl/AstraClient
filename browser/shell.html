@@ -11,7 +11,31 @@
   <div id="astra-root">
     <canvas id="canvas" tabindex="0"></canvas>
     <textarea id="astra-virtual-keyboard" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div id="astra-mobile-keyboard-bar" hidden role="region" aria-label="Text input">
+      <input id="astra-mobile-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+      <textarea id="astra-mobile-textarea" rows="2" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" hidden></textarea>
+      <button id="astra-mobile-input-next" type="button" class="mobile-kb-btn">Next</button>
+      <button id="astra-mobile-input-done" type="button" class="mobile-kb-btn mobile-kb-done">OK</button>
+    </div>
     <div id="astra-status"></div>
+    <div id="astra-rotate-overlay" hidden role="dialog" aria-modal="true" aria-label="Landscape orientation recommended">
+      <div class="rotate-card">
+        <div class="rotate-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4">
+            <rect x="14" y="6" width="20" height="36" rx="4"/>
+            <path d="M21 36h6"/>
+            <path d="M38 14a16 16 0 0 1 0 20"/>
+            <path d="M35 31l3 3 3-3"/>
+          </svg>
+        </div>
+        <h2>Rotate your device to Landscape</h2>
+        <p>Astra Web Mobile Lite is optimized for horizontal gameplay with touch controls.</p>
+        <div class="rotate-actions">
+          <button class="play-button" id="astra-rotate-lock" type="button">Enter Landscape Fullscreen</button>
+          <button class="secondary" id="astra-rotate-dismiss" type="button">Continue in Portrait</button>
+        </div>
+      </div>
+    </div>
   </div>
   <section id="astra-launcher" data-mode="manage" aria-label="Astra Web launcher">
     <nav class="launcher-nav" aria-label="Launcher branding">
@@ -37,10 +61,19 @@
           <div><h2 id="game-data-title">Installed Game Data</h2><p class="card-caption" id="launcher-size">Checking your browser storage…</p></div>
         </div>
         <dl class="data-info">
+          <div><dt>Profile</dt><dd id="launcher-profile-label">Web Desktop Full</dd></div>
           <div><dt>Version</dt><dd id="launcher-version">8.60</dd></div>
           <div><dt>Status</dt><dd id="launcher-state" role="status">Checking game data</dd></div>
           <div><dt>Credits</dt><dd>JokerCore</dd></div>
         </dl>
+        <div class="profile-picker" id="launcher-profile-row" hidden>
+          <label for="launcher-profile-select">Client profile</label>
+          <select id="launcher-profile-select" aria-label="Select client profile">
+            <option value="auto">Auto (recommended)</option>
+            <option value="desktop">Web Desktop Full</option>
+            <option value="mobile">Web Mobile Lite</option>
+          </select>
+        </div>
         <div class="launcher-actions">
           <button class="secondary" id="launcher-install" disabled>Install</button>
           <button class="secondary" id="launcher-uninstall" disabled>Uninstall</button>
@@ -63,13 +96,23 @@
     <button id="astra-web-options-button" aria-expanded="false" aria-controls="astra-web-options-panel">⚙ Web options</button>
     <div id="astra-web-options-panel" hidden>
       <label><input type="checkbox" id="launcher-performance-toggle"> Performance diagnostics</label>
-      <p>Local measurements only. No data is sent.</p>
+      <label class="web-option-select" id="web-profile-option" hidden>
+        <span>Client profile</span>
+        <select id="web-profile-select" aria-label="Switch client profile">
+          <option value="auto">Auto</option>
+          <option value="desktop">Desktop Full</option>
+          <option value="mobile">Mobile Lite</option>
+        </select>
+      </label>
+      <p>Local measurements only. No data is sent. Switching profile reloads the page cleanly.</p>
     </div>
   </div>
   <details id="astra-performance" hidden><summary>Local performance diagnostics</summary><button id="astra-performance-close" aria-label="Turn off performance diagnostics">×</button><pre id="astra-performance-values"></pre></details>
   <script src="config.js"></script>
+  <script src="platform.js"></script>
   <script src="security.js"></script>
   <script src="runtime.js"></script>
+  <script src="spr-pager.js"></script>
   <script src="bootstrap.js"></script>
   <script src="asset-cache.js"></script>
   <script src="launcher.js"></script>

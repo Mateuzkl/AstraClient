@@ -1,6 +1,12 @@
+// Clean-room Translucent Dark-Charcoal Floating Equipment Panel matching Image 2.
 InventoryItem < Item
+  size: 34 34
+  background-color: #14171cc4
+  border-width: 1
+  border-color: #545b66aa
   $on:
     image-source: /images/ui/item-blessed
+    border-color: #d6cca8dd
 
 HeadSlot < InventoryItem
   id: slot1
@@ -74,41 +80,38 @@ AmmoSlot < InventoryItem
 
 PurseButton < UIButton
   id: purseButton
-  size: 34 12
-  !tooltip: tr('Open purse')
+  size: 34 14
   icon-source: /images/game/slots/purse
   icon-clip: 0 0 34 12
-
+  background-color: #16191ecc
+  border-width: 1
+  border-color: #585e6aaa
   $on:
     icon-clip: 0 12 34 12
-
   $pressed:
     icon-clip: 0 12 34 12
 
 CombatBox < UICheckBox
   size: 20 20
   image-clip: 0 0 20 20
-  margin-left: 4
-
-  $checked:
-    image-clip: 0 20 20 20
-
+  visible: false
 
 InventoryButton < Button
-  font: verdana-11px-antialised
-  height: 18
-  margin-top: 2
-  text-align: center
+  font: mobile-hud-12
+  height: 22
+  visible: false
 
 SoulCapLabel < GameLabel
   text-align: center
-  color: #FFFFFF
-  font: cipsoftFont
-  margin-top: 4
-  text-offset: 0 3
+  color: #edf0f5
+  font: mobile-hud-12
+  margin-top: 2
+  text-offset: 0 1
   width: 36
-  height: 20
-  icon-source: /images/game/slots/soulcap
+  height: 18
+  background-color: #101318cc
+  border-width: 1
+  border-color: #4c525caa
 
 FightOffensiveBox < CombatBox
   image-source: /images/game/combatmodes/fightoffensive
@@ -120,16 +123,16 @@ ChaseModeBox < CombatBox
   image-source: /images/game/combatmodes/chasemode
 SafeFightBox < CombatBox
   image-source: /images/game/combatmodes/safefight
-
 MountButton < CombatBox
   image-source: /images/game/combatmodes/mount
 
 InventoryWindow < MiniWindow
-  icon: /images/topbuttons/inventory
-  height: 200
+  icon: /images/mobile_ui/icon_equip
+  height: 178
+  width: 128
   id: inventoryWindow
   @onClose: modules.game_inventory.onMiniWindowClose()
-  &save: true
+  &save: false
   &autoOpen: 3
 
   MiniWindowContents
@@ -137,14 +140,13 @@ InventoryWindow < MiniWindow
 
     Panel
       id: inventoryPanel
-      margin-right: 63
-      margin-top: 2
       anchors.fill: parent
+      margin: 2
 
       HeadSlot
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 3
+        margin-top: 2
 
       BodySlot
         anchors.top: prev.bottom
@@ -164,8 +166,8 @@ InventoryWindow < MiniWindow
       NeckSlot
         anchors.top: slot1.top
         anchors.right: slot1.left
-        margin-top: 13
-        margin-right: 5
+        margin-top: 10
+        margin-right: 4
 
       LeftSlot
         anchors.top: prev.bottom
@@ -180,8 +182,8 @@ InventoryWindow < MiniWindow
       BackSlot
         anchors.top: slot1.top
         anchors.left: slot1.right
-        margin-top: 13
-        margin-left: 5
+        margin-top: 10
+        margin-left: 4
 
       RightSlot
         anchors.top: prev.bottom
@@ -195,105 +197,58 @@ InventoryWindow < MiniWindow
 
       SoulCapLabel
         id: soulLabel
-        anchors.top: slot10.bottom
-        anchors.horizontalCenter: slot10.horizontalCenter
+        anchors.top: slot9.bottom
+        anchors.horizontalCenter: slot9.horizontalCenter
 
       SoulCapLabel
         id: capLabel
-        anchors.top: slot9.bottom
-        anchors.horizontalCenter: slot9.horizontalCenter
+        anchors.top: slot10.bottom
+        anchors.horizontalCenter: slot10.horizontalCenter
 
       PurseButton
         anchors.left: slot3.left
         anchors.bottom: slot3.top
-        margin-bottom: 3
+        margin-bottom: 1
 
       Panel
         id: conditionPanel
-        layout:
-          type: horizontalBox
-        height: 22
-        padding: 2
-        anchors.top: slot8.bottom
-        anchors.left: slot6.left
-        anchors.right: slot5.right
-        margin-top: 4
-        border-width: 1
-        border-color: #00000077
-        background-color: #ffffff22
+        size: 1 1
+        visible: false
 
     Panel
-      margin-top: 5
-      anchors.fill: parent
-      anchors.left: prev.right
+      size: 1 1
+      visible: false
 
       FightOffensiveBox
         id: fightOffensiveBox
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 8
-
       ChaseModeBox
         id: chaseModeBox
-        anchors.left: prev.right
-        anchors.top: parent.top
-
+      ChaseModeBox
+        id: chaseModeBoxStand
+      ChaseModeBox
+        id: chaseModeBoxChase
       FightBalancedBox
         id: fightBalancedBox
-        margin-top: 22
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 8
-
       SafeFightBox
         id: safeFightBox
-        margin-top: 22
-        anchors.left: prev.right
-        anchors.top: parent.top
-
       FightDefensiveBox
         id: fightDefensiveBox
-        margin-top: 44
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 8
-
       MountButton
         id: mountButton
-        margin-top: 44
-        anchors.left: prev.right
-        anchors.top: parent.top
-
+      Panel
+        id: pvpModesPanel
+        visible: false
+        UICheckBox
+          id: doveMode
+        UICheckBox
+          id: whiteMode
+        UICheckBox
+          id: yellowMode
+        UICheckBox
+          id: redMode
+      UIButton
+        id: openPvpButton
+        visible: false
       Panel
         id: buttonsPanel
-        margin-top: 4
-        margin-right: 5
-        anchors.fill: parent
-        anchors.top: prev.bottom
-        layout:
-          type: verticalBox
-
-        UIButton
-          id: buttonPvp
-          height: 20
-          icon: /images/game/combatmodes/pvp
-          icon-clip: 0 0 42 20
-
-          $on:
-            icon-clip: 0 20 42 20
-
-        InventoryButton
-          !text: tr('Stop')
-          @onClick: g_game.stop(); g_game.cancelAttackAndFollow()
-
-        InventoryButton
-          !text: tr('Options')
-          @onClick: modules.client_options.toggle()
-
-        InventoryButton
-          !text: tr('Quests')
-          @onClick: g_game.requestQuestLog()
-
-        InventoryButton
-          !text: tr('Logout')
-          @onClick: modules.game_interface.tryLogout()
+        visible: false

@@ -234,6 +234,127 @@ test('game focus consumes mapped hotkeys without stealing HTML or clipboard inpu
   assert.equal(document.count() + editor.count(), 0);
 });
 
+test('mobile touch on synced text input rect synchronously focuses native input and syncs text', () => {
+  const document = eventTarget();
+  const canvas = Object.assign(eventTarget(), {
+    getBoundingClientRect: () => ({ left: 10, top: 20, width: 800, height: 390 }),
+    focusCount: 0,
+    focus() { this.focusCount++; }
+  });
+  const editor = eventTarget();
+  const bar = { hidden: true, style: {} };
+  const mobileInput = Object.assign(eventTarget(), {
+    type: 'text', inputMode: 'text', placeholder: '', value: '', maxLength: 0, hidden: false,
+    selectionStart: 0, selectionEnd: 0, focusCount: 0, blurCount: 0,
+    focus() { this.focusCount++; document.activeElement = this; },
+    blur() { this.blurCount++; if (document.activeElement === this) document.activeElement = null; },
+    setSelectionRange(s, e) { this.selectionStart = s; this.selectionEnd = e; },
+    removeAttribute() {}
+  });
+  const mobileTextarea = Object.assign(eventTarget(), {
+    placeholder: '', value: '', hidden: true,
+    selectionStart: 0, selectionEnd: 0, focusCount: 0, blurCount: 0,
+    focus() { this.focusCount++; document.activeElement = this; },
+    blur() { this.blurCount++; if (document.activeElement === this) document.activeElement = null; },
+    setSelectionRange(s, e) { this.selectionStart = s; this.selectionEnd = e; },
+    removeAttribute() {}
+  });
+  const nextBtn = eventTarget();
+  const doneBtn = eventTarget();
+  document.body = { getAttribute: (k) => k === 'data-profile' ? 'mobile' : null };
+  document.getElementById = id => ({
+    canvas, 'astra-virtual-keyboard': editor,
+    'astra-mobile-keyboard-bar': bar, 'astra-mobile-input': mobileInput,
+    'astra-mobile-textarea': mobileTextarea,
+    'astra-mobile-input-next': nextBtn, 'astra-mobile-input-done': doneBtn
+  }[id] || null);
+  const calls = [];
+  const api = runtime({}, undefined, { document, innerHeight: 390, visualViewport: Object.assign(eventTarget(), { height: 190, offsetTop: 0 }) });
+  const stop = api.installTextBridge({ ccall(name, _, _t, values) { calls.push([name, ...values]); } });
+
+  api.updateTextInputRects(JSON.stringify([
+    { id: 'accountNameTextEdit', x: 200, y: 100, w: 180, h: 28, text: '', email: true, password: false, numeric: false, multiline: false, maxLen: 49 }
+  ]));
+
+  // Tap directly on Email field -> focuses widget in C++, opens bar, prevents canvas focus steal, and focuses mobileInput SYNCHRONOUSLY!
+  let touchEndPrevented = 0;
+  canvas.dispatch('touchstart', { changedTouches: [{ identifier: 1, clientX: 250, clientY: 134 }] });
+  canvas.dispatch('touchend', { changedTouches: [{ identifier: 1, clientX: 252, clientY: 135 }], preventDefault() { touchEndPrevented++; } });
+  assert.equal(touchEndPrevented, 1);
+  assert.deepEqual(calls[0], ['astra_browser_focus_text_edit', 'accountNameTextEdit']);
+  assert.equal(bar.hidden, false);
+  assert.equal(mobileInput.hidden, false);
+  assert.equal(mobileTextarea.hidden, true);
+  assert.equal(mobileInput.focusCount, 1);
+  assert.equal(mobileInput.type, 'text');
+  assert.equal(mobileInput.inputMode, 'email');
+  assert.equal(bar.style.bottom, '200px');
+
+  // Typing via Gboard/Android IME (even while compositionstart is active!) calls astra_browser_set_text with expectedId + exact value + selection.
+  mobileInput.dispatch('compositionstart', {});
+  mobileInput.value = 'player@astra.gg';
+  mobileInput.selectionStart = 15;
+  mobileInput.selectionEnd = 15;
+  mobileInput.dispatch('input', {});
+  assert.deepEqual(calls[1], ['astra_browser_set_text', 'accountNameTextEdit', 'player@astra.gg', 15, 15]);
+  mobileInput.dispatch('compositionend', {});
+
+  // Enter during CJK IME composition must be ignored (does not send Enter or close bar).
+  mobileInput.dispatch('keydown', { key: 'Enter', isComposing: true, preventDefault() {} });
+  assert.equal(bar.hidden, false);
+  assert.equal(calls.filter(c => c[0] === 'astra_browser_virtual_key' && c[1] === 13).length, 0);
+
+  // Delayed C++ showMobileKeyboard echo for the same focused widget preserves already-typed text.
+  api.showMobileKeyboard(JSON.stringify({ id: 'accountNameTextEdit', text: '', email: true }));
+  assert.equal(mobileInput.value, 'player@astra.gg');
+
+  // Engine-normalized text echo (e.g. numeric field rejecting letters) immediately updates mobileInput.
+  api.syncFocusedTextInput(JSON.stringify({ id: 'accountNameTextEdit', text: 'player@astra.gg', selStart: 15, selEnd: 15, normalized: true }));
+  assert.equal(mobileInput.value, 'player@astra.gg');
+
+  // C++ setCursorPos / setSelection updates caret even when text didn't change (after recent-input window).
+  api.syncFocusedTextInput(JSON.stringify({ id: 'other', text: 'abcd', selStart: 4, selEnd: 4 }));
+  api.syncFocusedTextInput(JSON.stringify({ id: 'other', text: 'abcd', selStart: 0, selEnd: 0 }));
+  assert.equal(mobileInput.selectionStart, 0);
+  assert.equal(mobileInput.selectionEnd, 0);
+
+  // Tapping Next via touch (touchend) flushes text, asks C++ to advance focus, suppresses stale input until onVirtualTabProcessed fires.
+  let nextTouchPrevented = 0;
+  nextBtn.dispatch('touchend', { preventDefault() { nextTouchPrevented++; } });
+  nextBtn.dispatch('click', {});
+  assert.equal(nextTouchPrevented, 1);
+  assert.equal(calls.filter(c => c[0] === 'astra_browser_next_text_edit').length, 1);
+  const countAfterNext = calls.length;
+  mobileInput.value = 'stale-typing-before-tab';
+  mobileInput.dispatch('input', {});
+  assert.equal(calls.length, countAfterNext, 'Input typed after Next before Tab settles must not overwrite next widget');
+  api.onVirtualTabProcessed(JSON.stringify({ id: 'other', text: 'abcd', selStart: 4, selEnd: 4 }));
+  mobileInput.value = 'abcd2';
+  mobileInput.dispatch('input', {});
+  assert.equal(calls.length, countAfterNext + 1, 'onVirtualTabProcessed must unlock editing even when Tab stays on same widget');
+
+  // Multiline fields switch to <textarea>, preserve line breaks, and pressing Next never blocks subsequent edits.
+  api.showMobileKeyboard(JSON.stringify({ id: 'bookText', text: 'Line 1\nLine 2', multiline: true, selStart: 13, selEnd: 13 }));
+  assert.equal(mobileInput.hidden, true);
+  assert.equal(mobileTextarea.hidden, false);
+  assert.equal(mobileTextarea.value, 'Line 1\nLine 2');
+  nextBtn.dispatch('click', {});
+  mobileTextarea.value = 'Line 1\nLine 2\nLine 3';
+  mobileTextarea.selectionStart = 20;
+  mobileTextarea.selectionEnd = 20;
+  mobileTextarea.dispatch('input', {});
+  assert.deepEqual(calls[calls.length - 1], ['astra_browser_set_text', 'bookText', 'Line 1\nLine 2\nLine 3', 20, 20]);
+
+  // Tapping outside text rects hides the bar and blurs active control.
+  canvas.dispatch('touchstart', { changedTouches: [{ identifier: 2, clientX: 30, clientY: 40 }] });
+  canvas.dispatch('touchend', { changedTouches: [{ identifier: 2, clientX: 30, clientY: 40 }] });
+  assert.equal(bar.hidden, true);
+  assert.equal(mobileTextarea.blurCount, 1);
+
+  stop();
+  assert.equal(document.count() + canvas.count() + editor.count() + mobileInput.count() + mobileTextarea.count() + nextBtn.count() + doneBtn.count(), 0);
+});
+
 test('persistence hooks release timers and listeners and ignore late ticks', () => {
   const host = eventTarget();
   const document = eventTarget();

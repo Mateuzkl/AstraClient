@@ -489,7 +489,9 @@ function UIRealMinimap:createFlagWindow(pos)
 
   -- Keep the map alive while editing a flag. Rebuilding it on confirmation
   -- loses marker state and schedules a second world-catalog load.
-  modules.game_cyclopedia.cyclopediaWindow:hide()
+  if modules.game_cyclopedia and modules.game_cyclopedia.cyclopediaWindow then
+    modules.game_cyclopedia.cyclopediaWindow:hide()
+  end
   self.flagWindow = g_ui.createWidget('MinimapFlagWindow', rootWidget)
   g_client.setInputLockWidget(self.flagWindow)
 
@@ -534,9 +536,11 @@ function UIRealMinimap:destroyFlagWindow(oldPos)
     self.flagWindow = nil
 
     if not self._closing and not self:isDestroyed() then
-      local window = modules.game_cyclopedia.cyclopediaWindow
-      window:show(true); window:raise(); window:focus()
-      g_client.setInputLockWidget(window)
+      local window = modules.game_cyclopedia and modules.game_cyclopedia.cyclopediaWindow
+      if window then
+        window:show(true); window:raise(); window:focus()
+        g_client.setInputLockWidget(window)
+      end
       if oldPos then self:setCameraPosition(oldPos) end
     end
   end

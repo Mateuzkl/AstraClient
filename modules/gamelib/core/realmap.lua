@@ -78,7 +78,9 @@ function RealMap.setRegions(minimapWidget, mainAreaId, regions)
     end
   end
 
-  modules.game_cyclopedia.MapCyclopedia.setImprovevedValue(mainAreaId)
+  if modules.game_cyclopedia and modules.game_cyclopedia.MapCyclopedia then
+    modules.game_cyclopedia.MapCyclopedia.setImprovevedValue(mainAreaId)
+  end
 
   if minimapWidget.selectedRegion then
     g_realMinimap.disableRegion(minimapWidget.selectedRegion.id)
@@ -127,8 +129,10 @@ function RealMap.setRegion(minimapWidget)
       g_realMinimap.enableRegion(imageId)
 
       local areaName, subAreaName = self:getAreaNameById(region.areaId)
-      modules.game_cyclopedia.MapCyclopedia.onChangeArea(areaName, subAreaName)
-      modules.game_cyclopedia.MapCyclopedia.setImprovevedValue(region.areaId)
+      if modules.game_cyclopedia and modules.game_cyclopedia.MapCyclopedia then
+        modules.game_cyclopedia.MapCyclopedia.onChangeArea(areaName, subAreaName)
+        modules.game_cyclopedia.MapCyclopedia.setImprovevedValue(region.areaId)
+      end
 
       return true
     end)

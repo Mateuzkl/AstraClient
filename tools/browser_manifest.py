@@ -13,7 +13,7 @@ from pathlib import Path
 CHUNK_SIZE = 64 * 1024 * 1024  # Emscripten 6.0.8 EM_PRELOAD_CACHE chunk size.
 
 
-def create_manifest(dist):
+def create_manifest(dist, profile=None):
     source = (dist / 'astraclient.js').read_text(encoding='utf-8')
     match = re.search(r'var PACKAGE_NAME\s*=\s*("[^"\n]+")', source)
     package = re.search(r'loadPackage\(\s*(\{\s*"?files"?\s*:)', source)
@@ -50,7 +50,7 @@ def create_manifest(dist):
     # Accept that SDK format, but never accept a conflicting supplied identity.
     if ('package_uuid' in metadata and uuid != metadata['package_uuid']) or size != metadata['remote_package_size']:
         raise ValueError('The generated .data does not match the SDK preload identity')
-    return {
+    result = {
         'schema': 1, 'version': '8.60', 'packageName': json.loads(match.group(1)),
         'uuid': uuid, 'file': 'astraclient.data', 'size': size, 'chunks': chunks,
         'groups': groups,
@@ -59,22 +59,74 @@ def create_manifest(dist):
         # excluded unused files as deferred assets or promise a nonexistent loader.
         'bootPackageBytes': size, 'deferredPackageBytes': 0,
         'artifacts': {p.name: p.stat().st_size for p in sorted(dist.iterdir())
-                      if p.suffix in ('.js', '.wasm', '.data', '.png', '.css', '.html')}
+                      if p.suffix in ('.js', '.wasm', '.data', '.png', '.css', '.html', '.spr') or p.name == 'spr-manifest.json'}
     }
+    if profile:
+        result['profile'] = profile
+    spr_manifest_path = dist / 'spr-manifest.json'
+    if spr_manifest_path.is_file():
+        spr_meta = json.loads(spr_manifest_path.read_text(encoding='utf-8'))
+        result['sprMode'] = 'paged'
+        result['sprManifest'] = 'spr-manifest.json'
+        result['onDemandSprBytes'] = spr_meta.get('size', 0)
+        result['onDemandSprPageSize'] = spr_meta.get('pageSize', 262144)
+        result['onDemandSprPages'] = len(spr_meta.get('hashes', []))
+    return result
+
+
+def update_profiles_index(root_dist: Path, profile: str, subdir: str, manifest: dict):
+    index_path = root_dist / 'profiles.json'
+    index = {'schema': 1, 'defaultProfile': 'desktop', 'profiles': {}}
+    if index_path.is_file():
+        try:
+            loaded = json.loads(index_path.read_text(encoding='utf-8'))
+            if isinstance(loaded, dict) and isinstance(loaded.get('profiles'), dict):
+                index = loaded
+        except Exception:
+            pass
+    base = subdir.strip('/') + '/' if subdir.strip('/') else ''
+    entry = {
+        'profile': profile,
+        'label': 'Web Mobile Lite' if profile == 'mobile' else 'Web Desktop Full',
+        'base': base,
+        'manifest': 'asset-manifest.json',
+        'script': 'astraclient.js',
+        'bootPackageBytes': manifest['bootPackageBytes'],
+        'wasmBytes': manifest['artifacts'].get('astraclient.wasm', 0),
+        'sprMode': manifest.get('sprMode', 'bundled'),
+    }
+    if manifest.get('sprManifest'):
+        entry['sprManifest'] = manifest['sprManifest']
+        entry['onDemandSprBytes'] = manifest.get('onDemandSprBytes', 0)
+    index['profiles'][profile] = entry
+    if 'desktop' not in index['profiles'] and profile in index['profiles']:
+        index['defaultProfile'] = profile
+    elif 'desktop' in index['profiles']:
+        index['defaultProfile'] = 'desktop'
+    index_path.write_text(json.dumps(index, sort_keys=True, indent=2) + '\n', encoding='utf-8')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('dist', type=Path)
     parser.add_argument('--compression-report', action='store_true')
+    parser.add_argument('--profile', choices=('desktop', 'mobile'), default=None)
+    parser.add_argument('--root-dist', type=Path, default=None)
+    parser.add_argument('--subdir', default='')
     args = parser.parse_args()
-    manifest = create_manifest(args.dist)
+    manifest = create_manifest(args.dist, profile=args.profile)
     (args.dist / 'asset-manifest.json').write_text(
         json.dumps(manifest, sort_keys=True, indent=2) + '\n', encoding='utf-8')
+    if args.profile and args.root_dist:
+        update_profiles_index(args.root_dist, args.profile, args.subdir, manifest)
     print(f"Browser bundle: {manifest['size'] / 1048576:.2f} MiB, {len(manifest['chunks'])} cache chunks")
-    print(json.dumps({'groups': manifest['groups'], 'largestFiles': manifest['largestFiles'],
-                      'bootPackageBytes': manifest['bootPackageBytes'],
-                      'deferredPackageBytes': manifest['deferredPackageBytes']}, indent=2))
+    summary = {'groups': manifest['groups'], 'largestFiles': manifest['largestFiles'],
+               'bootPackageBytes': manifest['bootPackageBytes'],
+               'deferredPackageBytes': manifest['deferredPackageBytes']}
+    if 'onDemandSprBytes' in manifest:
+        summary['onDemandSprBytes'] = manifest['onDemandSprBytes']
+        summary['onDemandSprPages'] = manifest['onDemandSprPages']
+    print(json.dumps(summary, indent=2))
     if manifest['size'] > 768 * 1048576:
         print('WARNING: browser boot package exceeds 768 MiB; audit the size report before deployment.')
     if args.compression_report:
