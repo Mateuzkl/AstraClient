@@ -170,6 +170,16 @@ void UIManager::inputEvent(const InputEvent& event)
             break;
         }
         case Fw::MouseMoveInputEvent: {
+            if (event.mouseButton == Fw::MouseTouch2 || event.mouseButton == Fw::MouseTouch3) {
+                g_lua.callGlobalField("g_ui", "onTouchMove", event.mousePos, event.mouseMoved, event.mouseButton);
+                if (m_pressedWidget[event.mouseButton]) {
+                    m_pressedWidget[event.mouseButton]->onMouseMove(event.mousePos, event.mouseMoved);
+                }
+                break;
+            }
+            if (event.mouseButton == Fw::MouseTouch) {
+                g_lua.callGlobalField("g_ui", "onTouchMove", event.mousePos, event.mouseMoved, Fw::MouseTouch);
+            }
             g_lua.callGlobalField("g_ui", "onMouseMove", event.mousePos, event.mouseMoved);
 
             // start dragging when moving a pressed widget

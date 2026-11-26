@@ -1,6 +1,11 @@
+// Clean-room Mobile Obsidian + Gold Inventory & Equipment Window.
 InventoryItem < Item
+  background-color: #090e1ad8
+  border-width: 1
+  border-color: #ffffff28
   $on:
     image-source: /images/ui/item-blessed
+    border-color: #f0be4acc
 
 HeadSlot < InventoryItem
   id: slot1
@@ -74,41 +79,49 @@ AmmoSlot < InventoryItem
 
 PurseButton < UIButton
   id: purseButton
-  size: 34 12
+  size: 36 16
   !tooltip: tr('Open purse')
   icon-source: /images/game/slots/purse
   icon-clip: 0 0 34 12
+  background-color: #101728cc
+  border-width: 1
+  border-color: #e8b83e66
 
   $on:
     icon-clip: 0 12 34 12
+    border-color: #ffd96a
 
   $pressed:
     icon-clip: 0 12 34 12
 
 CombatBox < UICheckBox
-  size: 20 20
+  size: 26 26
   image-clip: 0 0 20 20
   margin-left: 4
+  border-width: 1
+  border-color: #ffffff28
 
   $checked:
     image-clip: 0 20 20 20
-
+    border-color: #f0be4ae6
 
 InventoryButton < Button
-  font: verdana-11px-antialised
-  height: 18
-  margin-top: 2
+  font: mobile-hud-12
+  height: 24
+  margin-top: 3
   text-align: center
 
 SoulCapLabel < GameLabel
   text-align: center
-  color: #FFFFFF
-  font: cipsoftFont
+  color: #f3eedc
+  font: mobile-hud-12
   margin-top: 4
-  text-offset: 0 3
-  width: 36
+  text-offset: 0 2
+  width: 38
   height: 20
-  icon-source: /images/game/slots/soulcap
+  background-color: #090e1ad8
+  border-width: 1
+  border-color: #ffffff24
 
 FightOffensiveBox < CombatBox
   image-source: /images/game/combatmodes/fightoffensive
@@ -125,8 +138,9 @@ MountButton < CombatBox
   image-source: /images/game/combatmodes/mount
 
 InventoryWindow < MiniWindow
-  icon: /images/topbuttons/inventory
-  height: 200
+  icon: /images/mobile_ui/icon_bag
+  height: 242
+  width: 222
   id: inventoryWindow
   @onClose: modules.game_inventory.onMiniWindowClose()
   &save: true
@@ -137,61 +151,61 @@ InventoryWindow < MiniWindow
 
     Panel
       id: inventoryPanel
-      margin-right: 63
+      margin-right: 74
       margin-top: 2
       anchors.fill: parent
 
       HeadSlot
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       BodySlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       LegSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       FeetSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       NeckSlot
         anchors.top: slot1.top
         anchors.right: slot1.left
-        margin-top: 13
+        margin-top: 14
         margin-right: 5
 
       LeftSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       FingerSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       BackSlot
         anchors.top: slot1.top
         anchors.left: slot1.right
-        margin-top: 13
+        margin-top: 14
         margin-left: 5
 
       RightSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       AmmoSlot
         anchors.top: prev.bottom
         anchors.horizontalCenter: prev.horizontalCenter
-        margin-top: 3
+        margin-top: 4
 
       SoulCapLabel
         id: soulLabel
@@ -217,13 +231,13 @@ InventoryWindow < MiniWindow
         anchors.top: slot8.bottom
         anchors.left: slot6.left
         anchors.right: slot5.right
-        margin-top: 4
+        margin-top: 5
         border-width: 1
-        border-color: #00000077
-        background-color: #ffffff22
+        border-color: #e8b83e44
+        background-color: #070b14cc
 
     Panel
-      margin-top: 5
+      margin-top: 4
       anchors.fill: parent
       anchors.left: prev.right
 
@@ -231,7 +245,7 @@ InventoryWindow < MiniWindow
         id: fightOffensiveBox
         anchors.left: parent.left
         anchors.top: parent.top
-        margin-left: 8
+        margin-left: 4
 
       ChaseModeBox
         id: chaseModeBox
@@ -240,34 +254,34 @@ InventoryWindow < MiniWindow
 
       FightBalancedBox
         id: fightBalancedBox
-        margin-top: 22
+        margin-top: 28
         anchors.left: parent.left
         anchors.top: parent.top
-        margin-left: 8
+        margin-left: 4
 
       SafeFightBox
         id: safeFightBox
-        margin-top: 22
+        margin-top: 28
         anchors.left: prev.right
         anchors.top: parent.top
 
       FightDefensiveBox
         id: fightDefensiveBox
-        margin-top: 44
+        margin-top: 56
         anchors.left: parent.left
         anchors.top: parent.top
-        margin-left: 8
+        margin-left: 4
 
       MountButton
         id: mountButton
-        margin-top: 44
+        margin-top: 56
         anchors.left: prev.right
         anchors.top: parent.top
 
       Panel
         id: buttonsPanel
-        margin-top: 4
-        margin-right: 5
+        margin-top: 6
+        margin-right: 4
         anchors.fill: parent
         anchors.top: prev.bottom
         layout:
@@ -275,7 +289,7 @@ InventoryWindow < MiniWindow
 
         UIButton
           id: buttonPvp
-          height: 20
+          height: 22
           icon: /images/game/combatmodes/pvp
           icon-clip: 0 0 42 20
 

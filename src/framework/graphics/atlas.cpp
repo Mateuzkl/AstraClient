@@ -118,13 +118,18 @@ void Atlas::release()
 
 Point Atlas::cacheFont(const TexturePtr& fontTexture)
 {
+    if (!fontTexture || !m_atlas[1]) {
+        return Point(-1, -1);
+    }
     fontTexture->update();
     int index = calculateIndex(fontTexture->getSize());
     if (index < 0) {
-        g_logger.fatal("[Atlas] Too big font texture. Max is 2048x2048");
+        g_logger.warning("[Atlas] Font texture exceeds 2048x2048; rendering with standalone texture");
+        return Point(-1, -1);
     }
     if (m_locations[1][index].empty() && !findSpace(1, index)) {
-        g_logger.fatal("[Atlas] Out of space for new fonts, compile with BIG_FONTS or DONT_CACHE_FONTS definition");
+        g_logger.warning("[Atlas] Font atlas full; rendering font with standalone texture");
+        return Point(-1, -1);
     }
     Point location = m_locations[1][index].front();
     m_locations[1][index].pop_front();

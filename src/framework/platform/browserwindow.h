@@ -60,7 +60,7 @@ class BrowserWindow final : public PlatformWindow
 
     void handlePaste(std::string text);
     void handleVirtualText(std::string text);
-    void handleVirtualTextReplace(std::string text, int selStart, int selEnd);
+    void handleVirtualTextReplace(std::string expectedId, std::string text, int selStart, int selEnd);
     void handleVirtualKey(Fw::Key key);
     void handleVisibilityChange(bool visible);
     void handleViewportChanged();

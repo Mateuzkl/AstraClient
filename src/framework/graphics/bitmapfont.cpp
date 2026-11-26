@@ -89,7 +89,11 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
     Point offset(0, 0);
 #else
     Point offset = g_atlas.cacheFont(m_texture);
-    m_texture = g_atlas.get(1);
+    if (offset.x >= 0 && offset.y >= 0) {
+        m_texture = g_atlas.get(1);
+    } else {
+        offset = Point(0, 0);
+    }
 #endif
     for (int glyph = m_firstGlyph; glyph < 256; ++glyph) {
         m_glyphsTextureCoords[glyph].setRect(((glyph - m_firstGlyph) % numHorizontalGlyphs) * glyphSize.width() + offset.x,
@@ -115,7 +119,12 @@ void BitmapFont::reload()
     m_texture = sourceTexture;
 #else
     Point offset = g_atlas.cacheFont(sourceTexture);
-    m_texture = g_atlas.get(1);
+    if (offset.x >= 0 && offset.y >= 0) {
+        m_texture = g_atlas.get(1);
+    } else {
+        offset = Point(0, 0);
+        m_texture = sourceTexture;
+    }
 #endif
     for (int glyph = m_firstGlyph; glyph < 256; ++glyph) {
         m_glyphsTextureCoords[glyph].setRect(((glyph - m_firstGlyph) % numHorizontalGlyphs) * m_glyphSize.width() + offset.x,

@@ -629,7 +629,7 @@ end
 
 function CharacterList.create(characters, account, otui)
   removeAutoReconnectEvent()
-  if not otui then otui = 'characterlist' end
+  if not otui then otui = (g_app and g_app.isMobile and g_app.isMobile()) and 'characterlist_mobile' or 'characterlist' end
   if charactersWindow then
     charactersWindow:destroy()
   end
@@ -639,7 +639,11 @@ function CharacterList.create(characters, account, otui)
   panelSort = charactersWindow:getChildById('characterTable')
   autoReconnectButton = charactersWindow:getChildById('autoReconnect')
   updateAutoReconnectButton()
-  CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
+  if charactersWindow.recordPanel then
+    CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
+  else
+    CharacterList.camRecordCheck = nil
+  end
 
   charactersWindow.static = not g_game.isOnline()
 
@@ -870,8 +874,54 @@ function CharacterList.cancelWait()
   charactersWindow:recursiveFocus(2)
 end
 
+local function updateMobileHeroStage(row)
+  if not charactersWindow or not charactersWindow.mobileStage or not row then return end
+  local stageName = charactersWindow:recursiveGetChildById('stageName')
+  local stageDetails = charactersWindow:recursiveGetChildById('stageDetails')
+  local stageWorldLabel = charactersWindow:recursiveGetChildById('stageWorldLabel')
+  local stageCreature = charactersWindow:recursiveGetChildById('stageCreature')
+  if stageName then
+    stageName:setText(tostring(row.characterName or ''))
+  end
+  if stageDetails then
+    local lvl = row.characterLevel and ('Level ' .. tostring(row.characterLevel)) or ''
+    local voc = tostring(row.vocationName or '')
+    stageDetails:setText(lvl ~= '' and voc ~= '' and (lvl .. ' - ' .. voc) or (lvl .. voc))
+  end
+  if stageWorldLabel then
+    stageWorldLabel:setText(tostring(row.gameworldName or row.worldName or ''))
+  end
+  if stageCreature and row.characterOutfit then
+    stageCreature:setOutfit(row.characterOutfit)
+    stageCreature:setVisible(true)
+  elseif stageCreature then
+    stageCreature:setVisible(false)
+  end
+end
+
 function onUpdateOnStates(self)
   if not self:isFocused() then
+    return
+  end
+
+  if charactersWindow and charactersWindow.mobileStage then
+    self:setBackgroundColor("#e8b83e2e")
+    self:setBorderColor("#f0be4ae6")
+    if self.name then self.name:setColor("#ffffff") end
+    if self.level then self.level:setColor("#ffd96a") end
+    if self.vocation then self.vocation:setColor("#eef2ff") end
+    if self.pin then self.pin:setVisible(true) end
+
+    if lastWidget and lastWidget ~= self then
+      lastWidget:setBackgroundColor(lastWidget.realColor or "#0b111ecc")
+      lastWidget:setBorderColor("#ffffff1f")
+      if lastWidget.pin then lastWidget.pin:setVisible(false) end
+      if lastWidget.name then lastWidget.name:setColor("#f3eedc") end
+      if lastWidget.level then lastWidget.level:setColor("#f0c85c") end
+      if lastWidget.vocation then lastWidget.vocation:setColor("#b7c2d6") end
+    end
+    lastWidget = self
+    updateMobileHeroStage(self)
     return
   end
 
@@ -949,7 +999,11 @@ function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverri
   local firstWidget
   for i, characterInfo in ipairs(characters) do
     local widget = g_ui.createWidget(showOutfit and 'CharacterWidgetOn' or 'CharacterWidgetOff', characterList)
-    widget.realColor = i % 2 == 0 and '#414141' or '#484848'
+    if charactersWindow and charactersWindow.mobileStage then
+      widget.realColor = i % 2 == 0 and '#0d1424cc' or '#090e1acc'
+    else
+      widget.realColor = i % 2 == 0 and '#414141' or '#484848'
+    end
     widget:setBackgroundColor(widget.realColor)
 
     local pvpType = PvPTypes[characterInfo.pvpType] or PvPTypes[0] or ''
@@ -987,11 +1041,16 @@ function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverri
 
     -- Keep both the new row identity and Astra's login fields.
     widget.characterName = characterInfo.name
+    widget.characterLevel = characterInfo.level
+    widget.characterOutfit = characterInfo.outfit
     widget.worldName = characterInfo.worldName
     widget.gameworldName = characterInfo.worldName
     widget.worldHost = characterInfo.worldHost or characterInfo.worldIp
     widget.worldPort = characterInfo.worldPort
     widget.vocationName = characterInfo.vocation
+    if charactersWindow and charactersWindow.mobileStage and widget.level and characterInfo.level then
+      widget.level:setText('Lv.' .. tostring(characterInfo.level))
+    end
     local pin = widget:getChildById('pin')
     setCheckedWithoutCallback(pin, isCharacterPinned(widget.characterName, widget.worldName, pinnedLookup))
 

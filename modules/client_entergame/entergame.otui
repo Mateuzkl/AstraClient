@@ -5,7 +5,7 @@ EnterGameWindow
   id: enterGame
   size: 280 248
   $mobile:
-    size: 400 258
+    size: 320 300
   @onEnter: EnterGame.doLogin()
 
   MenuLabel
@@ -17,9 +17,6 @@ EnterGameWindow
     font: $var-cip-font
     color: $var-text-cip-color
     margin-top: -3
-    $mobile:
-      font: verdana-11px-antialised
-      margin-top: 6
 
   UIWidget
     id: emailStatus
@@ -43,14 +40,6 @@ EnterGameWindow
     margin-left: 30
     max-length: 49
     padding-right: 23
-    $mobile:
-      height: 28
-      font: verdana-11px-antialised
-      margin-top: -5
-      margin-left: 44
-      padding-left: 6
-      padding-top: 5
-      padding-right: 30
     @onTextChange: modules.client_entergame.onTextChange()
 
   Button
@@ -60,12 +49,6 @@ EnterGameWindow
     margin-top: -5
     margin-right: 1
     size: 18 18
-    $mobile:
-      anchors.top: none
-      anchors.verticalCenter: accountNameTextEdit.verticalCenter
-      size: 18 18
-      margin-top: 0
-      margin-right: 5
     image-source: /images/ui/hidden-button
     image-clip: 0 0 18 18
     $pressed:
@@ -85,9 +68,6 @@ EnterGameWindow
     font: $var-cip-font
     color: $var-text-cip-color
     text-auto-resize: true
-    $mobile:
-      font: verdana-11px-antialised
-      margin-top: 16
 
   PasswordTextEdit
     id: accountPasswordTextEdit
@@ -99,14 +79,6 @@ EnterGameWindow
     width: 182
     margin-top: -3
     margin-left: -1
-    $mobile:
-      anchors.left: accountNameTextEdit.left
-      height: 28
-      font: verdana-11px-antialised
-      margin-top: -5
-      margin-left: 0
-      padding-left: 6
-      padding-top: 5
 
   MenuLabel
     id: tokenLabel
@@ -118,9 +90,6 @@ EnterGameWindow
     text-auto-resize: false
     margin-top: 2
     width: 80
-    $mobile:
-      font: verdana-11px-antialised
-      margin-top: 16
 
   TextEdit
     id: accountTokenTextEdit
@@ -130,13 +99,6 @@ EnterGameWindow
     max-length: 6
     only-number: true
     width: 180
-    $mobile:
-      anchors.left: accountNameTextEdit.left
-      height: 28
-      font: verdana-11px-antialised
-      margin-top: 8
-      padding-left: 6
-      padding-top: 5
 
   Panel
     id: serverSelectorPanel
@@ -145,8 +107,6 @@ EnterGameWindow
     anchors.top: loginButton.top
     on: true
     focusable: false
-    $mobile:
-      size: 132 30
 
     $on:
       visible: true
@@ -159,8 +119,6 @@ EnterGameWindow
       anchors.fill: parent
       font: $var-cip-font
       color: $var-text-cip-color
-      $mobile:
-        font: verdana-11px-antialised
       @onOptionChange: EnterGame.onServerChange()
 
   UIButton
@@ -168,14 +126,12 @@ EnterGameWindow
     anchors.top: loginButton.top
     anchors.left: prev.right
     margin-left: 5
-    $mobile:
-      visible: false
     image-source: /images/ui/cam
     image-clip: 0 0 20 20
     $pressed:
       image-clip: 0 20 20 20
     !tooltip: tr('Open Recordings List')
-    @onClick: function() if modules.client_camviewer and modules.client_camviewer.toggle then EnterGame.hide(false) modules.client_camviewer.toggle() end end
+    @onClick: function() EnterGame.hide(false) modules.client_camviewer.toggle() end
 
   Panel
     id: customServerSelectorPanel
@@ -240,9 +196,6 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: accountTokenTextEdit.bottom
     margin-top: 12
-    $mobile:
-      height: 22
-      margin-top: 10
     @onCheckChange: chooseButtonVisibility()
 
     Label
@@ -255,10 +208,6 @@ EnterGameWindow
       color: $var-text-cip-color
       margin-left: 14
       margin-top: -2
-      $mobile:
-        font: verdana-11px-antialised
-        margin-left: 20
-        margin-top: 1
 
   ButtonInformation
     id: buttonInformation
@@ -282,9 +231,6 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: rememberEmailBox.bottom
     margin-top: 5
-    $mobile:
-      height: 22
-      margin-top: 6
     @onCheckChange: chooseButtonVisibility()
 
     Label
@@ -297,10 +243,6 @@ EnterGameWindow
       color: $var-text-cip-color
       margin-left: 14
       margin-top: -2
-      $mobile:
-        font: verdana-11px-antialised
-        margin-left: 20
-        margin-top: 1
 
   ButtonInformation
     id: passwordInformation
@@ -327,8 +269,6 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.top: rememberPasswordBox.bottom
     margin-top: 5
-    $mobile:
-      visible: false
     @onCheckChange: EnterGame.onAutoLoginChange()
 
   TextButton
@@ -342,8 +282,6 @@ EnterGameWindow
     color: $var-text-cip-color
     //cursor: attacker
     image-source: /images/ui/special_miniwindow
-    $mobile:
-      visible: false
     @onClick: openPlataform(self)
 
   Label
@@ -353,8 +291,6 @@ EnterGameWindow
     anchors.left: clickSitePassword.left
     margin-top: -1
     margin-right: 1
-    $mobile:
-      visible: false
 
   TextButton
     id: clickSiteCreateAccount
@@ -367,8 +303,6 @@ EnterGameWindow
     color: $var-text-cip-color
     cursor: pointer
     image-source: /images/ui/special_miniwindow
-    $mobile:
-      visible: false
     @onClick: modules.client_entergame.openPlataform(self)
 
   Label
@@ -377,17 +311,12 @@ EnterGameWindow
     anchors.top: clickSiteCreateAccount.bottom
     anchors.left: clickSiteCreateAccount.left
     margin-top: -1
-    $mobile:
-      visible: false
 
   HorizontalSeparator
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 11
-    $mobile:
-      anchors.top: rememberPasswordBox.bottom
-      margin-top: 10
 
   Button
     !text: tr('Login with Google')
@@ -396,8 +325,6 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.bottom: loginButton.top
     margin-bottom: 6
-    $mobile:
-      visible: false
     icon: /images/ui/google
     icon-offset: -57 0
     image-source: /images/ui/buttons-blue
@@ -413,11 +340,6 @@ EnterGameWindow
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 6
-    $mobile:
-      height: 30
-      width: 132
-      font: verdana-11px-antialised
-      margin-bottom: 4
     @onClick: EnterGame.doLogin()
 
   Label

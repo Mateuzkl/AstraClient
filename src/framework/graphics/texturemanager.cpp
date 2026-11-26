@@ -126,7 +126,7 @@ void TextureManager::reload()
                         std::vector<ImagePtr> frames;
                         frames.reserve(apng.num_frames);
                         for (uint i = 0; i < apng.num_frames; ++i) {
-                            uchar* frameData = apng.pdata + (i * apng.height * apng.width * apng.bpp);
+                            uchar* frameData = apng.pdata + ((apng.first_frame + i) * apng.height * apng.width * apng.bpp);
                             frames.push_back(std::make_shared<Image>(imageSize, apng.bpp, frameData));
                         }
                         static_cast<AnimatedTexture*>(tex.get())->replaceFrames(frames);

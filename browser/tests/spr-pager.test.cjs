@@ -170,6 +170,55 @@ test('spr-pager aborts stalled downloads on timeout and on dispose', async () =>
   assert.equal(aborted, 1);
   assert.equal(pager.getStats().errors, 1);
   assert.equal(pager.getStats().inFlight, 0);
+
+  // Disposing immediately after requestPage (while store setup is pending) must never start a network fetch.
+  let disposedFetches = 0;
+  const slowStore = {
+    getMeta: () => new Promise(r => setTimeout(() => r(null), 15)),
+    putMeta: async () => {},
+    getPage: async () => null,
+    putPage: async () => {},
+    clearPages: async () => {}
+  };
+  const pager2 = api.createPager({
+    manifest,
+    baseUrl: 'http://localhost/mobile/spr-manifest.json',
+    store: slowStore,
+    fetcher: async () => { disposedFetches++; return new Response(new Uint8Array(PAGE_SIZE), { status: 206 }); },
+    onDeliver() {}
+  });
+  pager2.requestPage(0);
+  pager2.dispose();
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(disposedFetches, 0, 'disposed pager must not start fetch after async store lookup');
+});
+
+test('spr-pager inactivity timeout allows slow streamed valid pages to finish', async () => {
+  const { full, manifest } = await buildFixture(PAGE_SIZE);
+  const res = await new Promise(resolve => {
+    const pager = api.createPager({
+      manifest,
+      baseUrl: 'http://localhost/mobile/spr-manifest.json',
+      timeoutMs: 60,
+      fetcher: async () => {
+        const stream = new ReadableStream({
+          async start(controller) {
+            const half = PAGE_SIZE / 2;
+            await new Promise(r => setTimeout(r, 25));
+            controller.enqueue(full.slice(0, half));
+            await new Promise(r => setTimeout(r, 25));
+            controller.enqueue(full.slice(half, PAGE_SIZE));
+            controller.close();
+          }
+        });
+        return new Response(stream, { status: 206 });
+      },
+      onDeliver(pageIndex, bytes, ok) { resolve({ pageIndex, bytes, ok }); }
+    });
+    pager.requestPage(0);
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.bytes.byteLength, PAGE_SIZE);
 });
 
 test('spr-pager invalidates old cached pages automatically when manifest UUID changes', async () => {

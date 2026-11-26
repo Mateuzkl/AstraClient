@@ -178,15 +178,25 @@
         } catch (_) {}
       }
 
+      if (disposed) return null;
+
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       if (controller) activeControllers.add(controller);
       let timeoutId = null;
+      let rejectIdle = null;
+      const resetIdleTimer = () => {
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        if (timeoutMs > 0) {
+          timeoutId = setTimeout(() => {
+            if (controller) { try { controller.abort(); } catch (_) {} }
+            if (rejectIdle) rejectIdle(new Error(`Sprite page ${pageIndex} download timed out`));
+          }, timeoutMs);
+        }
+      };
       const deadlinePromise = timeoutMs > 0
         ? new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-              if (controller) { try { controller.abort(); } catch (_) {} }
-              reject(new Error(`Sprite page ${pageIndex} download timed out`));
-            }, timeoutMs);
+            rejectIdle = reject;
+            resetIdleTimer();
           })
         : null;
 
@@ -200,10 +210,36 @@
           };
           if (controller) init.signal = controller.signal;
           const response = await fetcher(sprUrl, init);
+          if (disposed) throw new Error(`Sprite page ${pageIndex} aborted after dispose`);
+          resetIdleTimer();
           if (response.status !== 206) {
             throw new Error(`Expected HTTP 206 for sprite page ${pageIndex}, got ${response.status}`);
           }
-          const buffer = await response.arrayBuffer();
+          let buffer;
+          if (response.body && typeof response.body.getReader === 'function') {
+            const reader = response.body.getReader();
+            const chunks = [];
+            let total = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              resetIdleTimer();
+              if (value && value.byteLength) {
+                chunks.push(value);
+                total += value.byteLength;
+                if (total > range.size) {
+                  try { await reader.cancel(); } catch (_) {}
+                  throw new Error(`Sprite page ${pageIndex} length mismatch (${total} > ${range.size})`);
+                }
+              }
+            }
+            const merged = new Uint8Array(total);
+            let off = 0;
+            for (const c of chunks) { merged.set(c, off); off += c.byteLength; }
+            buffer = merged.buffer;
+          } else {
+            buffer = await response.arrayBuffer();
+          }
           if (buffer.byteLength !== range.size) {
             throw new Error(`Sprite page ${pageIndex} length mismatch (${buffer.byteLength} != ${range.size})`);
           }
@@ -215,6 +251,7 @@
         };
 
         const buffer = deadlinePromise ? await Promise.race([doFetch(), deadlinePromise]) : await doFetch();
+        if (disposed) return null;
         stats.networkFetches++;
         stats.bytesTransferred += buffer.byteLength;
 

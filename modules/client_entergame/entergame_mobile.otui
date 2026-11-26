@@ -1,0 +1,238 @@
+// Clean-room Dedicated Mobile Login Screen for AstraClient Web Mobile Lite.
+// Loaded ONLY when g_app.isMobile() (Desktop Full entergame.otui is 100% untouched).
+
+UIWindow
+  id: enterGame
+  anchors.fill: parent
+  draggable: false
+  phantom: true
+  focusable: true
+  color: alpha
+  @onEnter: EnterGame.doLogin()
+
+  // Top centered golden AstraClient wordmark crest
+  UIWidget
+    id: mobileLoginCrest
+    size: 310 68
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 12
+    image-source: /images/mobile_ui/astra_crest
+    image-smooth: true
+    phantom: true
+    focusable: false
+
+  // Center translucent obsidian-glass 2-column card
+  MobileGlassPanel
+    id: mobileLoginCard
+    size: 616 250
+    anchors.top: mobileLoginCrest.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 10
+    phantom: true
+
+  // ---- Left Column: Touch-Sized Inputs (Email, Password, Token) ----
+  MobileLoginLabel
+    id: emailLabel
+    !text: tr('Email')
+    anchors.top: mobileLoginCard.top
+    anchors.left: mobileLoginCard.left
+    margin-top: 16
+    margin-left: 22
+
+  MobileLoginInput
+    id: accountNameTextEdit
+    anchors.top: emailLabel.bottom
+    anchors.left: mobileLoginCard.left
+    margin-top: 4
+    margin-left: 22
+    width: 348
+    max-length: 49
+    @onTextChange: modules.client_entergame.onTextChange()
+
+  UIButton
+    id: hidden
+    size: 36 38
+    anchors.right: accountNameTextEdit.right
+    anchors.verticalCenter: accountNameTextEdit.verticalCenter
+    margin-right: 4
+    focusable: false
+    image-source: /images/mobile_ui/eye_toggle
+    image-clip: 0 28 28 28
+    image-rect: 6 7 24 24
+    @onClick: chooseTextMode()
+
+  MobileLoginLabel
+    id: passwordLabel
+    !text: tr('Password')
+    anchors.top: accountNameTextEdit.bottom
+    anchors.left: mobileLoginCard.left
+    margin-top: 10
+    margin-left: 22
+
+  MobileLoginInput
+    id: accountPasswordTextEdit
+    anchors.top: passwordLabel.bottom
+    anchors.left: mobileLoginCard.left
+    margin-top: 4
+    margin-left: 22
+    width: 348
+    max-length: 49
+    text-hidden: true
+
+  UICheckBox
+    id: passwordEyeToggle
+    size: 36 38
+    anchors.right: accountPasswordTextEdit.right
+    anchors.verticalCenter: accountPasswordTextEdit.verticalCenter
+    margin-right: 4
+    focusable: false
+    image-source: /images/mobile_ui/eye_toggle
+    image-clip: 0 0 28 28
+    image-rect: 6 7 24 24
+    @onCheckChange: |
+      local passEdit = self:getParent():getChildById('accountPasswordTextEdit')
+      if passEdit then
+        passEdit:setTextHidden(not self:isChecked())
+      end
+    $checked:
+      image-clip: 0 28 28 28
+
+  MobileLoginLabel
+    id: tokenLabel
+    !text: tr('Token (2FA - Optional)')
+    anchors.top: accountPasswordTextEdit.bottom
+    anchors.left: mobileLoginCard.left
+    margin-top: 10
+    margin-left: 22
+
+  MobileLoginInput
+    id: accountTokenTextEdit
+    height: 36
+    anchors.top: tokenLabel.bottom
+    anchors.left: mobileLoginCard.left
+    margin-top: 4
+    margin-left: 22
+    width: 348
+    max-length: 6
+    only-number: true
+    padding: 8 12 6 12
+
+  // ---- Right Column: Gold Primary CTA, Server Selector, Checkboxes ----
+  MobileGoldButton
+    id: loginButton
+    !text: tr('LOG IN')
+    size: 204 46
+    anchors.top: accountNameTextEdit.top
+    anchors.right: mobileLoginCard.right
+    margin-right: 22
+    @onClick: EnterGame.doLogin()
+
+  MobileLoginLabel
+    id: mobileServerCaption
+    !text: tr('Server')
+    anchors.top: passwordLabel.top
+    anchors.left: loginButton.left
+
+  Panel
+    id: serverSelectorPanel
+    size: 204 40
+    anchors.top: accountPasswordTextEdit.top
+    anchors.left: loginButton.left
+    on: true
+    focusable: false
+    $on:
+      visible: true
+    $!on:
+      visible: false
+
+    ComboBox
+      id: serverSelector
+      anchors.fill: parent
+      @onOptionChange: EnterGame.onServerChange()
+
+  CheckBox
+    id: rememberEmailBox
+    anchors.top: tokenLabel.top
+    anchors.left: loginButton.left
+    anchors.right: loginButton.right
+    height: 26
+    margin-top: 2
+    !text: tr('Remember Email')
+    @onCheckChange: chooseButtonVisibility()
+
+  CheckBox
+    id: rememberPasswordBox
+    anchors.top: rememberEmailBox.bottom
+    anchors.left: loginButton.left
+    anchors.right: loginButton.right
+    height: 26
+    margin-top: 6
+    !text: tr('Remember Password')
+    @onCheckChange: chooseButtonVisibility()
+
+  Label
+    id: serverInfoLabel
+    font: mobile-hud-12
+    anchors.top: mobileLoginCard.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 8
+    color: #9be8a8
+    text-auto-resize: true
+    phantom: true
+
+  // ---- Hidden desktop compatibility widgets required by entergame.lua ----
+  UIWidget
+    id: emailStatus
+    size: 1 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    visible: false
+    phantom: true
+
+  UIWidget
+    id: buttonInformation
+    size: 1 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    visible: false
+    phantom: true
+
+  UIWidget
+    id: passwordInformation
+    size: 1 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    visible: false
+    phantom: true
+
+  CheckBox
+    id: autoLoginBox
+    size: 1 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    enabled: false
+    visible: false
+    @onCheckChange: EnterGame.onAutoLoginChange()
+
+  Panel
+    id: customServerSelectorPanel
+    size: 1 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    visible: false
+    on: false
+    $on:
+      visible: false
+    $!on:
+      visible: false
+
+    TextEdit
+      id: serverHostTextEdit
+      size: 1 1
+      visible: false
+
+    ComboBox
+      id: clientVersionSelector
+      size: 1 1
+      visible: false

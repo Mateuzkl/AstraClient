@@ -1,0 +1,7 @@
+Font
+  name: mobile-hud-12
+  texture: mobile-hud-12
+  height: 19
+  glyph-size: 16 19
+  space-width: 4
+  spacing: 1 1

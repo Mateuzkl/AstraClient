@@ -1,65 +1,172 @@
-// Clean-room touch-ergonomic styles for AstraClient Web Mobile Lite.
+// Clean-room Mobile Obsidian + Brushed Gold HUD, Action Arc, Login & Stage Controls.
 
-MobileHudPill < UIButton
-  size: 46 30
-  padding: 2 6 2 6
-  font: verdana-11px-antialised
-  color: #edf2ff
-  background-color: #101524cc
-  border-width: 1
-  border-color: #6f86c2aa
+MobileGoldButton < UIButton
+  font: mobile-btn-15
+  color: #261404
   text-align: center
+  image-source: /images/mobile_ui/btn_gold
+  image-clip: 0 0 180 48
+  image-border: 12
+  image-smooth: true
   focusable: false
 
+  $hover !disabled:
+    image-clip: 0 48 180 48
+    color: #1c0e02
+
   $pressed:
-    background-color: #36508aee
-    border-color: #b7d2ff
+    image-clip: 0 96 180 48
+    text-offset: 0 1
+
+  $disabled:
+    opacity: 0.55
+
+MobileDarkButton < UIButton
+  font: mobile-hud-12
+  color: #f3eedc
+  text-align: center
+  image-source: /images/mobile_ui/btn_dark
+  image-clip: 0 0 128 48
+  image-border: 10
+  image-smooth: true
+  focusable: false
+
+  $hover !disabled:
+    image-clip: 0 48 128 48
+    color: #ffd96a
+
+  $pressed:
+    image-clip: 0 96 128 48
+    text-offset: 0 1
+    color: #ffd96a
 
   $checked:
-    background-color: #2f5e9cee
-    border-color: #9ed2ff
+    image-clip: 0 48 128 48
+    color: #ffd96a
+
+  $on:
+    image-clip: 0 48 128 48
+    color: #ffd96a
+
+  $disabled:
+    opacity: 0.5
+
+MobileIconButton < MobileDarkButton
+  size: 40 40
+  icon-rect: 8 8 24 24
+  opacity: 0.94
+
+MobileHudPill < MobileDarkButton
+  size: 56 32
+  padding: 2 8 2 8
 
 MobileActionButton < UIButton
-  size: 50 50
-  font: verdana-11px-antialised
-  color: #f4f7ff
-  background-color: #111728cc
-  border-width: 2
-  border-color: #6b7faecc
-  text-align: center
+  size: 48 48
+  font: mobile-hud-12
+  color: #f7f4eb
+  text-align: bottom
+  text-offset: 0 -3
+  image-source: /images/mobile_ui/slot_frame
+  image-clip: 0 0 48 48
+  image-border: 8
+  image-smooth: true
+  icon-rect: 12 5 24 24
+  opacity: 0.94
   focusable: false
 
   $pressed:
-    background-color: #3a5696ee
-    border-color: #cfe0ff
+    image-clip: 48 0 48 48
+    color: #ffd96a
+    opacity: 1.0
 
   $checked:
-    background-color: #8f3232ee
-    border-color: #ffb8b8
+    image-clip: 48 0 48 48
+    color: #ffd96a
+    opacity: 1.0
 
-MobileHotkeySlot < UIButton
-  size: 46 42
-  font: verdana-11px-antialised
-  color: #eef2ff
-  background-color: #101420cc
-  border-width: 1
-  border-color: #7b8db8bb
-  text-align: center
+MobileAttackButton < UIButton
+  size: 60 60
+  font: mobile-hud-12
+  color: #fff6dc
+  text-align: bottom
+  text-offset: 0 -5
+  image-source: /images/mobile_ui/btn_crimson
+  image-clip: 0 0 96 48
+  image-border: 12
+  image-smooth: true
+  icon-source: /images/mobile_ui/icon_swords
+  icon-rect: 16 7 28 28
+  opacity: 0.96
   focusable: false
 
   $pressed:
-    background-color: #3d5b9eee
-    border-color: #c8deff
+    image-clip: 0 96 96 48
+    text-offset: 0 -4
+    color: #ffd96a
+    opacity: 1.0
 
-MobileDrawerPanel < UIWidget
-  background-color: #0e1220ee
-  border-width: 1
-  border-color: #7c90c9cc
-  padding: 10
+MobileHotkeySlot < UIButton
+  size: 42 42
+  font: mobile-hud-12
+  color: #e6ecf8
+  text-align: center
+  image-source: /images/mobile_ui/slot_empty
+  image-border: 8
+  image-smooth: true
+  opacity: 0.92
   focusable: false
+
+  $pressed:
+    image-source: /images/mobile_ui/slot_frame
+    image-clip: 48 0 48 48
+    color: #ffd96a
+    opacity: 1.0
+
+  $on:
+    image-source: /images/mobile_ui/slot_frame
+    image-clip: 48 0 48 48
+    color: #ffd96a
+
+MobileGlassPanel < UIWidget
+  image-source: /images/mobile_ui/panel_glass
+  image-border: 12
+  focusable: false
+
+MobileGoldPanel < UIWidget
+  image-source: /images/mobile_ui/panel_gold
+  image-border: 12
+  focusable: false
+
+MobileDrawerPanel < MobileGoldPanel
+  padding: 12
 
 MobileDrawerRow < UIWidget
-  height: 32
+  height: 34
   margin-top: 4
   focusable: false
+  phantom: true
+
+MobileMenuTile < MobileDarkButton
+  size: 108 38
+  font: mobile-hud-12
+  text-align: center
+
+MobileLoginInput < UITextEdit
+  height: 42
+  font: mobile-input-14
+  color: #f6f2e6
+  padding: 10 42 8 12
+  image-source: /images/mobile_ui/input_idle
+  image-border: 10
+  selection-color: #ffffff
+  selection-background-color: #2478d4cc
+  change-cursor-image: false
+
+  $focus:
+    image-source: /images/mobile_ui/input_focus
+
+MobileLoginLabel < UILabel
+  font: mobile-hud-12
+  color: #f6d475
+  text-auto-resize: true
   phantom: true

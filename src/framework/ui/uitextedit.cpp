@@ -389,6 +389,9 @@ void UITextEdit::setCursorPos(int pos)
         else
             m_cursorPos = pos;
         update(true);
+#ifdef __EMSCRIPTEN__
+        g_browserWindow.onTextEditChanged(this);
+#endif
     }
 }
 
@@ -406,11 +409,14 @@ void UITextEdit::setSelection(int start, int end)
     m_selectionStart = stdext::clamp<int>(start, 0, (int)m_text.length());
     m_selectionEnd = stdext::clamp<int>(end, 0, (int)m_text.length());
     recacheGlyphs();
+#ifdef __EMSCRIPTEN__
+    g_browserWindow.onTextEditChanged(this);
+#endif
 }
 
 void UITextEdit::setTextHidden(bool hidden)
 {
-    m_textHidden = true;
+    m_textHidden = hidden;
     update(true);
 }
 

@@ -585,7 +585,7 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
 
                 if (slotIdx == 0) {
                     const int dist = std::max(std::abs(pos.x - slot.startPos.x), std::abs(pos.y - slot.startPos.y));
-                    if (!slot.dragged && dist > DragThresholdPx) {
+                    if (!slot.dragged && !slot.consumed && dist > DragThresholdPx) {
                         slot.dragged = true;
                         m_inputEvent.reset(Fw::MouseMoveInputEvent);
                         m_inputEvent.mouseMoved = slot.startPos - m_inputEvent.mousePos;
@@ -599,9 +599,18 @@ void BrowserWindow::dispatchTouchEvent(int eventType, std::vector<TouchSample> t
                         m_onInputEvent(m_inputEvent);
                     }
                     m_inputEvent.reset(Fw::MouseMoveInputEvent);
+                    m_inputEvent.mouseButton = Fw::MouseTouch;
                     m_inputEvent.mouseMoved = pos - prevPos;
                     m_inputEvent.mousePos = pos;
                     m_onInputEvent(m_inputEvent);
+                } else {
+                    const Fw::MouseButton btn = (slotIdx == 1) ? Fw::MouseTouch2 : Fw::MouseTouch3;
+                    InputEvent multi;
+                    multi.reset(Fw::MouseMoveInputEvent);
+                    multi.mouseButton = btn;
+                    multi.mousePos = pos;
+                    multi.mouseMoved = pos - prevPos;
+                    m_onInputEvent(multi);
                 }
             } else if (eventType == EMSCRIPTEN_EVENT_TOUCHEND || eventType == EMSCRIPTEN_EVENT_TOUCHCANCEL) {
                 const int slotIdx = findSlotById(sample.identifier);
@@ -800,9 +809,70 @@ void BrowserWindow::handlePaste(std::string text)
 
 void BrowserWindow::handleVirtualText(std::string text) { handlePaste(std::move(text)); }
 
-void BrowserWindow::handleVirtualTextReplace(std::string text, int selStart, int selEnd)
+namespace {
+size_t utf8CodepointLength(const std::string &s, size_t pos)
 {
-    g_dispatcher.addEvent([this, text = std::move(text), selStart, selEnd] {
+    if (pos >= s.size())
+        return 0;
+    const unsigned char c = static_cast<unsigned char>(s[pos]);
+    size_t len = 1;
+    if ((c & 0x80) == 0x00)
+        len = 1;
+    else if ((c & 0xE0) == 0xC0)
+        len = 2;
+    else if ((c & 0xF0) == 0xE0)
+        len = 3;
+    else if ((c & 0xF8) == 0xF0)
+        len = 4;
+    if (pos + len > s.size())
+        return s.size() - pos;
+    for (size_t k = 1; k < len; ++k) {
+        if ((static_cast<unsigned char>(s[pos + k]) & 0xC0) != 0x80)
+            return k;
+    }
+    return len;
+}
+
+int utf16ToUtf8Offset(const std::string &utf8, int utf16Index)
+{
+    if (utf16Index <= 0)
+        return 0;
+    size_t pos = 0;
+    int units = 0;
+    while (pos < utf8.size() && units < utf16Index) {
+        const size_t cpLen = utf8CodepointLength(utf8, pos);
+        if (cpLen == 0)
+            break;
+        const int cpUnits = (cpLen == 4) ? 2 : 1;
+        if (units + cpUnits > utf16Index)
+            break;
+        units += cpUnits;
+        pos += cpLen;
+    }
+    return static_cast<int>(pos);
+}
+
+int utf8ToUtf16Offset(const std::string &utf8, int byteOffset)
+{
+    if (byteOffset <= 0)
+        return 0;
+    const size_t limit = std::min<size_t>(utf8.size(), static_cast<size_t>(byteOffset));
+    size_t pos = 0;
+    int units = 0;
+    while (pos < limit) {
+        const size_t cpLen = utf8CodepointLength(utf8, pos);
+        if (cpLen == 0)
+            break;
+        units += (cpLen == 4) ? 2 : 1;
+        pos += cpLen;
+    }
+    return units;
+}
+} // namespace
+
+void BrowserWindow::handleVirtualTextReplace(std::string expectedId, std::string text, int selStart, int selEnd)
+{
+    g_dispatcher.addEvent([this, expectedId = std::move(expectedId), text = std::move(text), selStart, selEnd] {
         if (!m_created)
             return;
         UIWidgetPtr current = g_ui.getKeyboardReceiver();
@@ -815,26 +885,49 @@ void BrowserWindow::handleVirtualTextReplace(std::string text, int selStart, int
         auto edit = std::dynamic_pointer_cast<UITextEdit>(current);
         if (!edit || !edit->isEditable())
             return;
+        if (!expectedId.empty() && edit->getId() != expectedId)
+            return;
 
         m_syncingFromBrowser = true;
-        std::string applied = text;
+        const size_t origStartByte =
+            (selStart >= 0) ? static_cast<size_t>(utf16ToUtf8Offset(text, selStart)) : text.size();
+        const size_t origEndByte =
+            (selEnd >= 0) ? static_cast<size_t>(utf16ToUtf8Offset(text, selEnd)) : origStartByte;
         const uint maxLen = edit->getMaxLength();
-        if (maxLen > 0 && applied.size() > maxLen)
-            applied.resize(maxLen);
         const std::string &validChars = edit->getValidCharacters();
-        if (!validChars.empty()) {
-            std::string filtered;
-            filtered.reserve(applied.size());
-            for (char ch : applied) {
-                if (validChars.find(ch) != std::string::npos)
-                    filtered.push_back(ch);
+
+        std::string applied;
+        applied.reserve(text.size());
+        int mappedStart = -1;
+        int mappedEnd = -1;
+        size_t pos = 0;
+        while (pos < text.size()) {
+            if (mappedStart < 0 && pos >= origStartByte)
+                mappedStart = static_cast<int>(applied.size());
+            if (mappedEnd < 0 && pos >= origEndByte)
+                mappedEnd = static_cast<int>(applied.size());
+            const size_t cpLen = utf8CodepointLength(text, pos);
+            if (cpLen == 0)
+                break;
+            bool keep = true;
+            if (!validChars.empty()) {
+                for (size_t k = 0; k < cpLen; ++k) {
+                    if (validChars.find(text[pos + k]) == std::string::npos) {
+                        keep = false;
+                        break;
+                    }
+                }
             }
-            applied = std::move(filtered);
+            if (keep && maxLen > 0 && applied.size() + cpLen > maxLen)
+                break;
+            if (keep)
+                applied.append(text, pos, cpLen);
+            pos += cpLen;
         }
-        edit->setText(applied);
         const int len = static_cast<int>(applied.size());
-        const int start = std::clamp(selStart >= 0 ? selStart : len, 0, len);
-        const int end = std::clamp(selEnd >= 0 ? selEnd : start, 0, len);
+        const int start = std::clamp(mappedStart >= 0 ? mappedStart : len, 0, len);
+        const int end = std::clamp(mappedEnd >= 0 ? mappedEnd : len, 0, len);
+        edit->setText(applied);
         edit->setCursorPos(end);
         if (edit->isSelectable())
             edit->setSelection(start, end);
@@ -859,9 +952,9 @@ EMSCRIPTEN_KEEPALIVE void astra_browser_text_input(const char *text)
     g_browserWindow.handleVirtualText(text ? text : "");
 }
 
-EMSCRIPTEN_KEEPALIVE void astra_browser_set_text(const char *text, int selStart, int selEnd)
+EMSCRIPTEN_KEEPALIVE void astra_browser_set_text(const char *expectedId, const char *text, int selStart, int selEnd)
 {
-    g_browserWindow.handleVirtualTextReplace(text ? text : "", selStart, selEnd);
+    g_browserWindow.handleVirtualTextReplace(expectedId ? expectedId : "", text ? text : "", selStart, selEnd);
 }
 
 EMSCRIPTEN_KEEPALIVE void astra_browser_virtual_key(int key)
@@ -1063,8 +1156,9 @@ static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, dou
 {
     const Rect r = edit->getRect();
     const std::string text = edit->getText();
-    const int selStart = edit->hasSelection() ? edit->getSelectionStart() : edit->getCursorPos();
-    const int selEnd = edit->hasSelection() ? edit->getSelectionEnd() : edit->getCursorPos();
+    const int cursorUtf16 = utf8ToUtf16Offset(text, edit->getCursorPos());
+    const int selStartUtf16 = edit->hasSelection() ? utf8ToUtf16Offset(text, edit->getSelectionStart()) : cursorUtf16;
+    const int selEndUtf16 = edit->hasSelection() ? utf8ToUtf16Offset(text, edit->getSelectionEnd()) : cursorUtf16;
     std::ostringstream oss;
     oss << "{\"id\":\"" << jsonEscape(edit->getId())
         << "\",\"x\":" << static_cast<int>(std::lround(r.left() * cssScaleX))
@@ -1073,9 +1167,9 @@ static std::string serializeTextEditMeta(UITextEdit *edit, double cssScaleX, dou
         << ",\"h\":" << static_cast<int>(std::lround(r.height() * cssScaleY))
         << ",\"text\":\"" << jsonEscape(text)
         << "\",\"placeholder\":\"" << jsonEscape(edit->getPlaceholder())
-        << "\",\"cursor\":" << edit->getCursorPos()
-        << ",\"selStart\":" << selStart
-        << ",\"selEnd\":" << selEnd
+        << "\",\"cursor\":" << cursorUtf16
+        << ",\"selStart\":" << selStartUtf16
+        << ",\"selEnd\":" << selEndUtf16
         << ",\"maxLen\":" << edit->getMaxLength()
         << ",\"password\":" << (edit->isTextHidden() ? "true" : "false")
         << ",\"multiline\":" << (edit->isMultiline() ? "true" : "false")

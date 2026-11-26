@@ -444,10 +444,14 @@ function EnterGame.addTestServer()
   return EnterGame.onError(tr('Legacy HTTP test servers are disabled. Configure a verified HTTPS endpoint in init.lua.'))
 end
 
+local function isMobileClient()
+  return g_app and g_app.isMobile and g_app.isMobile() or false
+end
+
 -- public functions
 function EnterGame.init()
   if USE_NEW_ENERGAME then return end
-  enterGame = g_ui.displayUI('entergame')
+  enterGame = g_ui.displayUI(isMobileClient() and 'entergame_mobile' or 'entergame')
   if LOGPASS ~= nil then
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
   end
@@ -967,15 +971,23 @@ end
 
 function chooseTextMode()
   local hiddenButton = enterGame:getChildById('hidden')
-  local hidden = enterGame.accountNameTextEdit:isTextHidden()
+  if not hiddenButton then return end
 
   isButtonPressed = not isButtonPressed
 
   if isButtonPressed then
-    hiddenButton:setImageSource("/images/ui/hidden-button-down")
+    if isMobileClient() then
+      hiddenButton:setImageClip('0 28 28 28')
+    else
+      hiddenButton:setImageSource("/images/ui/hidden-button-down")
+    end
     enterGame.accountNameTextEdit:setTextHidden(false)
   else
-    hiddenButton:setImageSource("/images/ui/hidden-button")
+    if isMobileClient() then
+      hiddenButton:setImageClip('0 0 28 28')
+    else
+      hiddenButton:setImageSource("/images/ui/hidden-button")
+    end
     enterGame.accountNameTextEdit:setTextHidden(true)
   end
 end
@@ -986,16 +998,12 @@ function chooseButtonVisibility()
   local buttonMail = enterGame:getChildById('buttonInformation')
   local buttonPass = enterGame:getChildById('passwordInformation')
 
-  if checkboxEmail:isChecked() then
-    buttonMail:setVisible(true)
-  else
-    buttonMail:setVisible(false)
+  if not isMobileClient() and buttonMail and checkboxEmail then
+    buttonMail:setVisible(checkboxEmail:isChecked())
   end
 
-  if checkbox:isChecked() then
-    buttonPass:setVisible(true)
-  else
-    buttonPass:setVisible(false)
+  if not isMobileClient() and buttonPass and checkbox then
+    buttonPass:setVisible(checkbox:isChecked())
   end
   if autoLoginBox then
     EnterGame.onAutoLoginChange()
@@ -1022,6 +1030,7 @@ local function isValidEmail(value)
 end
 
 function onTextChange()
+  if isMobileClient() or not enterGame or not enterGame.emailStatus then return end
   if not isValidEmail(enterGame.accountNameTextEdit:getText()) then
     enterGame.emailStatus:setVisible(true)
   else

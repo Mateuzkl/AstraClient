@@ -1,14 +1,20 @@
--- Clean-room Mobile Lite overlay, multitouch controls, HUD toggles and performance settings.
+-- Clean-room Dedicated Mobile HUD, Floating Vitals, Target Bar, Multitouch Joystick,
+-- MOBA Action Arc, Paginated Hotkeys, Collapsible Menu Grid & Scrollable Settings.
 local overlay
 local keypad
+local leftQuickCluster
 local rightControls
-local mobileHudBar
+local mobileVitalsHud
+local mobileTargetBar
+local mobileTopRightBar
+local mobileMenuPanel
 local mobileLoginSettingsBtn
 local settingsDrawer
 local touchStart = 0
 local touchOrigin = { x = 0, y = 0 }
 local updateCursorEvent
 local initScaleEvent
+local statusTickerEvent
 local zoomInButton
 local zoomOutButton
 local keypadButton
@@ -24,6 +30,8 @@ local manualUiScale = false
 local drawLightsEnabled = true
 local floorFadingEnabled = true
 local actionMode = nil -- nil | 'use' | 'look'
+local hotkeyPage = 1   -- 1 (F1-F6) | 2 (F7-F12)
+local lastPingMs = -1
 
 local DEADZONE = 0.16
 local LONG_PRESS_MS = 450
@@ -39,18 +47,31 @@ local function computeAutoScale()
   if not size or size.width <= 0 or size.height <= 0 then
     return 1.0
   end
-  -- Target crisp readability and generous touch targets in landscape (~700x360 logical UI units).
-  local ratioW = size.width / 700.0
-  local ratioH = size.height / 360.0
+  -- Target ~780x380 logical landscape UI space so 844x390 @ DPR 1.75 snaps to 1.75 (exact 1:1 CSS logical units).
+  local ratioW = size.width / 780.0
+  local ratioH = size.height / 380.0
   local autoScale = math.min(ratioW, ratioH)
-  -- Snap to 0.25 increments in [1.0, 2.5] for crisp bitmap font rendering.
   autoScale = clamp(math.floor(autoScale * 4 + 0.5) / 4, 1.0, 2.5)
   return autoScale
 end
 
+local function clampSettingsDrawerToViewport()
+  if not settingsDrawer then return end
+  local root = g_ui.getRootWidget()
+  if not root then return end
+  local rw = root:getWidth()
+  local rh = root:getHeight()
+  if rw <= 0 or rh <= 0 then return end
+  local maxW = math.min(354, math.max(280, rw - 24))
+  local maxH = math.min(316, math.max(210, rh - 28))
+  settingsDrawer:setSize({ width = maxW, height = maxH })
+end
+
 local function applyResponsiveScale()
-  if manualUiScale then return end
-  g_app.scale(computeAutoScale())
+  if not manualUiScale then
+    g_app.scale(computeAutoScale())
+  end
+  clampSettingsDrawerToViewport()
 end
 
 local function getMapPanel()
@@ -60,21 +81,54 @@ local function getMapPanel()
   return nil
 end
 
+local function isWidgetDescendantOf(widget, ancestor)
+  local cur = widget
+  while cur do
+    if cur == ancestor then return true end
+    cur = cur:getParent()
+  end
+  return false
+end
+
+local function isPointDirectlyOnMap(pos)
+  local mapPanel = getMapPanel()
+  if not mapPanel or not mapPanel:isVisible() then return false end
+  local root = g_ui.getRootWidget()
+  if not root then return false end
+  local hit = root:recursiveGetChildByPos(pos, false)
+  if not hit then return false end
+  return isWidgetDescendantOf(hit, mapPanel)
+end
+
+local function updateHotkeyPageLabels()
+  if not rightControls then return end
+  local pageBtn = rightControls:recursiveGetChildById('hkPageBtn')
+  if pageBtn then
+    pageBtn:setText(tostring(hotkeyPage) .. '/2')
+  end
+  local base = (hotkeyPage - 1) * 6
+  for i = 1, 6 do
+    local slot = rightControls:recursiveGetChildById('hkSlot' .. i)
+    if slot then
+      slot:setText('F' .. tostring(base + i))
+    end
+  end
+end
+
 local function applyControlScale()
   if not keypad or not rightControls then return end
   local s = clamp(controlScale, 0.75, 1.5)
-  local padSize = math.floor(156 * s)
-  local knobSize = math.floor(46 * s)
+  local padSize = math.floor(152 * s)
+  local knobSize = math.floor(52 * s)
   keypad:setSize({ width = padSize, height = padSize })
-  keypad:setImageRect({ x = 3, y = 3, width = padSize - 6, height = padSize - 6 })
   if keypad.pointer then
     keypad.pointer:setSize({ width = knobSize, height = knobSize })
   end
 
-  local actionW = math.floor(168 * s)
-  local actionH = math.floor(112 * s)
-  local rightW = math.floor(214 * s)
-  local rightH = math.floor(166 * s)
+  local actionW = math.floor(184 * s)
+  local actionH = math.floor(124 * s)
+  local rightW = math.floor(266 * s)
+  local rightH = math.floor(174 * s)
   rightControls:setSize({ width = rightW, height = rightH })
 
   local actionCluster = rightControls:recursiveGetChildById('actionCluster')
@@ -85,20 +139,22 @@ local function applyControlScale()
     local btnFollow = actionCluster:getChildById('btnFollow')
     local btnLook = actionCluster:getChildById('btnLook')
     local btnStop = actionCluster:getChildById('btnStop')
-    if btnAttack then btnAttack:setSize({ width = math.floor(56 * s), height = math.floor(56 * s) }) end
-    if btnUse then btnUse:setSize({ width = math.floor(50 * s), height = math.floor(50 * s) }) end
-    if btnFollow then btnFollow:setSize({ width = math.floor(50 * s), height = math.floor(50 * s) }) end
-    if btnLook then btnLook:setSize({ width = math.floor(50 * s), height = math.floor(50 * s) }) end
-    if btnStop then btnStop:setSize({ width = math.floor(44 * s), height = math.floor(44 * s) }) end
+    if btnAttack then btnAttack:setSize({ width = math.floor(60 * s), height = math.floor(60 * s) }) end
+    if btnUse then btnUse:setSize({ width = math.floor(48 * s), height = math.floor(48 * s) }) end
+    if btnFollow then btnFollow:setSize({ width = math.floor(48 * s), height = math.floor(48 * s) }) end
+    if btnLook then btnLook:setSize({ width = math.floor(48 * s), height = math.floor(48 * s) }) end
+    if btnStop then btnStop:setSize({ width = math.floor(42 * s), height = math.floor(42 * s) }) end
   end
 
-  local hotkeyPad = rightControls:recursiveGetChildById('hotkeyPad')
-  if hotkeyPad then
-    hotkeyPad:setSize({ width = math.floor(210 * s), height = math.floor(44 * s) })
+  local hotkeyRow = rightControls:recursiveGetChildById('hotkeyRow')
+  if hotkeyRow then
+    hotkeyRow:setSize({ width = rightW, height = math.floor(42 * s) })
+    local pageBtn = hotkeyRow:getChildById('hkPageBtn')
+    if pageBtn then pageBtn:setSize({ width = math.floor(34 * s), height = math.floor(40 * s) }) end
     for i = 1, 6 do
-      local slot = hotkeyPad:getChildById('hkF' .. i)
+      local slot = hotkeyRow:getChildById('hkSlot' .. i)
       if slot then
-        slot:setSize({ width = math.floor(32 * s), height = math.floor(40 * s) })
+        slot:setSize({ width = math.floor(34 * s), height = math.floor(40 * s) })
       end
     end
   end
@@ -108,31 +164,160 @@ local function applyJoystickSide()
   if not keypad or not rightControls then return end
   keypad:breakAnchors()
   rightControls:breakAnchors()
+  if leftQuickCluster then leftQuickCluster:breakAnchors() end
   if joystickSide == 'right' then
     keypad:addAnchor(AnchorBottom, 'parent', AnchorBottom)
     keypad:addAnchor(AnchorRight, 'parent', AnchorRight)
-    keypad:setMarginRight(16)
-    keypad:setMarginBottom(16)
+    keypad:setMarginRight(14)
+    keypad:setMarginBottom(14)
     keypad:setMarginLeft(0)
+
+    if leftQuickCluster then
+      leftQuickCluster:addAnchor(AnchorBottom, 'parent', AnchorBottom)
+      leftQuickCluster:addAnchor(AnchorRight, 'keypad', AnchorLeft)
+      leftQuickCluster:setMarginRight(10)
+      leftQuickCluster:setMarginLeft(0)
+      leftQuickCluster:setMarginBottom(16)
+    end
 
     rightControls:addAnchor(AnchorBottom, 'parent', AnchorBottom)
     rightControls:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-    rightControls:setMarginLeft(14)
-    rightControls:setMarginBottom(14)
+    rightControls:setMarginLeft(12)
+    rightControls:setMarginBottom(12)
     rightControls:setMarginRight(0)
   else
     keypad:addAnchor(AnchorBottom, 'parent', AnchorBottom)
     keypad:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-    keypad:setMarginLeft(16)
-    keypad:setMarginBottom(16)
+    keypad:setMarginLeft(14)
+    keypad:setMarginBottom(14)
     keypad:setMarginRight(0)
+
+    if leftQuickCluster then
+      leftQuickCluster:addAnchor(AnchorBottom, 'parent', AnchorBottom)
+      leftQuickCluster:addAnchor(AnchorLeft, 'keypad', AnchorRight)
+      leftQuickCluster:setMarginLeft(10)
+      leftQuickCluster:setMarginRight(0)
+      leftQuickCluster:setMarginBottom(16)
+    end
 
     rightControls:addAnchor(AnchorBottom, 'parent', AnchorBottom)
     rightControls:addAnchor(AnchorRight, 'parent', AnchorRight)
-    rightControls:setMarginRight(14)
-    rightControls:setMarginBottom(14)
+    rightControls:setMarginRight(12)
+    rightControls:setMarginBottom(12)
     rightControls:setMarginLeft(0)
   end
+end
+
+local function updateVitalsHud()
+  if not mobileVitalsHud or not g_game.isOnline() then return end
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+
+  local hp = math.max(0, player:getHealth() or 0)
+  local maxHp = math.max(1, player:getMaxHealth() or 1)
+  local mp = math.max(0, player:getMana() or 0)
+  local maxMp = math.max(1, player:getMaxMana() or 1)
+  local level = player:getLevel() or 1
+  local levelPct = clamp(player:getLevelPercent() or 0, 0, 100)
+
+  local hpTrack = mobileVitalsHud:recursiveGetChildById('hpTrack')
+  local hpFill = mobileVitalsHud:recursiveGetChildById('hpFill')
+  local hpLabel = mobileVitalsHud:recursiveGetChildById('hpLabel')
+  if hpTrack and hpFill then
+    local innerW = math.max(4, hpTrack:getWidth() - 2)
+    hpFill:setWidth(math.max(0, math.floor(innerW * clamp(hp / maxHp, 0, 1))))
+  end
+  if hpLabel then hpLabel:setText(tostring(hp) .. ' / ' .. tostring(maxHp)) end
+
+  local mpTrack = mobileVitalsHud:recursiveGetChildById('mpTrack')
+  local mpFill = mobileVitalsHud:recursiveGetChildById('mpFill')
+  local mpLabel = mobileVitalsHud:recursiveGetChildById('mpLabel')
+  if mpTrack and mpFill then
+    local innerW = math.max(4, mpTrack:getWidth() - 2)
+    mpFill:setWidth(math.max(0, math.floor(innerW * clamp(mp / maxMp, 0, 1))))
+  end
+  if mpLabel then mpLabel:setText(tostring(mp) .. ' / ' .. tostring(maxMp)) end
+
+  local xpTrack = mobileVitalsHud:recursiveGetChildById('xpTrack')
+  local xpFill = mobileVitalsHud:recursiveGetChildById('xpFill')
+  if xpTrack and xpFill then
+    local innerW = math.max(4, xpTrack:getWidth() - 2)
+    xpFill:setWidth(math.max(2, math.floor(innerW * (levelPct / 100))))
+  end
+
+  local levelLabel = mobileVitalsHud:recursiveGetChildById('levelLabel')
+  if levelLabel then
+    levelLabel:setText('Lv. ' .. tostring(level))
+  end
+
+  local statusLabel = mobileVitalsHud:recursiveGetChildById('statusMetricsLabel')
+  if statusLabel then
+    local fps = g_app.getFps and g_app.getFps() or 0
+    if lastPingMs >= 0 then
+      statusLabel:setText(tostring(lastPingMs) .. 'ms  ' .. tostring(fps) .. ' FPS')
+    else
+      statusLabel:setText(tostring(fps) .. ' FPS')
+    end
+  end
+end
+
+local function updateTargetBar()
+  if not mobileTargetBar then return end
+  if not g_game.isOnline() then
+    mobileTargetBar:setVisible(false)
+    return
+  end
+  local target = g_game.getAttackingCreature()
+  if not target then
+    mobileTargetBar:setVisible(false)
+    return
+  end
+  mobileTargetBar:setVisible(true)
+  local nameLbl = mobileTargetBar:recursiveGetChildById('targetName')
+  local pctLbl = mobileTargetBar:recursiveGetChildById('targetHpPercent')
+  local hpTrack = mobileTargetBar:recursiveGetChildById('targetHpTrack')
+  local hpFill = mobileTargetBar:recursiveGetChildById('targetHpFill')
+  local creatureBox = mobileTargetBar:recursiveGetChildById('targetCreature')
+  local pct = clamp(target:getHealthPercent() or 100, 0, 100)
+  if nameLbl then nameLbl:setText(target:getName() or '') end
+  if pctLbl then pctLbl:setText(tostring(pct) .. '%') end
+  if hpTrack and hpFill then
+    local innerW = math.max(4, hpTrack:getWidth() - 2)
+    hpFill:setWidth(math.max(0, math.floor(innerW * (pct / 100))))
+  end
+  if creatureBox then
+    creatureBox:setCreature(target)
+  end
+end
+
+local function updateStanceLabel()
+  if not leftQuickCluster then return end
+  local btn = leftQuickCluster:getChildById('quickStanceBtn')
+  if not btn or not g_game.getFightMode then return end
+  local fm = g_game.getFightMode()
+  if fm == FightOffensive then
+    btn:setText('OFF')
+    btn:setColor('#ff8e88')
+  elseif fm == FightDefensive then
+    btn:setText('DEF')
+    btn:setColor('#86c8ff')
+  else
+    btn:setText('BAL')
+    btn:setColor('#f6d475')
+  end
+end
+
+local function cycleCombatStance()
+  if not g_game.isOnline() or not g_game.getFightMode or not g_game.setFightMode then return end
+  local fm = g_game.getFightMode()
+  if fm == FightOffensive then
+    g_game.setFightMode(FightBalanced)
+  elseif fm == FightBalanced then
+    g_game.setFightMode(FightDefensive)
+  else
+    g_game.setFightMode(FightOffensive)
+  end
+  updateStanceLabel()
 end
 
 local function syncSettingsHighlights()
@@ -190,16 +375,35 @@ local function applyMobileGraphicsOptions()
   end
 end
 
+local function closeMenuPanel()
+  if mobileMenuPanel then mobileMenuPanel:setVisible(false) end
+  if mobileTopRightBar then
+    local menuBtn = mobileTopRightBar:getChildById('topMenuToggle')
+    if menuBtn then menuBtn:setChecked(false) end
+  end
+end
+
 local function updateOnlineVisibility()
   if not overlay then return end
   local isOnline = g_game.isOnline()
   if mobileLoginSettingsBtn then mobileLoginSettingsBtn:setVisible(not isOnline) end
-  if mobileHudBar then mobileHudBar:setVisible(isOnline) end
+  if mobileVitalsHud then mobileVitalsHud:setVisible(isOnline) end
+  if mobileTopRightBar then mobileTopRightBar:setVisible(isOnline) end
+  if not isOnline then
+    closeMenuPanel()
+    if mobileTargetBar then mobileTargetBar:setVisible(false) end
+  end
   if keypad then keypad:setVisible(isOnline and controlsVisible) end
+  if leftQuickCluster then leftQuickCluster:setVisible(isOnline and controlsVisible) end
   if rightControls then rightControls:setVisible(isOnline and controlsVisible) end
-  if mobileHudBar then
-    local padBtn = mobileHudBar:getChildById('hudTogglePad')
+  if mobileMenuPanel then
+    local padBtn = mobileMenuPanel:recursiveGetChildById('hudTogglePad')
     if padBtn then padBtn:setChecked(controlsVisible) end
+  end
+  if isOnline then
+    updateVitalsHud()
+    updateTargetBar()
+    updateStanceLabel()
   end
 end
 
@@ -268,6 +472,7 @@ local function triggerTouchActionOnTile(pos)
 end
 
 local function focusMobileChat()
+  closeMenuPanel()
   local consoleMod = modules.game_console
   if consoleMod then
     if consoleMod.isChatEnabled and not consoleMod.isChatEnabled() and consoleMod.enableChat then
@@ -308,49 +513,107 @@ end
 
 local function toggleSettingsDrawer()
   if not settingsDrawer then return end
+  closeMenuPanel()
   local show = not settingsDrawer:isVisible()
   settingsDrawer:setVisible(show)
   if show then
+    clampSettingsDrawerToViewport()
+    if overlay then overlay:raise() end
     settingsDrawer:raise()
+    settingsDrawer:focus()
     syncSettingsHighlights()
   end
 end
 
+local function toggleMenuPanel()
+  if not mobileMenuPanel then return end
+  local show = not mobileMenuPanel:isVisible()
+  if show and settingsDrawer then settingsDrawer:setVisible(false) end
+  mobileMenuPanel:setVisible(show)
+  if show then
+    if overlay then overlay:raise() end
+    mobileMenuPanel:raise()
+  end
+  if mobileTopRightBar then
+    local menuBtn = mobileTopRightBar:getChildById('topMenuToggle')
+    if menuBtn then menuBtn:setChecked(show) end
+  end
+end
+
 local function wireOverlayButtons()
-  if mobileHudBar then
-    local function bindHud(id, fn)
-      local btn = mobileHudBar:getChildById(id)
-      if btn then btn.onClick = fn end
+  if mobileLoginSettingsBtn then
+    mobileLoginSettingsBtn.onClick = toggleSettingsDrawer
+  end
+
+  if mobileTopRightBar then
+    local mapBtn = mobileTopRightBar:getChildById('topQuickMap')
+    local bagBtn = mobileTopRightBar:getChildById('topQuickBag')
+    local menuBtn = mobileTopRightBar:getChildById('topMenuToggle')
+    if mapBtn then
+      mapBtn.onClick = function()
+        closeMenuPanel()
+        if modules.game_minimap and modules.game_minimap.toggle then modules.game_minimap.toggle() end
+      end
     end
-    bindHud('hudInventory', function()
+    if bagBtn then
+      bagBtn.onClick = function()
+        closeMenuPanel()
+        if modules.game_inventory and modules.game_inventory.toggle then modules.game_inventory.toggle() end
+      end
+    end
+    if menuBtn then
+      menuBtn.onClick = toggleMenuPanel
+    end
+  end
+
+  if mobileMenuPanel then
+    local function bindMenu(id, fn)
+      local btn = mobileMenuPanel:recursiveGetChildById(id)
+      if btn then
+        btn.onClick = function()
+          closeMenuPanel()
+          fn()
+        end
+      end
+    end
+    bindMenu('hudInventory', function()
       if modules.game_inventory and modules.game_inventory.toggle then modules.game_inventory.toggle() end
     end)
-    bindHud('hudBattle', function()
+    bindMenu('hudBattle', function()
       if modules.game_battle and modules.game_battle.toggle then modules.game_battle.toggle() end
     end)
-    bindHud('hudVip', function()
+    bindMenu('hudVip', function()
       if modules.game_viplist and modules.game_viplist.toggle then modules.game_viplist.toggle() end
     end)
-    bindHud('hudSkills', function()
+    bindMenu('hudSkills', function()
       if modules.game_skills and modules.game_skills.toggle then modules.game_skills.toggle() end
     end)
-    bindHud('hudMinimap', function()
+    bindMenu('hudMinimap', function()
       if modules.game_minimap and modules.game_minimap.toggle then modules.game_minimap.toggle() end
     end)
-    bindHud('hudChat', focusMobileChat)
-    bindHud('hudHotkeys', function()
+    bindMenu('hudChat', focusMobileChat)
+    bindMenu('hudHotkeys', function()
       if modules.game_hotkeys and modules.game_hotkeys.toggle then modules.game_hotkeys.toggle() end
     end)
-    bindHud('hudTogglePad', function()
+    bindMenu('hudTogglePad', function()
       controlsVisible = not controlsVisible
       g_settings.set('mobileControlsVisible', controlsVisible)
       if keypadButton then keypadButton:setChecked(controlsVisible) end
       updateOnlineVisibility()
     end)
-    bindHud('hudSettings', toggleSettingsDrawer)
+    bindMenu('hudSettings', toggleSettingsDrawer)
+    bindMenu('hudLogout', function()
+      if modules.game_interface and modules.game_interface.tryLogout then
+        modules.game_interface.tryLogout()
+      end
+    end)
   end
-  if mobileLoginSettingsBtn then
-    mobileLoginSettingsBtn.onClick = toggleSettingsDrawer
+
+  if leftQuickCluster then
+    local chatBtn = leftQuickCluster:getChildById('quickChatBtn')
+    local stanceBtn = leftQuickCluster:getChildById('quickStanceBtn')
+    if chatBtn then chatBtn.onClick = focusMobileChat end
+    if stanceBtn then stanceBtn.onClick = cycleCombatStance end
   end
 
   if rightControls then
@@ -361,11 +624,7 @@ local function wireOverlayButtons()
     bindAction('btnAttack', attackNearestOrCycle)
     bindAction('btnFollow', toggleFollowOrChase)
     bindAction('btnUse', function()
-      if actionMode == 'use' then
-        actionMode = nil
-      else
-        actionMode = 'use'
-      end
+      if actionMode == 'use' then actionMode = nil else actionMode = 'use' end
       updateActionButtons()
     end)
     bindAction('btnLook', function()
@@ -374,11 +633,7 @@ local function wireOverlayButtons()
         g_game.look(target)
         return
       end
-      if actionMode == 'look' then
-        actionMode = nil
-      else
-        actionMode = 'look'
-      end
+      if actionMode == 'look' then actionMode = nil else actionMode = 'look' end
       updateActionButtons()
     end)
     bindAction('btnStop', function()
@@ -386,12 +641,15 @@ local function wireOverlayButtons()
       updateActionButtons()
       g_game.cancelAttackAndFollow()
     end)
-
+    bindAction('hkPageBtn', function()
+      hotkeyPage = (hotkeyPage == 1) and 2 or 1
+      updateHotkeyPageLabels()
+    end)
     for i = 1, 6 do
-      local combo = 'F' .. i
-      bindAction('hk' .. combo, function()
+      bindAction('hkSlot' .. i, function()
+        local keyNum = (hotkeyPage - 1) * 6 + i
         if modules.game_hotkeys and modules.game_hotkeys.doKeyCombo then
-          modules.game_hotkeys.doKeyCombo(combo)
+          modules.game_hotkeys.doKeyCombo('F' .. tostring(keyNum))
         end
       end)
     end
@@ -413,9 +671,9 @@ local function wireOverlayButtons()
     bindCfg('cfgScaleLg', function() setScale(1.25) end)
     bindCfg('cfgScaleXl', function() setScale(1.5) end)
 
-    bindCfg('cfgUiDown', function() manualUiScale = true; g_app.scaleDown() end)
+    bindCfg('cfgUiDown', function() manualUiScale = true; g_app.scaleDown(); clampSettingsDrawerToViewport() end)
     bindCfg('cfgUiAuto', function() manualUiScale = false; applyResponsiveScale() end)
-    bindCfg('cfgUiUp', function() manualUiScale = true; g_app.scaleUp() end)
+    bindCfg('cfgUiUp', function() manualUiScale = true; g_app.scaleUp(); clampSettingsDrawerToViewport() end)
 
     bindCfg('cfgStickLeft', function()
       joystickSide = 'left'
@@ -478,11 +736,27 @@ local function wireOverlayButtons()
     bindCfg('cfgCloseDrawer', function()
       settingsDrawer:setVisible(false)
     end)
+    bindCfg('cfgCloseTop', function()
+      settingsDrawer:setVisible(false)
+    end)
   end
 end
 
 local function onWindowResize()
   applyResponsiveScale()
+end
+
+local function onPingBack(ping)
+  lastPingMs = tonumber(ping) or -1
+end
+
+local function onStatusTick()
+  if not overlay then return end
+  if g_game.isOnline() then
+    updateVitalsHud()
+    updateTargetBar()
+  end
+  statusTickerEvent = scheduleEvent(onStatusTick, 800)
 end
 
 -- public functions
@@ -504,14 +778,19 @@ function init()
   overlay = g_ui.displayUI('mobile')
   if not overlay then return end
   keypad = overlay:getChildById('keypad')
+  leftQuickCluster = overlay:getChildById('leftQuickCluster')
   rightControls = overlay:getChildById('rightControls')
-  mobileHudBar = overlay:getChildById('mobileHudBar')
+  mobileVitalsHud = overlay:getChildById('mobileVitalsHud')
+  mobileTargetBar = overlay:getChildById('mobileTargetBar')
+  mobileTopRightBar = overlay:getChildById('mobileTopRightBar')
+  mobileMenuPanel = overlay:getChildById('mobileMenuPanel')
   mobileLoginSettingsBtn = overlay:getChildById('mobileLoginSettingsBtn')
   settingsDrawer = overlay:getChildById('mobileSettingsDrawer')
   overlay:raise()
 
   applyControlScale()
   applyJoystickSide()
+  updateHotkeyPageLabels()
   wireOverlayButtons()
   syncSettingsHighlights()
   updateActionButtons()
@@ -520,10 +799,12 @@ function init()
     zoomInButton = modules.client_topmenu.addLeftButton('zoomInButton', 'Zoom In', '/images/topbuttons/zoomin', function()
       manualUiScale = true
       g_app.scaleUp()
+      clampSettingsDrawerToViewport()
     end)
     zoomOutButton = modules.client_topmenu.addLeftButton('zoomOutButton', 'Zoom Out', '/images/topbuttons/zoomout', function()
       manualUiScale = true
       g_app.scaleDown()
+      clampSettingsDrawerToViewport()
     end)
     keypadButton = modules.client_topmenu.addLeftGameToggleButton('keypadButton', 'Touch Controls', '/images/topbuttons/keypad', function()
       controlsVisible = not controlsVisible
@@ -537,10 +818,12 @@ function init()
   initScaleEvent = scheduleEvent(function()
     applyResponsiveScale()
   end, 10)
+  statusTickerEvent = scheduleEvent(onStatusTick, 800)
 
   connect(g_ui, {
     onMousePress = onGlobalMousePress,
     onMouseMove = onGlobalMouseMove,
+    onTouchMove = onGlobalTouchMove,
     onMouseRelease = onGlobalMouseRelease
   })
   if keypad then
@@ -554,7 +837,14 @@ function init()
   end
   connect(g_game, {
     onGameStart = online,
-    onGameEnd = offline
+    onGameEnd = offline,
+    onPingBack = onPingBack,
+    onAttackingCreatureChange = updateTargetBar
+  })
+  connect(LocalPlayer, {
+    onHealthChange = updateVitalsHud,
+    onManaChange = updateVitalsHud,
+    onLevelChange = updateVitalsHud
   })
   local root = g_ui.getRootWidget()
   if root then
@@ -575,11 +865,15 @@ function terminate()
   keypadEvent = nil
   removeEvent(initScaleEvent)
   initScaleEvent = nil
+  removeEvent(statusTickerEvent)
+  statusTickerEvent = nil
   keypadActive = false
+  keypadTouchButton = nil
 
   disconnect(g_ui, {
     onMousePress = onGlobalMousePress,
     onMouseMove = onGlobalMouseMove,
+    onTouchMove = onGlobalTouchMove,
     onMouseRelease = onGlobalMouseRelease
   })
   if keypad then
@@ -593,7 +887,14 @@ function terminate()
   end
   disconnect(g_game, {
     onGameStart = online,
-    onGameEnd = offline
+    onGameEnd = offline,
+    onPingBack = onPingBack,
+    onAttackingCreatureChange = updateTargetBar
+  })
+  disconnect(LocalPlayer, {
+    onHealthChange = updateVitalsHud,
+    onManaChange = updateVitalsHud,
+    onLevelChange = updateVitalsHud
   })
   local root = g_ui.getRootWidget()
   if root then
@@ -607,8 +908,12 @@ function terminate()
   overlay:destroy()
   overlay = nil
   keypad = nil
+  leftQuickCluster = nil
   rightControls = nil
-  mobileHudBar = nil
+  mobileVitalsHud = nil
+  mobileTargetBar = nil
+  mobileTopRightBar = nil
+  mobileMenuPanel = nil
   mobileLoginSettingsBtn = nil
   settingsDrawer = nil
 end
@@ -631,6 +936,7 @@ end
 
 function offline()
   keypadActive = false
+  keypadTouchButton = nil
   actionMode = nil
   removeEvent(keypadEvent)
   keypadEvent = nil
@@ -645,14 +951,21 @@ end
 function onGlobalMousePress(pos, button)
   if not overlay then return end
   if button == MouseTouch then
-    if actionMode and not (keypad and keypad:isVisible() and keypad:containsPoint(pos))
-       and not (rightControls and rightControls:isVisible() and rightControls:containsPoint(pos))
-       and not (mobileHudBar and mobileHudBar:isVisible() and mobileHudBar:containsPoint(pos)) then
+    -- Close floating menu panel when tapping outside it.
+    if mobileMenuPanel and mobileMenuPanel:isVisible()
+       and not mobileMenuPanel:containsPoint(pos)
+       and not (mobileTopRightBar and mobileTopRightBar:containsPoint(pos)) then
+      closeMenuPanel()
+    end
+
+    -- Trigger USE/LOOK action ONLY when hit-test confirms the touch landed directly on the game map.
+    if actionMode and isPointDirectlyOnMap(pos) then
       if triggerTouchActionOnTile(pos) and g_window.consumeTouchGesture then
         g_window.consumeTouchGesture()
       end
       return
     end
+
     if keypad and keypad:isVisible() and keypad:containsPoint(pos) then
       if overlay.cursor then overlay.cursor:hide() end
       removeEvent(updateCursorEvent)
@@ -675,9 +988,16 @@ function onGlobalMousePress(pos, button)
   end
 end
 
+function onGlobalTouchMove(pos, moved, button)
+  if not overlay then return end
+  if keypadActive and keypad and keypadTouchButton == button then
+    updateKeypadMousePos(keypad, pos)
+  end
+end
+
 function onGlobalMouseMove(pos, moved)
   if not overlay then return end
-  if keypadActive and keypad then
+  if keypadActive and keypad and (keypadTouchButton == nil or keypadTouchButton == MouseTouch or keypadTouchButton == MouseLeftButton) then
     updateKeypadMousePos(keypad, pos)
   end
   if overlay.cursor and overlay.cursor:isVisible() then
@@ -734,7 +1054,9 @@ end
 
 function onKeypadTouchMove(widget, pos, offset)
   if not keypadActive then return false end
-  updateKeypadMousePos(widget, pos)
+  if keypadTouchButton == MouseTouch or keypadTouchButton == MouseLeftButton or keypadTouchButton == nil then
+    updateKeypadMousePos(widget, pos)
+  end
   return true
 end
 
@@ -772,8 +1094,7 @@ local function directionFromVector(dx, dy)
   if mag < DEADZONE then
     return nil
   end
-  -- 8-way compass sector calculation (22.5 deg half-sectors around each cardinal/diagonal)
-  local deg = math.deg(math.atan2(dy, dx)) -- 0 = East, 90 = South, -90 = North, +-180 = West
+  local deg = math.deg(math.atan2(dy, dx))
   if deg >= -22.5 and deg < 22.5 then
     return Directions.East
   elseif deg >= 22.5 and deg < 67.5 then
@@ -798,32 +1119,26 @@ function executeWalk()
   removeEvent(keypadEvent)
   keypadEvent = nil
   if not keypadActive or not modules.game_walking then
-    stopKeypadWalk()
-    return
-  end
-  local activeBtn = keypadTouchButton or MouseTouch
-  if not g_mouse.isPressed(activeBtn) and not g_mouse.isPressed(MouseLeftButton) then
-    stopKeypadWalk()
     return
   end
 
-  keypadEvent = scheduleEvent(executeWalk, 35)
   local dx = clamp((keypadMousePos.x - 0.5) * 2.0, -1.0, 1.0)
   local dy = clamp((keypadMousePos.y - 0.5) * 2.0, -1.0, 1.0)
   local mag = math.sqrt(dx * dx + dy * dy)
-  local maxRadius = math.floor(keypad:getWidth() * 0.34)
   if mag > 1.0 then
     dx = dx / mag
     dy = dy / mag
   end
-  keypad.pointer:setMarginLeft(math.floor(dx * maxRadius))
-  keypad.pointer:setMarginTop(math.floor(dy * maxRadius))
+
+  local maxOffset = math.floor(keypad:getWidth() * 0.30)
+  keypad.pointer:setMarginLeft(math.floor(dx * maxOffset))
+  keypad.pointer:setMarginTop(math.floor(dy * maxOffset))
 
   local dir = directionFromVector(dx, dy)
   if dir then
     modules.game_walking.walk(dir, keypadTicks)
-    if keypadTicks == 0 then
-      keypadTicks = 100
-    end
+    keypadTicks = keypadTicks + 1
   end
+
+  keypadEvent = scheduleEvent(executeWalk, 45)
 end

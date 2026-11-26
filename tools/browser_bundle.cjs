@@ -165,26 +165,62 @@ function buildSprManifest(sprFilePath, pageSize = SPR_PAGE_SIZE) {
   }
 }
 
+function sha256File(filePath) {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const hash = crypto.createHash('sha256');
+    const buf = Buffer.alloc(1024 * 1024);
+    let n;
+    while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) {
+      hash.update(buf.subarray(0, n));
+    }
+    return 'sha256-' + hash.digest('hex');
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function preparePagedSpr(thingsRoot, profileDist) {
   const srcSpr = path.join(thingsRoot, 'Tibia.spr');
   if (!fs.existsSync(srcSpr)) throw new Error('Asset obrigatorio ausente: Tibia.spr');
   fs.mkdirSync(profileDist, { recursive: true });
   const dstSpr = path.join(profileDist, 'Tibia.spr');
-  const sprReplaced = copyAsset(srcSpr, dstSpr);
   const manifestPath = path.join(profileDist, 'spr-manifest.json');
   const sprStat = fs.statSync(srcSpr);
-  if (!sprReplaced && fs.existsSync(manifestPath)) {
+
+  // Verify actual content hash so same-size/same-mtime edits or interrupted copies
+  // can never leave a stale public Tibia.spr or mismatched spr-manifest.json.
+  let existingManifest = null;
+  if (fs.existsSync(manifestPath)) {
     try {
-      const existing = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      const mStat = fs.statSync(manifestPath);
-      if (existing && existing.schema === 1 && existing.size === sprStat.size &&
-          existing.pageSize === SPR_PAGE_SIZE && mStat.mtimeMs >= sprStat.mtimeMs) {
-        return existing;
+      const parsed = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (parsed && parsed.schema === 1 && parsed.size === sprStat.size && parsed.pageSize === SPR_PAGE_SIZE &&
+          typeof parsed.uuid === 'string' && parsed.uuid.startsWith('sha256-')) {
+        existingManifest = parsed;
       }
     } catch (_) {}
   }
-  const sprManifest = buildSprManifest(srcSpr);
-  fs.writeFileSync(manifestPath, JSON.stringify(sprManifest, null, 2) + '\n');
+
+  const srcUuid = sha256File(srcSpr);
+  const dstMatches = fs.existsSync(dstSpr) && fs.statSync(dstSpr).size === sprStat.size && sha256File(dstSpr) === srcUuid;
+  if (dstMatches && existingManifest && existingManifest.uuid === srcUuid) {
+    return existingManifest;
+  }
+
+  // Invalidate manifest BEFORE replacing Tibia.spr so an interrupted build can never reuse old hashes.
+  if (fs.existsSync(manifestPath)) {
+    fs.unlinkSync(manifestPath);
+  }
+  if (!dstMatches) {
+    const tmpSpr = dstSpr + '.tmp.' + process.pid;
+    fs.copyFileSync(srcSpr, tmpSpr);
+    fs.utimesSync(tmpSpr, sprStat.atime, sprStat.mtime);
+    fs.renameSync(tmpSpr, dstSpr);
+  }
+  const sprManifest = buildSprManifest(dstSpr);
+  const tmpManifest = manifestPath + '.tmp.' + process.pid;
+  fs.writeFileSync(tmpManifest, JSON.stringify(sprManifest, null, 2) + '\n');
+  fs.renameSync(tmpManifest, manifestPath);
   return sprManifest;
 }
 

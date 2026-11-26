@@ -66,7 +66,8 @@
       const canvas = document.getElementById('canvas');
       const vkb = document.getElementById('astra-virtual-keyboard');
       const mobileInput = document.getElementById('astra-mobile-input');
-      return !!focused && (focused === canvas || focused === vkb || focused === mobileInput);
+      const mobileTextarea = document.getElementById('astra-mobile-textarea');
+      return !!focused && (focused === canvas || focused === vkb || focused === mobileInput || focused === mobileTextarea);
     },
 
     keyboardPolicy(event, mapped) {
@@ -74,8 +75,10 @@
       const vkb = document.getElementById('astra-virtual-keyboard');
       const canvas = document.getElementById('canvas');
       const mobileInput = document.getElementById('astra-mobile-input');
-      if (mobileInput && mobileInput !== vkb && mobileInput !== canvas && document.activeElement === mobileInput)
-        return 0; // Native mobile input handles all keys/IME/paste.
+      const mobileTextarea = document.getElementById('astra-mobile-textarea');
+      if ((mobileInput && mobileInput !== vkb && mobileInput !== canvas && document.activeElement === mobileInput) ||
+          (mobileTextarea && mobileTextarea !== vkb && mobileTextarea !== canvas && document.activeElement === mobileTextarea))
+        return 0; // Native mobile input/textarea handles all keys/IME/paste.
       const printable = [...(event.key || '')].length === 1;
       if (!mapped && !printable) return 0;
       const clipboard = (event.ctrlKey || event.metaKey) && !event.altKey;
@@ -182,6 +185,7 @@
       let composing = false;
       let touchTapStart = null;
       let lastUserInputAt = 0;
+      let awaitingTabFocus = false;
       const listeners = [];
       const listen = (target, type, callback, options) => {
         if (!target || typeof target.addEventListener !== 'function') return;
@@ -201,10 +205,21 @@
       const bar = rawBar && rawBar !== editor && rawBar !== canvas ? rawBar : null;
       const rawMobileInput = document.getElementById('astra-mobile-input');
       const mobileInput = rawMobileInput && rawMobileInput !== editor && rawMobileInput !== canvas ? rawMobileInput : null;
+      const rawMobileTextarea = document.getElementById('astra-mobile-textarea');
+      const mobileTextarea = rawMobileTextarea && rawMobileTextarea !== editor && rawMobileTextarea !== canvas && rawMobileTextarea !== mobileInput ? rawMobileTextarea : null;
       const rawNextBtn = document.getElementById('astra-mobile-input-next');
       const nextBtn = rawNextBtn && rawNextBtn !== editor && rawNextBtn !== canvas ? rawNextBtn : null;
       const rawDoneBtn = document.getElementById('astra-mobile-input-done');
       const doneBtn = rawDoneBtn && rawDoneBtn !== editor && rawDoneBtn !== canvas ? rawDoneBtn : null;
+
+      const getActiveControl = (meta) => {
+        const useMultiline = !!(meta && meta.multiline && mobileTextarea);
+        return useMultiline ? mobileTextarea : mobileInput;
+      };
+      const isMobileControlFocused = () => {
+        const ae = document.activeElement;
+        return !!(ae && (ae === mobileInput || ae === mobileTextarea));
+      };
 
       const positionBar = () => {
         if (!bar || bar.hidden) return;
@@ -218,39 +233,61 @@
       };
 
       const configureMobileInput = (meta, preserveIfFocused) => {
-        if (!mobileInput || !meta) return;
+        const ctrl = getActiveControl(meta);
+        if (!ctrl || !meta) return null;
         const prevId = currentMeta && currentMeta.id ? currentMeta.id : '';
         const nextId = meta.id || '';
         const sameWidget = !!(prevId && nextId && prevId === nextId);
-        currentMeta = meta;
-        const desiredType = meta.password ? 'password' : 'text';
-        if (mobileInput.type !== desiredType) {
-          try { mobileInput.type = desiredType; } catch (_) {}
+        if (!sameWidget) {
+          awaitingTabFocus = false;
+          lastUserInputAt = 0;
         }
-        mobileInput.inputMode = meta.numeric ? 'numeric' : (meta.email ? 'email' : 'text');
-        mobileInput.placeholder = meta.placeholder || (meta.password ? 'Password' : (meta.email ? 'Email' : (meta.numeric ? 'Token' : 'Type here…')));
-        if (meta.maxLen && meta.maxLen > 0) mobileInput.maxLength = meta.maxLen;
-        else mobileInput.removeAttribute('maxlength');
+        currentMeta = meta;
+
+        if (mobileInput && mobileTextarea) {
+          const useMulti = !!(meta.multiline);
+          mobileInput.hidden = useMulti;
+          mobileTextarea.hidden = !useMulti;
+        }
+        if (ctrl === mobileInput) {
+          const desiredType = meta.password ? 'password' : 'text';
+          if (ctrl.type !== desiredType) {
+            try { ctrl.type = desiredType; } catch (_) {}
+          }
+          ctrl.inputMode = meta.numeric ? 'numeric' : (meta.email ? 'email' : 'text');
+        }
+        ctrl.placeholder = meta.placeholder || (meta.password ? 'Password' : (meta.email ? 'Email' : (meta.numeric ? 'Token' : 'Type here…')));
+        // Enforce maxLen consistently in UTF-8 bytes on the engine side to avoid UTF-16 vs UTF-8 mismatch.
+        if (typeof ctrl.removeAttribute === 'function') ctrl.removeAttribute('maxlength');
+
         const nextVal = typeof meta.text === 'string' ? meta.text : '';
-        const skipValueOverwrite = composing || (preserveIfFocused && sameWidget && document.activeElement === mobileInput);
-        if (!skipValueOverwrite && mobileInput.value !== nextVal) {
-          mobileInput.value = nextVal;
+        const skipSync = composing || (preserveIfFocused && sameWidget && document.activeElement === ctrl);
+        if (!skipSync) {
+          if (ctrl.value !== nextVal) {
+            ctrl.value = nextVal;
+          }
           try {
             const s = typeof meta.selStart === 'number' ? meta.selStart : nextVal.length;
             const e = typeof meta.selEnd === 'number' ? meta.selEnd : s;
-            mobileInput.setSelectionRange(s, e);
+            if (ctrl.selectionStart !== s || ctrl.selectionEnd !== e) {
+              ctrl.setSelectionRange(s, e);
+            }
           } catch (_) {}
         }
+        return ctrl;
       };
 
-      const pushMobileTextToEngine = () => {
-        if (!active || !mobileInput) return;
-        const value = mobileInput.value;
-        const selStart = typeof mobileInput.selectionStart === 'number' ? mobileInput.selectionStart : value.length;
-        const selEnd = typeof mobileInput.selectionEnd === 'number' ? mobileInput.selectionEnd : selStart;
+      const pushMobileTextToEngine = (ctrlOverride) => {
+        if (!active || awaitingTabFocus) return;
+        const ctrl = ctrlOverride || getActiveControl(currentMeta);
+        if (!ctrl) return;
+        const expectedId = currentMeta && typeof currentMeta.id === 'string' ? currentMeta.id : '';
+        const value = ctrl.value;
+        const selStart = typeof ctrl.selectionStart === 'number' ? ctrl.selectionStart : value.length;
+        const selEnd = typeof ctrl.selectionEnd === 'number' ? ctrl.selectionEnd : selStart;
         if (typeof module.ccall === 'function') {
           try {
-            module.ccall('astra_browser_set_text', null, ['string', 'number', 'number'], [value, selStart, selEnd]);
+            module.ccall('astra_browser_set_text', null, ['string', 'string', 'number', 'number'], [expectedId, value, selStart, selEnd]);
             return;
           } catch (_) {}
         }
@@ -258,26 +295,29 @@
       };
 
       const openMobileBar = (meta, syncFocus) => {
-        if (!bar || !mobileInput) {
+        const targetMeta = meta || currentMeta || { text: '' };
+        const ctrl = getActiveControl(targetMeta);
+        if (!bar || !ctrl) {
           const fallback = document.getElementById('astra-virtual-keyboard');
           if (fallback) {
-            if (meta && typeof meta.text === 'string') fallback.value = meta.text;
+            if (targetMeta && typeof targetMeta.text === 'string') fallback.value = targetMeta.text;
             fallback.focus({ preventScroll: true });
           }
           return;
         }
-        const sameFocusedWidget = !bar.hidden && currentMeta && meta &&
-          currentMeta.id && meta.id && currentMeta.id === meta.id &&
-          document.activeElement === mobileInput;
-        configureMobileInput(meta || currentMeta || { text: '' }, sameFocusedWidget);
+        const sameFocusedWidget = !bar.hidden && currentMeta && targetMeta &&
+          currentMeta.id && targetMeta.id && currentMeta.id === targetMeta.id &&
+          document.activeElement === ctrl;
+        configureMobileInput(targetMeta, sameFocusedWidget);
         bar.hidden = false;
         positionBar();
         if (syncFocus) {
-          try { mobileInput.focus({ preventScroll: true }); } catch (_) { mobileInput.focus(); }
+          try { ctrl.focus({ preventScroll: true }); } catch (_) { ctrl.focus(); }
           if (!sameFocusedWidget) {
             try {
-              const len = mobileInput.value.length;
-              mobileInput.setSelectionRange(len, len);
+              const s = typeof targetMeta.selStart === 'number' ? targetMeta.selStart : ctrl.value.length;
+              const e = typeof targetMeta.selEnd === 'number' ? targetMeta.selEnd : s;
+              ctrl.setSelectionRange(s, e);
             } catch (_) {}
           }
           if (typeof navigator !== 'undefined' && navigator.virtualKeyboard && typeof navigator.virtualKeyboard.show === 'function') {
@@ -287,10 +327,14 @@
       };
 
       const closeMobileBar = (refocusCanvas) => {
+        awaitingTabFocus = false;
         if (!bar || bar.hidden) return;
         bar.hidden = true;
         if (mobileInput && document.activeElement === mobileInput) {
           try { mobileInput.blur(); } catch (_) {}
+        }
+        if (mobileTextarea && document.activeElement === mobileTextarea) {
+          try { mobileTextarea.blur(); } catch (_) {}
         }
         if (refocusCanvas && canvas && typeof canvas.focus === 'function') {
           try { canvas.focus({ preventScroll: true }); } catch (_) {}
@@ -326,9 +370,16 @@
         if (!active) return;
         let meta = null;
         try { meta = typeof json === 'string' ? JSON.parse(json) : json; } catch (_) { return; }
-        const recentlyTyped = (Date.now() - lastUserInputAt) < 250;
-        configureMobileInput(meta, recentlyTyped);
-        if (bar && !bar.hidden) positionBar();
+        const prevId = currentMeta && currentMeta.id ? currentMeta.id : '';
+        const switchedWidget = !!(meta && meta.id && prevId && meta.id !== prevId);
+        const recentlyTyped = !switchedWidget && (Date.now() - lastUserInputAt) < 250;
+        const ctrl = configureMobileInput(meta, recentlyTyped);
+        if (bar && !bar.hidden) {
+          positionBar();
+          if (switchedWidget && ctrl && document.activeElement !== ctrl) {
+            try { ctrl.focus({ preventScroll: true }); } catch (_) {}
+          }
+        }
       };
       window.AstraBrowser.hideMobileKeyboard = () => {
         if (!active) return;
@@ -337,7 +388,7 @@
 
       listen(document, 'paste', event => {
         if (!active || !this.ownsKeyboardFocus()) return;
-        if (mobileInput && document.activeElement === mobileInput) return; // Native paste fires input on mobileInput.
+        if (isMobileControlFocused()) return; // Native paste fires input on mobile control.
         const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
         if (text) {
           module.ccall('astra_browser_paste', null, ['string'], [text]);
@@ -357,7 +408,7 @@
         }, { capture: true, passive: true });
 
         listen(canvas, 'mousedown', event => {
-          if (active && isMobileContext() && bar && !bar.hidden && document.activeElement === mobileInput) {
+          if (active && isMobileContext() && bar && !bar.hidden && isMobileControlFocused()) {
             event.preventDefault();
           }
         }, { capture: true });
@@ -392,27 +443,30 @@
         }, { capture: true, passive: false });
       }
 
-      if (mobileInput) {
-        listen(mobileInput, 'compositionstart', () => { composing = true; });
-        listen(mobileInput, 'compositionend', () => {
+      const wireMobileControl = (ctrl, isMultiline) => {
+        if (!ctrl) return;
+        listen(ctrl, 'compositionstart', () => { composing = true; });
+        listen(ctrl, 'compositionend', () => {
           composing = false;
           lastUserInputAt = Date.now();
-          pushMobileTextToEngine();
+          pushMobileTextToEngine(ctrl);
         });
-        listen(mobileInput, 'input', () => {
+        listen(ctrl, 'input', () => {
           if (!active || composing) return;
           lastUserInputAt = Date.now();
-          pushMobileTextToEngine();
+          pushMobileTextToEngine(ctrl);
         });
-        listen(mobileInput, 'keydown', event => {
-          if (!active) return;
+        listen(ctrl, 'keydown', event => {
+          if (!active || composing || event.isComposing || event.keyCode === 229) return;
           if (event.key === 'Enter') {
-            pushMobileTextToEngine();
+            if (isMultiline) return; // Preserve native newline insertion in multiline textarea.
+            pushMobileTextToEngine(ctrl);
             module.ccall('astra_browser_virtual_key', null, ['number'], [13]);
             event.preventDefault();
-            if (!currentMeta || !currentMeta.multiline) closeMobileBar(true);
+            closeMobileBar(true);
           } else if (event.key === 'Tab') {
-            pushMobileTextToEngine();
+            pushMobileTextToEngine(ctrl);
+            awaitingTabFocus = true;
             module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
             event.preventDefault();
           } else if (event.key === 'Escape') {
@@ -421,15 +475,20 @@
             closeMobileBar(true);
           }
         });
-      }
+      };
+      wireMobileControl(mobileInput, false);
+      wireMobileControl(mobileTextarea, true);
+
       if (nextBtn) {
         let lastTouchNextMs = 0;
         const triggerNext = () => {
           if (!active) return;
           pushMobileTextToEngine();
+          awaitingTabFocus = true;
           module.ccall('astra_browser_virtual_key', null, ['number'], [9]);
-          if (mobileInput) {
-            try { mobileInput.focus({ preventScroll: true }); } catch (_) {}
+          const ctrl = getActiveControl(currentMeta);
+          if (ctrl) {
+            try { ctrl.focus({ preventScroll: true }); } catch (_) {}
           }
         };
         listen(nextBtn, 'mousedown', event => event.preventDefault());
