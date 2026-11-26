@@ -624,11 +624,15 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
       return true
     elseif mouseButton == MouseLeftButton and not g_mouse.isPressed(MouseRightButton) then
       if g_game.getAttackingCreature() == creature then
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
+        if modules.game_helper and modules.game_helper.helperConfig then
+          modules.game_helper.helperConfig.currentLockedTargetId = 0
+        end
         g_game.cancelAttack()
         g_game.attack(nil)
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = creature:getId()
+        if modules.game_helper and modules.game_helper.helperConfig then
+          modules.game_helper.helperConfig.currentLockedTargetId = creature:getId()
+        end
         g_game.attack(creature)
       end
       return true
@@ -643,9 +647,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
 
       if not isNpc then
         if g_game.getAttackingCreature() == creature then
-          menu:addOption(tr('Stop Attack'), function()  modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.attack(nil) end)
+          menu:addOption(tr('Stop Attack'), function() if modules.game_helper and modules.game_helper.helperConfig then modules.game_helper.helperConfig.currentLockedTargetId = 0 end g_game.attack(nil) end)
         else
-          menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creature:getId(); g_game.attack(creature) end)
+          menu:addOption(tr('Attack'), function() if modules.game_helper and modules.game_helper.helperConfig then modules.game_helper.helperConfig.currentLockedTargetId = creature:getId() end g_game.attack(creature) end)
         end
       elseif isNpc then
         menu:addOption(tr('Talk'), function()
@@ -690,9 +694,11 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
         end
         menu:addOption(tr('Inspect %s', creature:getName()), function() print("toDo") end)
         menu:addOption(tr('Revoke %s allowance to inspect me', creature:getName()), function() print("toDo") end)
-        menu:addSeparator()
-        menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creature:getName()) end)
-        menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creature:getId(), creature:getName()) end)
+        if modules.game_report then
+          menu:addSeparator()
+          menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creature:getName()) end)
+          menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creature:getId(), creature:getName()) end)
+        end
         menu:addSeparator()
         menu:addOption(tr('Copy Name'), function () g_window.setClipboardText(creatureName) end)
       else
@@ -839,7 +845,9 @@ function onPlayerUnload()
     end
   end
 
-  modules.game_party_list.PartyClass:registerInSideBars()
+  if modules.game_party_list and modules.game_party_list.PartyClass then
+    modules.game_party_list.PartyClass:registerInSideBars()
+  end
 end
 
 function moveBattle(instance, panel, height, minimized)
@@ -902,7 +910,9 @@ function chooseNextCreature()
 
   if nextChild then
     g_game.attack(nextChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = nextChild:getId()
+    if modules.game_helper and modules.game_helper.helperConfig then
+      modules.game_helper.helperConfig.currentLockedTargetId = nextChild:getId()
+    end
   end
 end
 
@@ -944,7 +954,9 @@ function choosePrevCreature()
 
   if prevChild then
     g_game.attack(prevChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = prevChild:getId()
+    if modules.game_helper and modules.game_helper.helperConfig then
+      modules.game_helper.helperConfig.currentLockedTargetId = prevChild:getId()
+    end
   end
 end
 

@@ -74,7 +74,9 @@ function UIMiniWindow:close()
       modules.game_sidebuttons.setButtonVisible("partyWidget", false)
     end
   elseif self:getId() == "lockerSearchWindow" then
-    modules.game_search_locker.toggleSearchFocus()
+    if modules.game_search_locker and modules.game_search_locker.toggleSearchFocus then
+      modules.game_search_locker.toggleSearchFocus()
+    end
   end
 
 

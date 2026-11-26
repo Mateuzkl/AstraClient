@@ -53,7 +53,7 @@ NonClosableMiniWindow
       image-clip: 0 0 108 20
       !tooltip: tr('Open the Store')
       tooltip-delayed: true
-      @onClick: g_game.openStore(); modules.game_store.Store:openHome()
+      @onClick: g_game.openStore(); if modules.game_store and modules.game_store.Store then modules.game_store.Store:openHome() end
       $pressed:
         image-source: /images/store/button-store-down
     UIWidget

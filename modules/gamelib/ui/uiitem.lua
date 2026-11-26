@@ -185,7 +185,7 @@ function UIItem:onDrop(widget, mousePos, forced)
       if destWidget and (destWidget:getClassName() == "UIItem" or destWidget:getClassName() == "Item") and destWidget:getItem() and not destWidget:isVirtual() then
         local destPos = destWidget:getItem():getPosition()
         local canAsk = m_settings.getOption('stowContainer')
-        if canAsk and (destPos.x == 65535 and destPos.y == 65 and destPos.z == 1) and destWidget:getItemId() == 28750 then
+        if canAsk and modules.game_stash and modules.game_stash.stowContainerContent and (destPos.x == 65535 and destPos.y == 65 and destPos.z == 1) and destWidget:getItemId() == 28750 then
           modules.game_stash.stowContainerContent(item, toPos, true)
           canMoveContainer = false
         end

@@ -2,6 +2,7 @@
 #include "framebuffermanager.h"
 #include "painter.h"
 #include "graphics.h"
+#include <framework/core/application.h>
 #include <framework/core/clock.h>
 #include <framework/platform/platform.h>
 
@@ -9,8 +10,10 @@ Atlas g_atlas;
 
 void Atlas::init()
 {
-    // If you don't care about players with old computers (~5% of players) you can change 4096 to 6144 or8192
-    m_size = std::min<size_t>(4096, g_graphics.getMaxTextureSize());
+    // Mobile profile uses a 2048x2048 sprite atlas (16 MiB VRAM vs 64 MiB on desktop).
+    // Desktop preserves the 4096x4096 atlas unchanged.
+    const size_t preferredSize = g_app.isMobile() ? 2048 : 4096;
+    m_size = std::min<size_t>(preferredSize, g_graphics.getMaxTextureSize());
     g_logger.info(stdext::format("[Atlas] Texture size is: %ix%i (max: %ix%i)", m_size, m_size, g_graphics.getMaxTextureSize(), g_graphics.getMaxTextureSize()));
 
     for(size_t i = 0; i < 2; ++i) {

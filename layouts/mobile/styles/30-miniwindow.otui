@@ -1,19 +1,24 @@
+// Touch-friendly MiniWindow overrides compatible with modern AstraClient child IDs.
 MiniWindow < UIMiniWindow
-  font: verdana-11px-antialised
-  icon-rect: 4 4 16 16
+  font: $var-cip-font
+  color: $var-text-cip-color-grey
+  icon-rect: 4 4 12 12
   width: 192
-  height: 200
-  text-offset: 24 5
+  height: 211
+  text-offset: 20 0
   text-align: topLeft
-  image-source: /images/ui/miniwindow
+  image-source: /images/ui/window
   image-border: 4
-  image-border-top: 23
+  image-border-top: 19
   image-border-bottom: 4
   focusable: false
-  &minimizedHeight: 24
+  &minimizedHeight: 22
+  icon-offset-y: -2
 
   $on:
-    image-border-bottom: 2
+    image-border-top: 19
+    image-border-bottom: 10
+    image-border: 4
 
   UIWidget
     id: miniwindowTopBar
@@ -23,82 +28,193 @@ MiniWindow < UIMiniWindow
     margin-right: 3
     margin-left: 3
     margin-top: 3
-    size: 258 18
+    size: 258 16
     phantom: true
 
   UIButton
     id: closeButton
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 5
-    margin-right: 5
+    margin-top: 2
+    margin-right: 3
     size: 14 14
     image-source: /images/ui/miniwindow_buttons
-    image-clip: 28 0 14 14
+    image-clip: 29 1 12 12
+    tooltip: Close this window
+    tooltip-delayed: true
 
     $hover:
-      image-clip: 28 14 14 14
+      image-clip: 29 15 12 12
 
     $pressed:
-      image-clip: 28 28 14 14
+      image-clip: 29 29 12 12
 
   UIButton
     id: minimizeButton
     anchors.top: closeButton.top
     anchors.right: closeButton.left
-    margin-right: 3
+    margin-right: 2
     size: 14 14
     image-source: /images/ui/miniwindow_buttons
-    image-clip: 0 0 14 14
+    image-clip: 1 1 12 12
+    tooltip: Maximise or minimise window
+    tooltip-delayed: true
 
     $hover:
-      image-clip: 0 14 14 14
+      image-clip: 1 15 12 12
 
     $pressed:
-      image-clip: 0 28 14 14
+      image-clip: 1 29 12 12
 
     $on:
-      image-clip: 14 0 14 14
+      image-clip: 15 1 12 12
 
     $on hover:
-      image-clip: 14 14 14 14
+      image-clip: 15 15 12 12
 
     $on pressed:
-      image-clip: 14 28 14 14
+      image-clip: 15 29 12 12
+
+  UIButton
+    id: filterBattleButton
+    anchors.top: lockButton.top
+    anchors.right: lockButton.left
+    margin-right: 5
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 99 1 12 12
+    $hover:
+      image-clip: 99 15 12 12
+    $pressed:
+      image-clip: 99 29 12 12
+    $on:
+      image-clip: 99 29 12 12
+
+  UIButton
+    id: redirectBattleButton
+    anchors.top: prev.top
+    anchors.right: prev.left
+    margin-right: 2
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 57 1 12 12
+
+    $hover:
+      image-clip: 57 15 12 12
+
+    $pressed:
+      image-clip: 57 29 12 12
+
+    $on:
+      image-clip: 57 29 12 12
+
+  UIButton
+    id: extraBattleButton
+    anchors.top: prev.top
+    anchors.right: prev.left
+    margin-right: 2
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 113 1 12 12
+
+    $hover:
+      image-clip: 113 15 12 12
+
+    $pressed:
+      image-clip: 113 29 12 12
+
+    $on:
+      image-clip: 113 29 12 12
+
+  UIButton
+    id: redirectButton
+    anchors.top: extraButton.top
+    anchors.right: extraButton.left
+    margin-right: 2
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 57 1 12 12
+
+    $hover:
+      image-clip: 57 15 12 12
+
+    $pressed:
+      image-clip: 57 29 12 12
+
+    $on:
+      image-clip: 57 29 12 12
 
   UIButton
     id: lockButton
     anchors.top: minimizeButton.top
     anchors.right: minimizeButton.left
-    margin-right: 3
+    margin-right: 2
     size: 14 14
     image-source: /images/ui/miniwindow_buttons
-    image-clip: 112 0 14 14
+    image-clip: 71 1 12 12
+    tooltip: Lock or unlock window
+    tooltip-delayed: true
 
     $hover:
-      image-clip: 112 14 14 14
+      image-clip: 71 15 12 12
 
     $pressed:
-      image-clip: 112 28 14 14
+      image-clip: 71 29 12 12
 
     $on:
-      image-clip: 98 0 14 14
+      image-clip: 85 1 12 12
 
     $on hover:
-      image-clip: 98 14 14 14
+      image-clip: 85 15 12 12
 
     $on pressed:
-      image-clip: 98 28 14 14
+      image-clip: 85 29 12 12
+
+  UIButton
+    id: extraButton
+    anchors.top: lockButton.top
+    anchors.right: lockButton.left
+    margin-right: 5
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 113 1 12 12
+
+    $hover:
+      image-clip: 113 15 12 12
+
+    $pressed:
+      image-clip: 113 29 12 12
+
+    $on:
+      image-clip: 113 29 12 12
+
+  UIButton
+    id: filterContainer
+    anchors.top: lockButton.top
+    anchors.right: lockButton.left
+    margin-right: 2
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 113 1 12 12
+
+    $hover:
+      image-clip: 113 15 12 12
+
+    $pressed:
+      image-clip: 113 29 12 12
+
+    $on:
+      image-clip: 113 29 12 12
 
   VerticalScrollBar
     id: miniwindowScrollBar
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    step: 14
-    margin-top: 22
+    step: 16
+    margin-top: 18
     margin-right: 3
-    margin-bottom: 3
+    margin-bottom: 4
     pixels-scroll: true
 
     $!on:
@@ -121,7 +237,7 @@ MiniWindowContents < ScrollablePanel
   anchors.right: miniwindowScrollBar.left
   margin-left: 3
   margin-bottom: 8
-  margin-top: 22
+  margin-top: 20
   margin-right: 1
   vertical-scrollbar: miniwindowScrollBar
 

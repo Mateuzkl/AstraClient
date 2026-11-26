@@ -39,6 +39,7 @@ public:
 
     /// Load font from otml node
     void load(const OTMLNodePtr& fontNode);
+    void reload();
 
     /// Simple text render starting at startPos
     void drawText(const std::string& text, const Point& startPos, const Color& color = Color::white, bool shadow = false);
@@ -75,6 +76,8 @@ private:
     void updateColors(std::vector<std::pair<int, Color>>* colors, int pos, int newTextLen);
 
     std::string m_name;
+    std::string m_textureFile;
+    Size m_glyphSize;
     int m_glyphHeight;
     int m_firstGlyph;
     int m_yOffset;

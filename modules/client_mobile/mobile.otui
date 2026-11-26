@@ -5,8 +5,8 @@ UIWidget
 
   UIProgressRect
     id: cursor
-    size: 64 64
-    background: #FF5858
+    size: 56 56
+    background: #6fa8ff
     percent: 100
     visible: false
     x: 0
@@ -15,24 +15,346 @@ UIWidget
     phantom: true
 
   UIWidget
+    id: mobileHudBar
+    height: 36
+    width: 446
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 6
+    padding: 3 4 3 4
+    background-color: #090d18bb
+    border-width: 1
+    border-color: #5b6d9e88
+    visible: false
+    focusable: false
+    layout:
+      type: horizontalBox
+      spacing: 3
+
+    MobileHudPill
+      id: hudInventory
+      text: Inv
+
+    MobileHudPill
+      id: hudBattle
+      text: Bat
+
+    MobileHudPill
+      id: hudVip
+      text: VIP
+
+    MobileHudPill
+      id: hudSkills
+      text: Skl
+
+    MobileHudPill
+      id: hudMinimap
+      text: Map
+
+    MobileHudPill
+      id: hudChat
+      text: Chat
+
+    MobileHudPill
+      id: hudHotkeys
+      text: Keys
+
+    MobileHudPill
+      id: hudTogglePad
+      text: Pad
+
+    MobileHudPill
+      id: hudSettings
+      text: Cfg
+
+  UIWidget
     id: keypad
-    size: 200 150
+    size: 156 156
     anchors.bottom: parent.bottom
-    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-left: 16
+    margin-bottom: 16
     phantom: false
     focusable: false
     visible: false
-    background: #00000044
+    background-color: #0d132477
+    border-width: 1
+    border-color: #6b84be88
     image-source: /images/game/mobile/keypad
     image-fixed-ratio: true
-    image-rect: 25 0 150 150
+    image-rect: 3 3 150 150
 
     UIWidget
       id: pointer
-      size: 49 49
+      size: 46 46
       anchors.verticalCenter: parent.verticalCenter
       anchors.horizontalCenter: parent.horizontalCenter
       image-source: /images/game/mobile/keypad_pointer
       image-fixed-ratio: true
       phantom: true
       focusable: false
+
+  UIWidget
+    id: rightControls
+    size: 214 166
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 14
+    margin-bottom: 14
+    visible: false
+    focusable: false
+    phantom: true
+
+    UIWidget
+      id: hotkeyPad
+      size: 210 44
+      anchors.top: parent.top
+      anchors.right: parent.right
+      focusable: false
+      phantom: true
+      layout:
+        type: horizontalBox
+        spacing: 4
+
+      MobileHotkeySlot
+        id: hkF1
+        size: 32 40
+        text: F1
+
+      MobileHotkeySlot
+        id: hkF2
+        size: 32 40
+        text: F2
+
+      MobileHotkeySlot
+        id: hkF3
+        size: 32 40
+        text: F3
+
+      MobileHotkeySlot
+        id: hkF4
+        size: 32 40
+        text: F4
+
+      MobileHotkeySlot
+        id: hkF5
+        size: 32 40
+        text: F5
+
+      MobileHotkeySlot
+        id: hkF6
+        size: 32 40
+        text: F6
+
+    UIWidget
+      id: actionCluster
+      size: 168 112
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      focusable: false
+      phantom: true
+
+      MobileActionButton
+        id: btnAttack
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        size: 56 56
+        text: ATK
+        border-color: #e06a6add
+
+      MobileActionButton
+        id: btnUse
+        anchors.bottom: parent.bottom
+        anchors.right: btnAttack.left
+        margin-right: 6
+        size: 50 50
+        text: USE
+        border-color: #6bc496cc
+
+      MobileActionButton
+        id: btnFollow
+        anchors.bottom: btnAttack.top
+        anchors.right: parent.right
+        margin-bottom: 6
+        size: 50 50
+        text: FLW
+        border-color: #6ba5e0cc
+
+      MobileActionButton
+        id: btnLook
+        anchors.bottom: btnUse.top
+        anchors.right: btnFollow.left
+        margin-right: 6
+        margin-bottom: 6
+        size: 50 50
+        text: LOK
+        border-color: #d9bd6acc
+
+      MobileActionButton
+        id: btnStop
+        anchors.bottom: parent.bottom
+        anchors.right: btnUse.left
+        margin-right: 6
+        size: 44 44
+        text: STP
+        border-color: #a688d6bb
+
+  MobileDrawerPanel
+    id: mobileSettingsDrawer
+    size: 300 290
+    anchors.top: mobileHudBar.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 8
+    visible: false
+    layout:
+      type: verticalBox
+      spacing: 4
+
+    Label
+      id: drawerTitle
+      text: Mobile Lite Settings
+      font: verdana-11px-antialised
+      color: #cfe0ff
+      text-align: center
+      height: 18
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: Controls
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgScaleSm
+        size: 46 28
+        text: 0.8x
+      MobileHudPill
+        id: cfgScaleMd
+        size: 46 28
+        text: 1.0x
+      MobileHudPill
+        id: cfgScaleLg
+        size: 46 28
+        text: 1.25x
+      MobileHudPill
+        id: cfgScaleXl
+        size: 46 28
+        text: 1.5x
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: UI Scale
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgUiDown
+        size: 58 28
+        text: -
+      MobileHudPill
+        id: cfgUiAuto
+        size: 66 28
+        text: Auto
+      MobileHudPill
+        id: cfgUiUp
+        size: 58 28
+        text: +
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: Joystick
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgStickLeft
+        size: 94 28
+        text: Left
+      MobileHudPill
+        id: cfgStickRight
+        size: 94 28
+        text: Right
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: FPS Cap
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgFps30
+        size: 60 28
+        text: 30
+      MobileHudPill
+        id: cfgFps45
+        size: 60 28
+        text: 45
+      MobileHudPill
+        id: cfgFps60
+        size: 60 28
+        text: 60
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: Quality
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgDpr10
+        size: 60 28
+        text: 1.0x
+      MobileHudPill
+        id: cfgDpr125
+        size: 60 28
+        text: 1.25x
+      MobileHudPill
+        id: cfgDpr15
+        size: 60 28
+        text: 1.5x
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      Label
+        text: Effects
+        width: 78
+        color: #d6dcf0
+        text-align: left
+      MobileHudPill
+        id: cfgLights
+        size: 94 28
+        text: Lights: On
+      MobileHudPill
+        id: cfgFloorFade
+        size: 94 28
+        text: Fade: On
+
+    MobileDrawerRow
+      layout:
+        type: horizontalBox
+        spacing: 4
+      MobileHudPill
+        id: cfgTrimCache
+        size: 136 28
+        text: Free Texture Cache
+      MobileHudPill
+        id: cfgCloseDrawer
+        size: 136 28
+        text: Close

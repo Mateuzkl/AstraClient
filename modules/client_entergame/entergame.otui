@@ -131,7 +131,7 @@ EnterGameWindow
     $pressed:
       image-clip: 0 20 20 20
     !tooltip: tr('Open Recordings List')
-    @onClick: function() EnterGame.hide(false) modules.client_camviewer.toggle() end
+    @onClick: function() if modules.client_camviewer and modules.client_camviewer.toggle then EnterGame.hide(false) modules.client_camviewer.toggle() end end
 
   Panel
     id: customServerSelectorPanel

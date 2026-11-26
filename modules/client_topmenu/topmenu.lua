@@ -64,7 +64,10 @@ function terminate()
   removeEvent(fpsUpdateEvent)
   removeEvent(statusUpdateEvent)
 
-  topMenu:destroy()
+  if topMenu then
+    topMenu:destroy()
+    topMenu = nil
+  end
 end
 
 function online()
@@ -109,7 +112,7 @@ function offline()
 end
 
 function updateFps()
-  if not topMenu.fpsLabel then return end
+  if not topMenu or not topMenu.fpsLabel then return end
   fpsUpdateEvent = scheduleEvent(updateFps, 500)
   text = 'FPS: ' .. g_app.getFps()
   topMenu.fpsLabel:setText(text)

@@ -25,9 +25,12 @@
 #include "indexedspr.h"
 #include "game.h"
 #include "thingtypemanager.h"
+#include <framework/core/application.h>
+#include <framework/core/clock.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
 #ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
 #include <framework/core/startuptimer.h>
 #endif
 #include <framework/graphics/image.h>
@@ -38,6 +41,7 @@
 #include <framework/util/pngunpacker.h>
 
 #include <algorithm>
+#include <cstring>
 #include <new>
 
 SpriteManager g_sprites;
@@ -48,6 +52,11 @@ constexpr int MinScaleFactor = 1;
 constexpr int MaxScaleFactor = 4;
 constexpr size_t MaxImageCacheEntries = 2000;
 constexpr size_t MaxImageCacheBytes = 32 * 1024 * 1024;
+constexpr size_t MobileMaxImageCacheEntries = 512;
+constexpr size_t MobileMaxImageCacheBytes = 8 * 1024 * 1024;
+constexpr uint32 PagedSprPageSize = 262144; // 256 KiB
+constexpr size_t MaxPagedCachePages = 64;   // 16 MiB bounded RAM budget
+constexpr ticks_t PagedRetryCooldownMs = 3000;
 }
 
 SpriteManager::SpriteManager()
@@ -99,6 +108,12 @@ bool SpriteManager::loadSpr(std::string file)
     auto sprFile = g_resources.guessFilePath(file, "spr");
     if (g_resources.fileExists(sprFile)) {
         return loadCasualSpr(sprFile);
+    }
+
+    // 3. Demand-paged SPR index (Web Mobile Lite on-demand 256 KiB HTTP Range paging)
+    const std::string idxFile = sprFile + ".idx";
+    if (g_resources.fileExists(idxFile)) {
+        return loadPagedSpr(idxFile);
     }
 
     return false;
@@ -342,6 +357,9 @@ void SpriteManager::unload()
     m_loaded = false;
     m_isHdMod = false;
     m_isIndexed = false;
+    m_isPaged = false;
+    m_lastSpritePending = false;
+    m_pagedFileSize = 0;
     m_spritesFile = nullptr;
     m_parts.clear();
     // A large indexed pack must not retain its logical index after switching
@@ -350,6 +368,11 @@ void SpriteManager::unload()
     m_spriteAddresses.clear();
     m_sprites.clear();
     m_cachedData.clear();
+    m_pagedCache.clear();
+    m_pagedCacheLru.clear();
+    m_pagedCacheBytes = 0;
+    m_pendingPages.clear();
+    m_failedPages.clear();
     clearImageCache();
     m_baseSpriteSize = 32;
     updateSpriteSize();
@@ -357,6 +380,7 @@ void SpriteManager::unload()
 
 ImagePtr SpriteManager::getSpriteImage(int id)
 {
+    m_lastSpritePending = false;
     if (id <= 0 || !m_loaded)
         return nullptr;
 
@@ -371,13 +395,17 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     }
 
     ImagePtr baseSprite = getSpriteImageCasual(id);
+    if (!baseSprite)
+        return nullptr;
     ImagePtr scaledSprite = m_scaleFactor > 1 ? upscaleSprite(baseSprite, m_scaleFactor) : baseSprite;
     if (!scaledSprite)
         return baseSprite;
 
+    const size_t maxEntries = g_app.isMobile() ? MobileMaxImageCacheEntries : MaxImageCacheEntries;
+    const size_t maxBytes = g_app.isMobile() ? MobileMaxImageCacheBytes : MaxImageCacheBytes;
     const size_t imageBytes = static_cast<size_t>(scaledSprite->getPixelCount()) * scaledSprite->getBpp();
     while (!m_imageCacheLru.empty() &&
-           (m_imageCache.size() >= MaxImageCacheEntries || m_imageCacheBytes + imageBytes > MaxImageCacheBytes)) {
+           (m_imageCache.size() >= maxEntries || m_imageCacheBytes + imageBytes > maxBytes)) {
         const int oldestId = m_imageCacheLru.back();
         m_imageCacheLru.pop_back();
 
@@ -540,6 +568,195 @@ bool SpriteManager::loadCasualSpr(std::string file)
         return false;
     }
 }
+
+bool SpriteManager::loadPagedSpr(std::string idxFile)
+{
+    m_baseSpriteSize = 32;
+    updateSpriteSize();
+    try {
+        FileStreamPtr fin = g_resources.openFile(idxFile, true);
+        if (!fin)
+            stdext::throw_exception("Unable to open paged sprite index");
+
+        const uint32 idxFileSize = fin->size();
+        if (idxFileSize < 8)
+            stdext::throw_exception("Paged sprite index header is truncated");
+
+        m_signature = fin->getU32();
+        const bool u32Count = g_game.getFeature(Otc::GameSpritesU32);
+        m_spritesCount = u32Count ? fin->getU32() : fin->getU16();
+        const uint32 indexOffset = fin->tell();
+        m_spritesOffset = indexOffset;
+
+        const uint64 tableBytes64 = static_cast<uint64>(m_spritesCount) * 4ULL;
+        if (m_spritesCount <= 0 || indexOffset + tableBytes64 > idxFileSize)
+            stdext::throw_exception("Invalid paged sprite address table");
+
+        const uint32 tableBytes = static_cast<uint32>(tableBytes64);
+        m_spriteAddresses.resize(m_spritesCount);
+        if (fin->read(m_spriteAddresses.data(), 1, tableBytes) != static_cast<int>(tableBytes))
+            stdext::throw_exception("Incomplete paged sprite address table");
+        for (uint32& address : m_spriteAddresses)
+            address = stdext::readULE32(reinterpret_cast<const uint8*>(&address));
+
+        if (idxFileSize >= indexOffset + tableBytes + 4) {
+            m_pagedFileSize = fin->getU32();
+        } else {
+            m_pagedFileSize = 0xFFFFFFFFU;
+        }
+        if (m_pagedFileSize < indexOffset + tableBytes)
+            stdext::throw_exception("Invalid paged sprite backing file size");
+
+        m_isPaged = true;
+        m_loaded = true;
+        g_logger.info(stdext::format("Demand-paged SPR index loaded: %d sprites (backing %u bytes, 256 KiB pages, max %zu MiB cache)",
+            m_spritesCount, m_pagedFileSize, (MaxPagedCachePages * PagedSprPageSize) / (1024 * 1024)));
+        g_lua.callGlobalField("g_sprites", "onLoadSpr", idxFile);
+        return true;
+    }
+    catch (const std::exception& e) {
+        g_logger.error(stdext::format("Failed to load paged sprite index '%s': %s", idxFile, e.what()));
+        unload();
+        return false;
+    }
+}
+
+void SpriteManager::requestPagedSprPage(uint32 pageIndex)
+{
+    if (m_pendingPages.count(pageIndex) != 0)
+        return;
+    const auto failIt = m_failedPages.find(pageIndex);
+    if (failIt != m_failedPages.end() && (stdext::millis() - failIt->second) < PagedRetryCooldownMs)
+        return;
+    m_pendingPages.insert(pageIndex);
+#ifdef __EMSCRIPTEN__
+    // clang-format off
+    MAIN_THREAD_ASYNC_EM_ASM({
+        if (Module && typeof Module.astraRequestSprPage === 'function')
+            Module.astraRequestSprPage($0 >>> 0);
+    }, pageIndex);
+    // clang-format on
+#endif
+}
+
+bool SpriteManager::readPagedBytes(uint32 offset, size_t length, uint8_t* out)
+{
+    if (length == 0)
+        return true;
+    if (static_cast<uint64>(offset) + length > m_pagedFileSize)
+        return false;
+
+    const uint32 firstPage = offset / PagedSprPageSize;
+    const uint32 lastPage = static_cast<uint32>((static_cast<uint64>(offset) + length - 1ULL) / PagedSprPageSize);
+    bool missing = false;
+    for (uint32 page = firstPage; page <= lastPage; ++page) {
+        if (m_pagedCache.find(page) == m_pagedCache.end()) {
+            requestPagedSprPage(page);
+            missing = true;
+        }
+    }
+    if (missing) {
+        m_lastSpritePending = true;
+        return false;
+    }
+
+    size_t copied = 0;
+    while (copied < length) {
+        const uint32 pos = offset + static_cast<uint32>(copied);
+        const uint32 pageIdx = pos / PagedSprPageSize;
+        const uint32 inPage = pos % PagedSprPageSize;
+        auto it = m_pagedCache.find(pageIdx);
+        if (it == m_pagedCache.end() || inPage >= it->second.bytes.size())
+            return false;
+        m_pagedCacheLru.splice(m_pagedCacheLru.begin(), m_pagedCacheLru, it->second.lruIt);
+        const size_t avail = it->second.bytes.size() - inPage;
+        const size_t chunk = std::min(length - copied, avail);
+        std::memcpy(out + copied, it->second.bytes.data() + inPage, chunk);
+        copied += chunk;
+    }
+    return true;
+}
+
+ImagePtr SpriteManager::getSpriteImagePaged(int id)
+{
+    if (id <= 0 || id > m_spritesCount || static_cast<size_t>(id) > m_spriteAddresses.size())
+        return nullptr;
+
+    const uint32 spriteAddress = m_spriteAddresses[id - 1];
+    if (spriteAddress == 0)
+        return nullptr;
+
+    uint8 header[5];
+    if (!readPagedBytes(spriteAddress, sizeof(header), header))
+        return nullptr;
+
+    const uint16 pixelDataSize = stdext::readULE16(header + 3);
+    if (static_cast<uint64>(spriteAddress) + 5ULL + pixelDataSize > m_pagedFileSize)
+        stdext::throw_exception("Paged SPR: Sprite payload exceeds file bounds");
+
+    std::vector<uint8> data(pixelDataSize);
+    if (pixelDataSize > 0 && !readPagedBytes(spriteAddress + 5, pixelDataSize, data.data()))
+        return nullptr;
+
+    const int spriteDataSize = m_baseSpriteSize * m_baseSpriteSize * 4;
+    auto image = std::make_shared<Image>(Size(m_baseSpriteSize, m_baseSpriteSize));
+    if (!SpriteDecoder::decode(data.data(), data.size(), image->getPixelData(), spriteDataSize,
+                               g_game.getFeature(Otc::GameSpritesAlphaChannel)))
+        stdext::throw_exception("Paged SPR: Invalid sprite pixel runs");
+
+    return image;
+}
+
+void SpriteManager::onPagedSprPageLoaded(uint32 pageIndex, std::vector<uint8_t>&& bytes, bool ok)
+{
+    m_pendingPages.erase(pageIndex);
+    if (!m_isPaged)
+        return;
+
+    if (!ok || bytes.empty()) {
+        m_failedPages[pageIndex] = stdext::millis();
+        return;
+    }
+    m_failedPages.erase(pageIndex);
+
+    auto existing = m_pagedCache.find(pageIndex);
+    if (existing != m_pagedCache.end()) {
+        m_pagedCacheBytes -= existing->second.bytes.size();
+        existing->second.bytes = std::move(bytes);
+        m_pagedCacheBytes += existing->second.bytes.size();
+        m_pagedCacheLru.splice(m_pagedCacheLru.begin(), m_pagedCacheLru, existing->second.lruIt);
+    } else {
+        while (m_pagedCache.size() >= MaxPagedCachePages && !m_pagedCacheLru.empty()) {
+            const uint32 oldestPage = m_pagedCacheLru.back();
+            m_pagedCacheLru.pop_back();
+            auto oldIt = m_pagedCache.find(oldestPage);
+            if (oldIt != m_pagedCache.end()) {
+                m_pagedCacheBytes -= oldIt->second.bytes.size();
+                m_pagedCache.erase(oldIt);
+            }
+        }
+        const size_t byteSize = bytes.size();
+        m_pagedCacheLru.push_front(pageIndex);
+        m_pagedCache.emplace(pageIndex, PagedPageEntry{ std::move(bytes), m_pagedCacheLru.begin() });
+        m_pagedCacheBytes += byteSize;
+    }
+
+    g_app.repaint();
+}
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+EMSCRIPTEN_KEEPALIVE void astra_spr_page_loaded(uint32_t pageIndex, const uint8_t* data, uint32_t size, int ok)
+{
+    std::vector<uint8_t> copy;
+    if (ok && data && size > 0)
+        copy.assign(data, data + size);
+    g_dispatcher.addEvent([pageIndex, copy = std::move(copy), ok = (ok != 0)]() mutable {
+        g_sprites.onPagedSprPageLoaded(pageIndex, std::move(copy), ok);
+    });
+}
+}
+#endif
 
 bool SpriteManager::loadCwmSpr(std::string file)
 {
@@ -809,6 +1026,10 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
 
         if (m_isIndexed) {
             return getSpriteImageIndexed(id);
+        }
+
+        if (m_isPaged) {
+            return getSpriteImagePaged(id);
         }
 
         int spriteDataSize = m_baseSpriteSize * m_baseSpriteSize * 4;

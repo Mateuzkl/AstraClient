@@ -47,6 +47,45 @@ void TextureManager::clearCache()
     m_textures.clear();
 }
 
+size_t TextureManager::trimCache(int maxIdleSeconds)
+{
+    if (m_textures.empty())
+        return 0;
+
+    std::unordered_map<const Texture*, long> internalRefCounts;
+    internalRefCounts.reserve(m_textures.size());
+    for (const auto& entry : m_textures) {
+        if (entry.second)
+            ++internalRefCounts[entry.second.get()];
+    }
+
+    const ticks_t now = stdext::time();
+    size_t removed = 0;
+    for (auto it = m_textures.begin(); it != m_textures.end();) {
+        const TexturePtr& tex = it->second;
+        if (!tex) {
+            it = m_textures.erase(it);
+            continue;
+        }
+        const auto refIt = internalRefCounts.find(tex.get());
+        const long mapRefs = refIt != internalRefCounts.end() ? refIt->second : 1;
+        const bool unreferencedExternally = tex.use_count() <= mapRefs;
+        const bool idleEnough = maxIdleSeconds <= 0 || (now - tex->getTime() >= static_cast<ticks_t>(maxIdleSeconds));
+        if (unreferencedExternally && idleEnough) {
+            const Texture* raw = tex.get();
+            // Decrement map ref count so sibling alias (filePath vs fileName) is also dropped safely.
+            if (refIt != internalRefCounts.end() && refIt->second > 0)
+                --refIt->second;
+            it = m_textures.erase(it);
+            ++removed;
+            (void)raw;
+        } else {
+            ++it;
+        }
+    }
+    return removed;
+}
+
 bool TextureManager::unload(const std::string& fileName)
 {
     const std::string filePath = g_resources.resolvePath(fileName);

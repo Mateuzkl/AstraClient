@@ -456,7 +456,9 @@ function cancelAll()
   end
     if lastAction + 50 > g_clock.millis() then return end
     lastAction = g_clock.millis()
-    modules.game_helper.helperConfig.currentLockedTargetId = 0
+    if modules.game_helper and modules.game_helper.helperConfig then
+      modules.game_helper.helperConfig.currentLockedTargetId = 0
+    end
     g_game.cancelAttackAndFollow()
 end
 
@@ -1673,7 +1675,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
   if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() then
     menu:addOption(tr('Inspect'), function() g_game.sendInspectionNormalObject(lookThing:getPosition()) end)
-    menu:addOption(tr('Cyclopedia'), function() modules.game_cyclopedia.CyclopediaItems.onRedirect(lookThing:getId()) end)
+    if modules.game_cyclopedia and modules.game_cyclopedia.CyclopediaItems then
+      menu:addOption(tr('Cyclopedia'), function() modules.game_cyclopedia.CyclopediaItems.onRedirect(lookThing:getId()) end)
+    end
 
     local proficiencyId = 0
     if lookThing.getProficiencyId then
@@ -1741,12 +1745,12 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if useThing:isRotateable() or isPodium then
       menu:addOption(tr('Rotate'), function() g_game.rotate(useThing) end)
     end
-    if isPodium then
+    if isPodium and (modules.game_monster_podium or modules.game_player_podium) then
       menu:addOption(tr('Customise Podium'),
         function()
-          if useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM or useThing:getId() == ASTRA_MONSTER_PODIUM then
+          if (useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM or useThing:getId() == ASTRA_MONSTER_PODIUM) and modules.game_monster_podium then
             modules.game_monster_podium.requestMonsterData(useThing)
-          elseif useThing:getId() == RENOWN_PODIUM or useThing:getId() == LEGACY_RENOWN_PODIUM then
+          elseif (useThing:getId() == RENOWN_PODIUM or useThing:getId() == LEGACY_RENOWN_PODIUM) and modules.game_player_podium then
             modules.game_player_podium.requestPodiumOutfitData(useThing)
           end
         end)
@@ -1759,8 +1763,10 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
     if g_game.getFeature(GameBrowseField) and useThing and useThing:getPosition() and useThing:getPosition().x ~= 0xffff then
       menu:addOption(tr('Browse Field'), function() g_game.browseField(useThing:getPosition()) end)
-      menu:addSeparator()
-      menu:addOption(tr('Report Coordinate'), function() modules.game_bugreport.show(useThing:getPosition(), 0) end)
+      if modules.game_bugreport then
+        menu:addSeparator()
+        menu:addOption(tr('Report Coordinate'), function() modules.game_bugreport.show(useThing:getPosition(), 0) end)
+      end
     end
   end
 
@@ -1772,18 +1778,18 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       menu:addOption(tr('Move up'), function() g_game.moveToParentContainer(lookThing, lookThing:getCount()) end)
     end
     menu:addOption(tr('Trade with ...'), function() startTradeWith(lookThing) end)
-    if lookThing:isMarketable() and localPlayer:isInMarket() then
+    if lookThing:isMarketable() and localPlayer:isInMarket() and modules.game_tibia_market then
       menu:addOption(tr('Show in Market'), function() modules.game_tibia_market.onRedirect(lookThing) end)
     end
   elseif useThing and not useThing:isCreature() and not useThing:isNotMoveable() and useThing:isPickupable() then
     menu:addSeparator()
     menu:addOption(tr('Trade with ...'), function() startTradeWith(useThing) end)
-    if useThing:isMarketable() and localPlayer:isInMarket() then
+    if useThing:isMarketable() and localPlayer:isInMarket() and modules.game_tibia_market then
       menu:addOption(tr('Show in Market'), function() modules.game_tibia_market.onRedirect(useThing) end)
     end
   end
 
-  if useThing and useThing:isContainer() and (useThing:getParentContainer() or useThing:getPosition().x == 65535) then
+  if useThing and useThing:isContainer() and (useThing:getParentContainer() or useThing:getPosition().x == 65535) and modules.game_quickloot then
     menu:addSeparator()
     menu:addOption(tr('Manage Loot containers'), function() modules.game_quickloot.showQuickLoot() end)
   end
@@ -1792,10 +1798,12 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if not useThing:isContainer() then
       menu:addSeparator()
     end
-    if not modules.game_quickloot.inWhiteList(lookThing:getId()) then
-      menu:addOption(tr('Add to Loot List'), function() modules.game_quickloot.addToQuickLoot(lookThing:getId()) end)
-    else
-      menu:addOption(tr('Remove from Loot List'), function() modules.game_quickloot.removeItemInList(lookThing:getId()) end)
+    if modules.game_quickloot then
+      if not modules.game_quickloot.inWhiteList(lookThing:getId()) then
+        menu:addOption(tr('Add to Loot List'), function() modules.game_quickloot.addToQuickLoot(lookThing:getId()) end)
+      else
+        menu:addOption(tr('Remove from Loot List'), function() modules.game_quickloot.removeItemInList(lookThing:getId()) end)
+      end
     end
     if not modules.game_npctrade.inWhiteList(lookThing:getId()) then
       menu:addOption(tr('Add to Quick Sell BlackList'), function() modules.game_npctrade.addToWhitelist(lookThing:getId()) end)
@@ -1806,7 +1814,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
   if useThing and useThing:isContainer() and (useThing:getParentContainer() or useThing:getPosition().x == 65535) and useThing:getId() ~= 28750 and localPlayer:isInStash() then
     menu:addSeparator()
-    menu:addOption(tr('Stow container\'s content'), function() if m_settings.getOption('stowContainer') then modules.game_stash.stowContainerContent(useThing, nil, false) else g_game.stowItemContainerStack(SUPPLY_STASH_ACTION_STOW_CONTAINER, useThing:getPosition(), useThing:getId(), useThing:getStackPos()) end end)
+    menu:addOption(tr('Stow container\'s content'), function() if m_settings.getOption('stowContainer') and modules.game_stash then modules.game_stash.stowContainerContent(useThing, nil, false) else g_game.stowItemContainerStack(SUPPLY_STASH_ACTION_STOW_CONTAINER, useThing:getPosition(), useThing:getId(), useThing:getStackPos()) end end)
   end
 
   if useThing and useThing:isStowable() and (useThing:getParentContainer() or useThing:getPosition().x == 65535) and localPlayer:isInStash() then
@@ -1857,9 +1865,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       if creatureThing:getPosition().z == localPosition.z then
         if not creatureThing:isNpc() then
           if g_game.getAttackingCreature() ~= creatureThing then
-            menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creatureThing:getId(); g_game.attack(creatureThing) end, shortcut)
+            menu:addOption(tr('Attack'), function() if modules.game_helper and modules.game_helper.helperConfig then modules.game_helper.helperConfig.currentLockedTargetId = creatureThing:getId() end g_game.attack(creatureThing) end, shortcut)
           else
-            menu:addOption(tr('Stop Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.cancelAttack() end, shortcut)
+            menu:addOption(tr('Stop Attack'), function() if modules.game_helper and modules.game_helper.helperConfig then modules.game_helper.helperConfig.currentLockedTargetId = 0 end g_game.cancelAttack() end, shortcut)
           end
         end
 
@@ -1883,8 +1891,10 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
           menu:addOption(tr('Customise Character'), function() g_game.requestHirelingOutfit(creatureThing:getId()) end)
           menu:addOption(tr('Change Name/Sex'), function() g_game.openStore() end, coloredText)
-          menu:addSeparator()
-          menu:addOption(tr('Report Name'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)
+          if modules.game_report then
+            menu:addSeparator()
+            menu:addOption(tr('Report Name'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)
+          end
       end
 
       if creatureThing:isPlayer() then
@@ -1928,9 +1938,11 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
           end
         end
         menu:addOption(tr('Inspect %s Prestige', creatureThing:getName()), function() g_game.sendRequestPrestigeInspect(creatureThing:getName()) end)
-        menu:addSeparator()
-        menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creatureThing:getName()) end)
-        menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)
+        if modules.game_report then
+          menu:addSeparator()
+          menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creatureThing:getName()) end)
+          menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)
+        end
       end
       menu:addSeparator()
       menu:addOption(tr('Copy Name'), function() g_window.setClipboardText(creatureThing:getName()) end)
@@ -2557,11 +2569,17 @@ end
 function toggleInternalFocus()
   for reason, _ in pairs(focusReason) do
     if reason == 'bosscooldown' then
-      modules.game_analyser.toggleBossCDFocus(false)
+      if modules.game_analyser and modules.game_analyser.toggleBossCDFocus then
+        modules.game_analyser.toggleBossCDFocus(false)
+      end
     elseif reason == 'npctrade' then
-      modules.game_npctrade.toggleNPCFocus(false)
+      if modules.game_npctrade and modules.game_npctrade.toggleNPCFocus then
+        modules.game_npctrade.toggleNPCFocus(false)
+      end
     elseif reason == 'searchlocker' then
-      modules.game_search_locker.toggleSearchFocus(false)
+      if modules.game_search_locker and modules.game_search_locker.toggleSearchFocus then
+        modules.game_search_locker.toggleSearchFocus(false)
+      end
     end
   end
 end
@@ -2985,9 +3003,13 @@ function setupLeftActions()
       end
       if child then
         g_game.attack(child.creature)
-        modules.game_helper.helperConfig.currentLockedTargetId = child.creature:getId()
+        if modules.game_helper and modules.game_helper.helperConfig then
+          modules.game_helper.helperConfig.currentLockedTargetId = child.creature:getId()
+        end
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
+        if modules.game_helper and modules.game_helper.helperConfig then
+          modules.game_helper.helperConfig.currentLockedTargetId = 0
+        end
         g_game.attack(nil)
       end
     end
@@ -3244,39 +3266,39 @@ function onPlayerLoad(config)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalRight) do
-        if x.type == 'container' then
+        if x.type == 'container' and modules.game_containers then
           modules.game_containers.move(x.instance, horizontalRightPanel, x.height, k)
-        elseif x.type == 'analyticsSelector' then
+        elseif x.type == 'analyticsSelector' and modules.game_analyser then
           modules.game_analyser.moveAnalyser(horizontalRightPanel, x.height)
-        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}, x.type) then
+        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}, x.type) and modules.game_analyser then
           modules.game_analyser.moveChildAnalyser(x.type, horizontalRightPanel, x.height)
-        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) then
+        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) and modules.game_trackers then
           modules.game_trackers.moveTracker(x.type, horizontalRightPanel, x.height, k)
-        elseif x.type == 'battleList' then
+        elseif x.type == 'battleList' and modules.game_battle then
           modules.game_battle.moveBattle(x.instance, horizontalRightPanel, x.height, x.minimized)
-        elseif x.type == 'prey' then
+        elseif x.type == 'prey' and modules.game_prey then
           modules.game_prey.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'questTracker' then
+        elseif x.type == 'questTracker' and modules.game_questlog then
           modules.game_questlog.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'skills' then
+        elseif x.type == 'skills' and modules.game_skills then
           modules.game_skills.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'unjustifiedPoints' then
+        elseif x.type == 'unjustifiedPoints' and modules.game_unjustifiedpoints then
           modules.game_unjustifiedpoints.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'vip' then
+        elseif x.type == 'vip' and modules.game_viplist then
           modules.game_viplist.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'miniMap' then
+        elseif x.type == 'miniMap' and modules.game_minimap then
           modules.game_minimap.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'healthInfo' then
+        elseif x.type == 'healthInfo' and modules.game_healthinfo then
           modules.game_healthinfo.move(horizontalRightPanel, k)
-        elseif x.type == 'inventoryWindow' then
+        elseif x.type == 'inventoryWindow' and modules.game_inventory then
           modules.game_inventory.move(horizontalRightPanel, k)
-        elseif x.type == 'mainButtons' then
+        elseif x.type == 'mainButtons' and modules.game_sidebuttons then
           modules.game_sidebuttons.move(horizontalRightPanel, k)
-        elseif x.type == 'partyList' then
+        elseif x.type == 'partyList' and modules.game_party_list then
           modules.game_party_list.move(horizontalRightPanel, x.height, x.minimized)
-        elseif x.type == 'spellList' then
+        elseif x.type == 'spellList' and modules.game_spells then
           modules.game_spells.move(horizontalRightPanel, x.height)
-        elseif x.type == 'helper' then
+        elseif x.type == 'helper' and modules.game_helper then
           modules.game_helper.move(horizontalRightPanel, x.height, k)
         end
       end
@@ -3288,39 +3310,39 @@ function onPlayerLoad(config)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalLeft) do
-        if x.type == 'container' then
+        if x.type == 'container' and modules.game_containers then
            modules.game_containers.move(x.instance, horizontalLeftPanel, x.heigh, k)
-        elseif x.type == 'analyticsSelector' then
+        elseif x.type == 'analyticsSelector' and modules.game_analyser then
           modules.game_analyser.moveAnalyser(horizontalLeftPanel, x.height)
-        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser'}, x.type) then
+        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser'}, x.type) and modules.game_analyser then
           modules.game_analyser.moveChildAnalyser(x.type, horizontalLeftPanel, x.height)
-        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) then
+        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) and modules.game_trackers then
           modules.game_trackers.moveTracker(x.type, horizontalLeftPanel, x.height, k)
-        elseif x.type == 'battleList' then
+        elseif x.type == 'battleList' and modules.game_battle then
           modules.game_battle.moveBattle(x.instance, horizontalLeftPanel, x.height, x.minimized)
-        elseif x.type == 'prey' then
+        elseif x.type == 'prey' and modules.game_prey then
           modules.game_prey.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'questTracker' then
+        elseif x.type == 'questTracker' and modules.game_questlog then
           modules.game_questlog.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'skills' then
+        elseif x.type == 'skills' and modules.game_skills then
           modules.game_skills.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'unjustifiedPoints' then
+        elseif x.type == 'unjustifiedPoints' and modules.game_unjustifiedpoints then
           modules.game_unjustifiedpoints.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'vip' then
+        elseif x.type == 'vip' and modules.game_viplist then
           modules.game_viplist.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'miniMap' then
+        elseif x.type == 'miniMap' and modules.game_minimap then
           modules.game_minimap.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'healthInfo' then
+        elseif x.type == 'healthInfo' and modules.game_healthinfo then
           modules.game_healthinfo.move(horizontalLeftPanel, k)
-        elseif x.type == 'inventoryWindow' then
+        elseif x.type == 'inventoryWindow' and modules.game_inventory then
           modules.game_inventory.move(horizontalLeftPanel, k)
-        elseif x.type == 'mainButtons' then
+        elseif x.type == 'mainButtons' and modules.game_sidebuttons then
           modules.game_sidebuttons.move(horizontalLeftPanel, k)
-        elseif x.type == 'partyList' then
+        elseif x.type == 'partyList' and modules.game_party_list then
           modules.game_party_list.move(horizontalLeftPanel, x.height, x.minimized)
-        elseif x.type == 'spellList' then
+        elseif x.type == 'spellList' and modules.game_spells then
           modules.game_spells.move(horizontalLeftPanel, x.height)
-        elseif x.type == 'helper' then
+        elseif x.type == 'helper' and modules.game_helper then
           modules.game_helper.move(horizontalLeftPanel, x.height, k)
         end
       end
@@ -3469,48 +3491,48 @@ function _moveChildren(panel, x, k)
   end
 
   local widget = nil
-  if x.type == 'container' then
+  if x.type == 'container' and modules.game_containers then
     widget = modules.game_containers.move(x.instance, panel, x.height, k, x.minimized, x.locked)
-  elseif x.type == 'analyticsSelector' then
+  elseif x.type == 'analyticsSelector' and modules.game_analyser then
     widget = modules.game_analyser.moveAnalyser(panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible("analyticsSelectorWidget", true)
-  elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}, x.type) then
+  elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}, x.type) and modules.game_analyser then
     widget = modules.game_analyser.moveChildAnalyser(x.type, panel, x.height, x.minimized)
-  elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) then
+  elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) and modules.game_trackers then
     widget = modules.game_trackers.moveTracker(x.type, panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible(x.type .. "Widget", true)
-  elseif x.type == 'battleList' then
+  elseif x.type == 'battleList' and modules.game_battle then
     widget = modules.game_battle.moveBattle(x.instance, panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
-  elseif x.type == 'prey' then
+  elseif x.type == 'prey' and modules.game_prey then
     widget = modules.game_prey.move(panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible("preyWidget", true)
-  elseif x.type == 'questTracker' then
+  elseif x.type == 'questTracker' and modules.game_questlog then
     widget = modules.game_questlog.move(panel, x.height, k, x.minimized)
     modules.game_sidebuttons.setButtonVisible("questTrackerWidget", true)
-  elseif x.type == 'skills' then
+  elseif x.type == 'skills' and modules.game_skills then
     widget = modules.game_skills.move(panel, x.height, k, x.minimized)
     modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
-  elseif x.type == 'unjustifiedPoints' then
+  elseif x.type == 'unjustifiedPoints' and modules.game_unjustifiedpoints then
     widget = modules.game_unjustifiedpoints.move(panel, x.height, k, x.minimized)
     modules.game_sidebuttons.setButtonVisible("unjustifiedPoinsWidget", true)
-  elseif x.type == 'vip' then
+  elseif x.type == 'vip' and modules.game_viplist then
     widget = modules.game_viplist.move(panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible("vipWidget", true)
-  elseif x.type == 'miniMap' then
+  elseif x.type == 'miniMap' and modules.game_minimap then
     widget = modules.game_minimap.move(panel, x.height, k)
-  elseif x.type == 'healthInfo' then
+  elseif x.type == 'healthInfo' and modules.game_healthinfo then
     widget = modules.game_healthinfo.move(panel, k)
-  elseif x.type == 'inventoryWindow' then
+  elseif x.type == 'inventoryWindow' and modules.game_inventory then
     widget = modules.game_inventory.move(panel, k, x.minimized)
-  elseif x.type == 'mainButtons' then
+  elseif x.type == 'mainButtons' and modules.game_sidebuttons then
     widget = modules.game_sidebuttons.move(panel, k, x.minimized)
-  elseif x.type == 'partyList' then
+  elseif x.type == 'partyList' and modules.game_party_list then
     widget = modules.game_party_list.move(panel, x.height, x.minimized)
     modules.game_sidebuttons.setButtonVisible("partyWidget", true)
-  elseif x.type == 'spellList' then
+  elseif x.type == 'spellList' and modules.game_spells then
     widget = modules.game_spells.move(panel, x.height, x.minimized)
-  elseif x.type == 'helper' then
+  elseif x.type == 'helper' and modules.game_helper then
     widget = modules.game_helper.move(panel, x.height, k, x.minimized, x.locked)
   end
 

@@ -206,7 +206,7 @@ MapMiniWindow
     margin-top: 2
     tooltip: Go to Cyclopedia Map
     tooltip-delayed: true
-    @onClick: modules.game_cyclopedia.toggleRedirect("Map")
+    @onClick: if modules.game_cyclopedia and modules.game_cyclopedia.toggleRedirect then modules.game_cyclopedia.toggleRedirect("Map") end
     $hover !pressed:
       image-clip: 0 0 20 20
 

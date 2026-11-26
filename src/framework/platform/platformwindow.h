@@ -77,6 +77,8 @@ public:
     int getDisplayHeight() { return getDisplaySize().height(); }
     float getDisplayDensity() { return m_displayDensity; }
     void setDisplayDensity(float density) { m_displayDensity = density > 0.0f ? density : 1.0f; }
+    virtual void setMaxPixelRatio(float maxRatio) { m_maxPixelRatio = maxRatio > 0.0f ? maxRatio : 0.0f; }
+    float getMaxPixelRatio() const { return m_maxPixelRatio; }
 
     Size getUnmaximizedSize() { return m_unmaximizedSize; }
     Size getSize() { return m_size; }
@@ -142,6 +144,7 @@ protected:
     std::atomic_bool m_verticalSyncApplied = false;
     float m_scaling = 1.0;
     float m_displayDensity = 1.0f;
+    float m_maxPixelRatio = 0.0f;
 
     std::function<void()> m_onClose;
     OnResizeCallback m_onResize;

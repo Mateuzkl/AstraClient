@@ -159,15 +159,35 @@ if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/data/images/splash.png")
 endif()
 
 if(WASM)
-    configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
-    configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)
-    configure_file(browser/security.js "${CMAKE_BINARY_DIR}/dist/security.js" COPYONLY)
-    configure_file(browser/bootstrap.js "${CMAKE_BINARY_DIR}/dist/bootstrap.js" COPYONLY)
-    configure_file(browser/asset-cache.js "${CMAKE_BINARY_DIR}/dist/asset-cache.js" COPYONLY)
-    configure_file(browser/launcher.js "${CMAKE_BINARY_DIR}/dist/launcher.js" COPYONLY)
-    configure_file(browser/launcher.css "${CMAKE_BINARY_DIR}/dist/launcher.css" COPYONLY)
-    configure_file(data/images/title.png "${CMAKE_BINARY_DIR}/dist/launcher-background.png" COPYONLY)
-    configure_file(data/images/astra-client-emblem.png "${CMAKE_BINARY_DIR}/dist/astra-client-emblem.png" COPYONLY)
+    set(ASTRA_WASM_PROFILE "desktop" CACHE STRING "WebAssembly bundle profile: desktop or mobile")
+    set_property(CACHE ASTRA_WASM_PROFILE PROPERTY STRINGS desktop mobile)
+    if(NOT ASTRA_WASM_PROFILE STREQUAL "desktop" AND NOT ASTRA_WASM_PROFILE STREQUAL "mobile")
+        message(FATAL_ERROR "Invalid ASTRA_WASM_PROFILE='${ASTRA_WASM_PROFILE}' (expected 'desktop' or 'mobile')")
+    endif()
+    set(ASTRA_WASM_DIST_DIR "${CMAKE_BINARY_DIR}/dist" CACHE PATH
+        "Root directory where browser artifacts are published")
+    set(ASTRA_WASM_OUTPUT_SUBDIR "" CACHE STRING
+        "Optional profile output subdirectory under ASTRA_WASM_DIST_DIR (e.g. desktop or mobile; empty = legacy flat dist)")
+
+    if(ASTRA_WASM_OUTPUT_SUBDIR)
+        set(ASTRA_WASM_PROFILE_DIST "${ASTRA_WASM_DIST_DIR}/${ASTRA_WASM_OUTPUT_SUBDIR}")
+    else()
+        set(ASTRA_WASM_PROFILE_DIST "${ASTRA_WASM_DIST_DIR}")
+    endif()
+    file(MAKE_DIRECTORY "${ASTRA_WASM_DIST_DIR}")
+    file(MAKE_DIRECTORY "${ASTRA_WASM_PROFILE_DIST}")
+
+    configure_file(browser/config.js "${ASTRA_WASM_DIST_DIR}/config.js" COPYONLY)
+    configure_file(browser/platform.js "${ASTRA_WASM_DIST_DIR}/platform.js" COPYONLY)
+    configure_file(browser/runtime.js "${ASTRA_WASM_DIST_DIR}/runtime.js" COPYONLY)
+    configure_file(browser/security.js "${ASTRA_WASM_DIST_DIR}/security.js" COPYONLY)
+    configure_file(browser/spr-pager.js "${ASTRA_WASM_DIST_DIR}/spr-pager.js" COPYONLY)
+    configure_file(browser/bootstrap.js "${ASTRA_WASM_DIST_DIR}/bootstrap.js" COPYONLY)
+    configure_file(browser/asset-cache.js "${ASTRA_WASM_DIST_DIR}/asset-cache.js" COPYONLY)
+    configure_file(browser/launcher.js "${ASTRA_WASM_DIST_DIR}/launcher.js" COPYONLY)
+    configure_file(browser/launcher.css "${ASTRA_WASM_DIST_DIR}/launcher.css" COPYONLY)
+    configure_file(data/images/title.png "${ASTRA_WASM_DIST_DIR}/launcher-background.png" COPYONLY)
+    configure_file(data/images/astra-client-emblem.png "${ASTRA_WASM_DIST_DIR}/astra-client-emblem.png" COPYONLY)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     set(ASTRA_WASM_THINGS_DIR "${CMAKE_SOURCE_DIR}/data/things/860" CACHE PATH
         "Asset pack containing Tibia.dat and Tibia.spr (only this pack is bundled)")
@@ -179,7 +199,19 @@ if(WASM)
 
     # Lista revisavel: um arquivo novo nunca entra automaticamente no pacote.
     find_program(ASTRA_NODE_EXECUTABLE NAMES node nodejs REQUIRED)
-    set(ASTRA_WEB_POLICY "${CMAKE_SOURCE_DIR}/browser/production-assets.json")
+    if(ASTRA_WASM_PROFILE STREQUAL "mobile")
+        set(ASTRA_WEB_POLICY_DEFAULT "${CMAKE_SOURCE_DIR}/browser/mobile-assets.json")
+        set(ASTRA_WASM_DEFAULT_PTHREAD_POOL_SIZE "2")
+        set(ASTRA_WASM_DEFAULT_INITIAL_MEMORY "268435456")
+        set(ASTRA_WASM_DEFAULT_MAXIMUM_MEMORY "805306368")
+    else()
+        set(ASTRA_WEB_POLICY_DEFAULT "${CMAKE_SOURCE_DIR}/browser/production-assets.json")
+        set(ASTRA_WASM_DEFAULT_PTHREAD_POOL_SIZE "4")
+        set(ASTRA_WASM_DEFAULT_INITIAL_MEMORY "805306368")
+        set(ASTRA_WASM_DEFAULT_MAXIMUM_MEMORY "2147483648")
+    endif()
+    set(ASTRA_WEB_POLICY "${ASTRA_WEB_POLICY_DEFAULT}" CACHE FILEPATH
+        "Explicit web asset whitelist JSON for the active profile")
     set(ASTRA_WEB_TOOL "${CMAKE_SOURCE_DIR}/tools/browser_bundle.cjs")
     execute_process(COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" stage-path
         "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}"
@@ -206,9 +238,13 @@ if(WASM)
             "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WEB_STAGE}" "${ASTRA_WASM_THINGS_DIR}"
         VERBATIM)
     add_dependencies(${PROJECT_NAME} astra_web_assets)
-    set(ASTRA_WASM_PTHREAD_POOL_SIZE "4" CACHE STRING "Number of worker threads created before main()")
-    set(ASTRA_WASM_INITIAL_MEMORY "805306368" CACHE STRING "Initial WebAssembly memory in bytes")
-    set(ASTRA_WASM_MAXIMUM_MEMORY "2147483648" CACHE STRING "Maximum WebAssembly memory in bytes")
+    set(ASTRA_WASM_PTHREAD_POOL_SIZE "${ASTRA_WASM_DEFAULT_PTHREAD_POOL_SIZE}" CACHE STRING
+        "Number of worker threads created before main()")
+    set(ASTRA_WASM_INITIAL_MEMORY "${ASTRA_WASM_DEFAULT_INITIAL_MEMORY}" CACHE STRING
+        "Initial WebAssembly memory in bytes")
+    set(ASTRA_WASM_MAXIMUM_MEMORY "${ASTRA_WASM_DEFAULT_MAXIMUM_MEMORY}" CACHE STRING
+        "Maximum WebAssembly memory in bytes")
+    message(STATUS "Astra Web profile: ${ASTRA_WASM_PROFILE} (init=${ASTRA_WASM_INITIAL_MEMORY}, max=${ASTRA_WASM_MAXIMUM_MEMORY}, pthreads=${ASTRA_WASM_PTHREAD_POOL_SIZE}, out=${ASTRA_WASM_PROFILE_DIST})")
 
     target_compile_options(${PROJECT_NAME} PRIVATE
         -pthread
@@ -239,8 +275,8 @@ if(WASM)
         -sPTHREAD_POOL_SIZE=${ASTRA_WASM_PTHREAD_POOL_SIZE}
         -sEXIT_RUNTIME=1
         -sENVIRONMENT=web,worker
-        -sEXPORTED_RUNTIME_METHODS=ccall
-        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
+        -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,wasmMemory
+        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free','_astra_spr_page_loaded','_astra_browser_set_visibility','_astra_browser_viewport_changed','_astra_browser_context_lost']"
         -sDYNAMIC_EXECUTION=0
         -lidbfs.js
         -lwebsocket.js
@@ -266,14 +302,40 @@ if(WASM)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         OUTPUT_NAME "astraclient"
         SUFFIX ".html"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/dist"
+        RUNTIME_OUTPUT_DIRECTORY "${ASTRA_WASM_PROFILE_DIST}"
     )
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py" "${CMAKE_BINARY_DIR}/dist"
-        COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
-            "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${CMAKE_BINARY_DIR}/dist" "${ASTRA_WASM_THINGS_DIR}"
-        VERBATIM
-    )
+
+    if(ASTRA_WASM_PROFILE STREQUAL "mobile")
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" prepare-spr
+                "${ASTRA_WASM_THINGS_DIR}" "${ASTRA_WASM_PROFILE_DIST}"
+            VERBATIM
+        )
+    endif()
+
+    if(ASTRA_WASM_OUTPUT_SUBDIR)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND "${Python3_EXECUTABLE}" -c
+                "import pathlib, sys; p = pathlib.Path(sys.argv[1]); s = p.read_text(encoding='utf-8').replace('{{{ SCRIPT }}}', ''); pathlib.Path(sys.argv[2]).write_text(s, encoding='utf-8')"
+                "${CMAKE_SOURCE_DIR}/browser/shell.html"
+                "${ASTRA_WASM_DIST_DIR}/astraclient.html"
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py"
+                "${ASTRA_WASM_PROFILE_DIST}"
+                --profile "${ASTRA_WASM_PROFILE}"
+                --root-dist "${ASTRA_WASM_DIST_DIR}"
+                --subdir "${ASTRA_WASM_OUTPUT_SUBDIR}"
+            COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
+                "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WASM_PROFILE_DIST}" "${ASTRA_WASM_THINGS_DIR}"
+            VERBATIM
+        )
+    else()
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py" "${ASTRA_WASM_PROFILE_DIST}"
+            COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
+                "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WASM_PROFILE_DIST}" "${ASTRA_WASM_THINGS_DIR}"
+            VERBATIM
+        )
+    endif()
 endif()
 
 if(WIN32 AND NOT WINDOWS_CONSOLE AND FRAMEWORK_GRAPHICS)

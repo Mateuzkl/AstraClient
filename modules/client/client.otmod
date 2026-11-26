@@ -12,6 +12,14 @@ Module
   browser-excluded-load-later:
     - client_autoreloadmodule
 
+  mobile-excluded-load-later:
+    - client_terminal
+    - client_feedback
+    - game_schedule
+    - client_ui_debug
+    - client_stats
+    - client_videoplayer
+
   load-later:
     - client_styles
     - client_init

@@ -64,6 +64,7 @@ server {
         try_files $uri =404;
     }
 
+    # Static assets (including mobile/Tibia.spr served with native HTTP Range 206 support).
     location / {
         try_files $uri $uri/ =404;
     }

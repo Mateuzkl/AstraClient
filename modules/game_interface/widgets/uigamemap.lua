@@ -23,7 +23,7 @@ function UIGameMap:setDrawMarks(draw)
     self.updateMarkedCreatureEvent = nil
   end
 
-  if draw then
+  if draw and not g_app.isMobile() then
     self.updateMarkedCreatureEvent = cycleEvent(function() self:updateMarkedCreature() end, 100)
   else
     if self.markedThing then

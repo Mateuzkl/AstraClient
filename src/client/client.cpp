@@ -36,6 +36,7 @@
 #include "spritemanager.h"
 #include "minimap.h"
 #include "healthbars.h"
+#include <framework/core/application.h>
 #include <framework/core/configmanager.h>
 
 Client g_client;
@@ -52,6 +53,9 @@ void Client::init(std::vector<std::string>& args)
     g_shaders.init();
     g_things.init();
     g_healthBars.init();
+#ifdef __EMSCRIPTEN__
+    g_app.setOnContextRestored([] { g_things.unloadTextures(); });
+#endif
 #ifdef FW_RMLUI
     registerRmlImageProvider();
     // Load the Lua plugin/fonts at startup, not inside the first window's input callback.

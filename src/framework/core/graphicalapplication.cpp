@@ -53,6 +53,7 @@
 #include <emscripten/emscripten.h>
 #include <emscripten/eventloop.h>
 #include <emscripten/heap.h>
+#include <framework/platform/browserwindow.h>
 #include <malloc.h>
 #endif
 
@@ -185,6 +186,8 @@ namespace {
 void GraphicalApplication::init(std::vector<std::string>& args)
 {
     Application::init(args);
+    if (isMobile())
+        m_maxFps = 45;
 
     // setup platform window
     g_window.init();
@@ -371,6 +374,10 @@ void GraphicalApplication::browserMainLoop()
     auto& state = *browserRunState;
     g_clock.update();
     pollGraphics();
+    if (g_browserWindow.isContextLost()) {
+        state.telemetryPreviousFrame = 0;
+        return;
+    }
 
     const ticks_t settingNow = stdext::micros();
     if (settingNow - state.telemetrySettingLast >= 1000000) {
@@ -590,6 +597,59 @@ void GraphicalApplication::browserMainLoop()
         MAIN_THREAD_EM_ASM({ if (Module.astraClientReady) Module.astraClientReady(); });
         // clang-format on
     }
+}
+
+void GraphicalApplication::onBrowserContextRestored()
+{
+    g_logger.info("WebGL2 context restored; rebuilding GPU resources.");
+    glEnable(GL_BLEND);
+
+    if (g_painter) {
+        delete g_painter;
+        g_painter = nullptr;
+    }
+    g_painter = new Painter();
+    g_painter->bind();
+
+    m_framebuffer = nullptr;
+    m_mapFramebuffer = nullptr;
+    m_uiFramebuffer = nullptr;
+
+    g_framebuffers.terminate();
+    g_framebuffers.init();
+
+    g_atlas.terminate();
+    g_atlas.init();
+
+    g_textures.reload();
+    g_fonts.reload();
+
+    if (m_onContextRestored)
+        m_onContextRestored();
+
+    const Size resolution = g_graphics.getViewportSize();
+    if (resolution.isValid()) {
+        g_painter->setResolution(resolution);
+        m_framebuffer = g_framebuffers.createFrameBuffer();
+        m_framebuffer->resize(resolution);
+        m_mapFramebuffer = g_framebuffers.createFrameBuffer();
+        m_mapFramebuffer->resize(resolution);
+        m_mapFramebuffer->setSmooth(m_mapSmooth.load());
+        m_uiFramebuffer = g_framebuffers.createFrameBuffer();
+        m_uiFramebuffer->resize(resolution);
+        m_uiFramebuffer->setSmooth(false);
+    }
+
+    if (browserRunState) {
+        browserRunState->uiCacheSize = Size();
+        browserRunState->uiCacheLastRender = 0;
+        browserRunState->toDrawQueue = nullptr;
+        browserRunState->toDrawMapQueue = nullptr;
+        browserRunState->toDrawMapForegroundQueue = nullptr;
+    }
+
+    g_lua.callGlobalField("g_app", "onContextRestored");
+    repaint();
 }
 
 #endif

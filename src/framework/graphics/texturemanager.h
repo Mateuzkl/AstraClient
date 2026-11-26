@@ -33,6 +33,7 @@ public:
     void terminate();
 
     void clearCache();
+    size_t trimCache(int maxIdleSeconds = 30);
     bool unload(const std::string& fileName);
     void reload();
     size_t getTextureCount() const { return m_textures.size(); }

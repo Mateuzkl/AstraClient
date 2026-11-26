@@ -107,9 +107,13 @@ void Application::init(std::vector<std::string>& args)
 
     m_startupOptions = startupOptions;
 
-    // mobile testing
-    if (startupOptions.find("-mobile") != std::string::npos)
+    // mobile / mobile-lite profile selection
+    if (hasStartupOption("-mobile-lite") || startupOptions.find("-mobile-lite") != std::string::npos) {
         m_mobile = true;
+        m_mobileLite = true;
+    } else if (hasStartupOption("-mobile") || startupOptions.find("-mobile") != std::string::npos) {
+        m_mobile = true;
+    }
 
     // initialize configs
     g_configs.init();

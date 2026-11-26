@@ -226,7 +226,7 @@ function onResourceBalance(resourceType, amount)
   end
 
   -- forge
-  if resourceType == ResourceForgeDust then
+  if resourceType == ResourceForgeDust and modules.game_forge and modules.game_forge.ForgeSystem then
     local forgeButton = getButtonById("exaltationForgeDialog")
     if forgeButton then
       forgeButton.highlight:setVisible(amount == modules.game_forge.ForgeSystem.maxPlayerDust)
@@ -288,7 +288,7 @@ function executeButtonFunctionality(button)
         button:setChecked(false)
     end
   elseif button:getParent():getId() == "partyWidget" then
-      modules.game_party_list.toggle()
+      if modules.game_party_list and modules.game_party_list.toggle then modules.game_party_list.toggle() end
   elseif button:getParent():getId() == "vipWidget" then
     if button:isChecked(true) then
         modules.game_viplist.toggle()
@@ -297,18 +297,20 @@ function executeButtonFunctionality(button)
         button:setChecked(false)
     end
   elseif button:getParent():getId() == "spellListWidget" then
-    modules.game_spells.toggle()
+    if modules.game_spells and modules.game_spells.toggle then modules.game_spells.toggle() end
   elseif button:getParent():getId() == "skillWheelDialog" then
-    modules.game_wheel:toggle()
+    if modules.game_wheel and modules.game_wheel.toggle then modules.game_wheel:toggle() end
   elseif button:getParent():getId() == "questDialog" then
-    g_game.requestQuestLog()
-    modules.game_questlog:toggle()
+    if modules.game_questlog and modules.game_questlog.toggle then
+      g_game.requestQuestLog()
+      modules.game_questlog:toggle()
+    end
   elseif button:getParent():getId() == "questTrackerWidget" then
-    modules.game_questlog:toggleTracker()
+    if modules.game_questlog and modules.game_questlog.toggleTracker then modules.game_questlog:toggleTracker() end
   elseif button:getParent():getId() == "unjustifiedPoinsWidget" then
-    modules.game_unjustifiedpoints:toggle()
+    if modules.game_unjustifiedpoints and modules.game_unjustifiedpoints.toggle then modules.game_unjustifiedpoints:toggle() end
   elseif button:getParent():getId() == "preyDialog" then
-    modules.game_prey.toggle()
+    if modules.game_prey and modules.game_prey.toggle then modules.game_prey.toggle() end
   elseif button:getParent():getId() == "preyWidget" then
     if modules.game_trackers and modules.game_trackers.toggleKillTracker then
       modules.game_trackers.toggleKillTracker()
@@ -316,37 +318,43 @@ function executeButtonFunctionality(button)
   elseif button:getParent():getId() == "rewardWallDialog" then
       g_game.openDailyReward()
   elseif button:getParent():getId() == "analyticsSelectorWidget" then
-    modules.game_analyser:toggle()
+    if modules.game_analyser and modules.game_analyser.toggle then modules.game_analyser:toggle() end
   elseif button:getParent():getId() == "compendiumDialog" then
-    modules.game_compendium:show(true)
+    if modules.game_compendium and modules.game_compendium.show then modules.game_compendium:show(true) end
   elseif button:getParent():getId() == "cyclopediaDialog" then
-    if button:getActionId() ~= 0 then
-      modules.game_cyclopedia.toggleRedirect("Bestiary", button:getActionId())
-      button:setActionId(0)
-      button:getParent().highlight:setVisible(false)
-      button:getParent().brightButton:setVisible(false)
-    else
-      modules.game_cyclopedia:toggle()
+    if modules.game_cyclopedia then
+      if button:getActionId() ~= 0 then
+        modules.game_cyclopedia.toggleRedirect("Bestiary", button:getActionId())
+        button:setActionId(0)
+        button:getParent().highlight:setVisible(false)
+        button:getParent().brightButton:setVisible(false)
+      else
+        modules.game_cyclopedia:toggle()
+      end
     end
   elseif button:getParent():getId() == "bosstiaryDialog" then
-    if button:getActionId() ~= 0 then
-      modules.game_cyclopedia.toggleRedirect("Bosstiary", button:getActionId())
-      button:setActionId(0)
-      button:getParent().highlight:setVisible(false)
-      button:getParent().brightButton:setVisible(false)
-    else
-      modules.game_cyclopedia.Bosstiary.onSideButtonRedirect()
+    if modules.game_cyclopedia then
+      if button:getActionId() ~= 0 then
+        modules.game_cyclopedia.toggleRedirect("Bosstiary", button:getActionId())
+        button:setActionId(0)
+        button:getParent().highlight:setVisible(false)
+        button:getParent().brightButton:setVisible(false)
+      elseif modules.game_cyclopedia.Bosstiary then
+        modules.game_cyclopedia.Bosstiary.onSideButtonRedirect()
+      end
     end
   elseif button:getParent():getId() == "bossslotsDialog" then
-    modules.game_cyclopedia.BosstiarySlot.onSideButtonRedirect()
+    if modules.game_cyclopedia and modules.game_cyclopedia.BosstiarySlot then
+      modules.game_cyclopedia.BosstiarySlot.onSideButtonRedirect()
+    end
   elseif button:getParent():getId() == "bosstiaryTrackerWidget" then
-    modules.game_trackers.toggleBossTracker()
+    if modules.game_trackers and modules.game_trackers.toggleBossTracker then modules.game_trackers.toggleBossTracker() end
   elseif button:getParent():getId() == "bestiaryTrackerWidget" then
-    modules.game_trackers.toggleBestiaryTracker()
+    if modules.game_trackers and modules.game_trackers.toggleBestiaryTracker then modules.game_trackers.toggleBestiaryTracker() end
   elseif button:getParent():getId() == "imbuementTrackerWidget" then
-    modules.game_trackers.toggleImbuementTracker()
+    if modules.game_trackers and modules.game_trackers.toggleImbuementTracker then modules.game_trackers.toggleImbuementTracker() end
   elseif button:getParent():getId() == "exaltationForgeDialog" then
-    modules.game_forge:toggle()
+    if modules.game_forge and modules.game_forge.toggle then modules.game_forge:toggle() end
   elseif button:getParent():getId() == "friendsDialog" then
     displayErrorBox(tr("For Your Information"), tr("Content Under Development..."))
   elseif button:getParent():getId() == "lenshelpFunction" then
@@ -361,13 +369,13 @@ function executeButtonFunctionality(button)
       button:getParent().highlight:setVisible(true)
     end
   elseif button:getParent():getId() == "highscoresDialog" then
-    modules.game_highscores:show(true)
+    if modules.game_highscores and modules.game_highscores.show then modules.game_highscores:show(true) end
   elseif button:getParent():getId() == "helperDialog" then
     if modules.game_helper and modules.game_helper.toggle then
       modules.game_helper.toggle()
     end
   elseif button:getParent():getId() == "weaponProficiency" then
-    modules.game_proficiency.requestOpenWindow()
+    if modules.game_proficiency and modules.game_proficiency.requestOpenWindow then modules.game_proficiency.requestOpenWindow() end
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings.toggleShortcuts()
   elseif button:getParent():getId() == "taskHuntDialog" then

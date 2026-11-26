@@ -1,0 +1,65 @@
+// Clean-room touch-ergonomic styles for AstraClient Web Mobile Lite.
+
+MobileHudPill < UIButton
+  size: 46 30
+  padding: 2 6 2 6
+  font: verdana-11px-antialised
+  color: #edf2ff
+  background-color: #101524cc
+  border-width: 1
+  border-color: #6f86c2aa
+  text-align: center
+  focusable: false
+
+  $pressed:
+    background-color: #36508aee
+    border-color: #b7d2ff
+
+  $checked:
+    background-color: #2f5e9cee
+    border-color: #9ed2ff
+
+MobileActionButton < UIButton
+  size: 50 50
+  font: verdana-11px-antialised
+  color: #f4f7ff
+  background-color: #111728cc
+  border-width: 2
+  border-color: #6b7faecc
+  text-align: center
+  focusable: false
+
+  $pressed:
+    background-color: #3a5696ee
+    border-color: #cfe0ff
+
+  $checked:
+    background-color: #8f3232ee
+    border-color: #ffb8b8
+
+MobileHotkeySlot < UIButton
+  size: 46 42
+  font: verdana-11px-antialised
+  color: #eef2ff
+  background-color: #101420cc
+  border-width: 1
+  border-color: #7b8db8bb
+  text-align: center
+  focusable: false
+
+  $pressed:
+    background-color: #3d5b9eee
+    border-color: #c8deff
+
+MobileDrawerPanel < UIWidget
+  background-color: #0e1220ee
+  border-width: 1
+  border-color: #7c90c9cc
+  padding: 10
+  focusable: false
+
+MobileDrawerRow < UIWidget
+  height: 32
+  margin-top: 4
+  focusable: false
+  phantom: true

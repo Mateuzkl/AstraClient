@@ -153,6 +153,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_app", "exit", &Application::exit, static_cast<Application*>(&g_app));
     g_lua.bindSingletonFunction("g_app", "quick_exit", &Application::quick_exit, static_cast<Application*>(&g_app));
     g_lua.bindSingletonFunction("g_app", "isMobile", &Application::isMobile, static_cast<Application*>(&g_app));
+    g_lua.bindSingletonFunction("g_app", "isMobileLite", &Application::isMobileLite, static_cast<Application*>(&g_app));
     g_lua.bindSingletonFunction("g_app", "restart", &Application::restart, static_cast<Application*>(&g_app));
     g_lua.bindSingletonFunction("g_app", "restartArgs", &Application::restartArgs, static_cast<Application*>(&g_app));
 
@@ -392,6 +393,8 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_window", "getDisplayWidth", &PlatformWindow::getDisplayWidth, &g_window);
     g_lua.bindSingletonFunction("g_window", "getDisplayHeight", &PlatformWindow::getDisplayHeight, &g_window);
     g_lua.bindSingletonFunction("g_window", "getDisplayDensity", &PlatformWindow::getDisplayDensity, &g_window);
+    g_lua.bindSingletonFunction("g_window", "setMaxPixelRatio", &PlatformWindow::setMaxPixelRatio, &g_window);
+    g_lua.bindSingletonFunction("g_window", "getMaxPixelRatio", &PlatformWindow::getMaxPixelRatio, &g_window);
     g_lua.bindSingletonFunction("g_window", "getUnmaximizedSize", &PlatformWindow::getUnmaximizedSize, &g_window);
     g_lua.bindSingletonFunction("g_window", "getSize", &PlatformWindow::getSize, &g_window);
     g_lua.bindSingletonFunction("g_window", "getWidth", &PlatformWindow::getWidth, &g_window);
@@ -435,6 +438,8 @@ void Application::registerLuaFunctions()
     g_lua.registerSingletonClass("g_textures");
     g_lua.bindSingletonFunction("g_textures", "preload", &TextureManager::preload, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "clearCache", &TextureManager::clearCache, &g_textures);
+    g_lua.bindSingletonFunction("g_textures", "trimCache", [](int maxIdleSeconds) { return g_textures.trimCache(maxIdleSeconds); });
+    g_lua.bindSingletonFunction("g_textures", "getTextureCount", &TextureManager::getTextureCount, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "unload", &TextureManager::unload, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "reload", &TextureManager::reload, &g_textures);
 

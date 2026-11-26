@@ -218,7 +218,7 @@ Panel
         image-clip: 0 0 27 27
         !tooltip: tr('Open Weapon Proficiency Dialog')
         tooltip-delayed: true
-        @onClick: modules.game_proficiency.requestOpenWindow()
+        @onClick: if modules.game_proficiency and modules.game_proficiency.requestOpenWindow then modules.game_proficiency.requestOpenWindow() end
         $hover !pressed:
           image-clip: 0 0 27 27
         $pressed:

@@ -870,6 +870,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
         m_texturesFramesOriginRects[animationPhase].resize(indexSize);
         m_texturesFramesOffsets[animationPhase].resize(indexSize);
 
+        bool pendingSprites = false;
         for(int z = 0; z < m_numPatternZ; ++z) {
             for(int y = 0; y < m_numPatternY; ++y) {
                 for(int x = 0; x < m_numPatternX; ++x) {
@@ -885,6 +886,8 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                                     uint spriteIndex = getSpriteIndex(w, h, spriteMask ? 1 : l, x, y, z, animationPhase);
                                     ImagePtr spriteImage = g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
                                     if (!spriteImage) {
+                                        if (g_sprites.wasLastSpritePending())
+                                            pendingSprites = true;
                                         continue;
                                     }
                                     Point spritePos = Point(m_size.width() - w - 1,
@@ -913,6 +916,10 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                     }
                 }
             }
+        }
+        if (pendingSprites) {
+            static const TexturePtr emptyTexture;
+            return emptyTexture;
         }
         animationPhaseTexture = std::make_shared<Texture>(fullImage, true, false, false);
         m_loaded = true;
@@ -978,8 +985,11 @@ int ThingType::getExactSize(int layer, int xPattern, int yPattern, int zPattern,
     if(m_null)
         return 0;
 
-    getTexture(animationPhase); // we must calculate it anyway.
+    if (!getTexture(animationPhase))
+        return g_sprites.spriteSize();
     int frameIndex = getTextureIndex(layer, xPattern, yPattern, zPattern);
+    if (frameIndex >= static_cast<int>(m_texturesFramesOriginRects[animationPhase].size()))
+        return g_sprites.spriteSize();
     Size size = m_texturesFramesOriginRects[animationPhase][frameIndex].size() - m_texturesFramesOffsets[animationPhase][frameIndex].toSize();
     return std::max<int>(size.width(), size.height());
 }

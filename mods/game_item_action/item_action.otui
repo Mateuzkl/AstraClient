@@ -14,7 +14,7 @@ ShowItem < UIButton
     show-count: false
     virtual-count: true
     draggable: false
-    @onClick: modules.game_stash.withdrawItem(self)
+    @onClick: if modules.game_stash and modules.game_stash.withdrawItem then modules.game_stash.withdrawItem(self) end
 
 UseItemWarningWindow < NewHeadlessWindow
   size: 400 210
